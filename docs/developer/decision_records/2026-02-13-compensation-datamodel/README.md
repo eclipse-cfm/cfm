@@ -25,13 +25,15 @@ in mind:
 
 On the `OrchestrationDefinition` API, the following changes must be made:
 
-- there is only one `OrchestrationDefinition` for both deploy and dispose orchestration definition
+- there is only one `OrchestrationDefinition` for both deploy and dispose activities
 - the `OrchestrationDefinition` loses the `type` field
-- each activity's `discriminator` field contains a unique and well-defined discriminator value
+- each activity is listed under its appropriate `discriminator`, which is used as key in the map. While there are
+  well-defined discriminator values (`cfm.orchestration.vpa.deploy` and `cfm.orchestration.vpa.dispose`), in the future
+  these discriminators may be extended.
 - necessary checks:
-    - grouping by activity type, there should be exactly one `...deploy` and 1...N `...dispose` activities. A warning is
-      issued if violated. This check can be disabled with a configuration flag.
-    - If an orchestration definition does not contain at least one `...deploy` activity, a warning is issued.
+  - grouping by activity type, each activity `type` should be unique within each group. A warning is issued if
+      violated. This check can be disabled with a configuration flag.
+  - If an orchestration definition does not contain at least one `...deploy` activity, a warning is issued.
 
 The following snippet illustrates the changes to the `OrchestrationDefinition` API data model:
 
@@ -70,49 +72,50 @@ The following snippet illustrates the changes to the `OrchestrationDefinition` A
     "schema": {},
     "id": "random-orchestration-id"
   }
+}
 ```
 
 ### Changes to the internal data model
 
-When converting the `OrchestrationDefinition` internal data model must reflect the changes described above. When
-generating an `Orchestration` from an `OrchestrationDefinition`, the following adaptations must be made:
+When converting the `OrchestrationDefinition` DTO to the internal representation (entity), the changes described above
+must be reflected there. When generating an `Orchestration` from an `OrchestrationDefinition`, the following adaptations
+must be made:
 
 - group all activities by discriminator
 - create a new orchestration definition instance for each group
 - when instantiating an `Orchestration` from an `OrchestrationDefinition`, the `Orchestration` entity gains the
-  `compensationId` field to identify   `deploy` and `dispose` orchestrations. This is necessary to look up the
+  `compensationRefId` field to identify   `deploy` and `dispose` orchestrations. This is necessary to look up the
   rollback-orchestration if a deploy-orchestration fails (fatally).
 
 These changes are illustrated in the following snippets:
 
 ```go
 type Orchestration struct {
-ID                string                  `json:"id"`
-CorrelationID     string                  `json:"correlationId"`
+ID                string                     `json:"id"`
+CorrelationID     string                     `json:"correlationId"`
 //...
-OrchestrationType model.OrchestrationType `json:"orchestrationType"`
-CompensationId    string                  `json:"compensationId" // <-- new field
+OrchestrationType model.OrchestrationType    `json:"orchestrationType"`
+CompensationRefId    string                  `json:"compensationRefId" // <-- new field
 }
 ```
 
 The following pseudocode shows the conversion procedure:
+
 ```go
+refId := uuid.New().String()
 deployActivities := filterActivitiesByDiscriminator(definition.Activities, "cfm.orchestration.vpa.deploy")
-disposeActivities := filterActivitiesByDiscriminator(definition.Activities, "cfm.orchestration.vpa.dispose")
-
-id := uuid.New().String()
-
 deployOchestration := api.Orchestration{
   //...
-  CompensationId: id,
+  CompensationRefId: refId,
   Activities: deployActivities,
   Type:        "cfm.orchestration.vpa.deploy"
 }
 
+disposeActivities := filterActivitiesByDiscriminator(definition.Activities, "cfm.orchestration.vpa.dispose")
 disposeOchestration := api.Orchestration{
-  //...
-  CompensationId: id,
-  Activities: disposeActivities,
-  Type:        "cfm.orchestration.vpa.dispose"
+ //...
+    CompensationRefId: refId,
+    Activities: disposeActivities,
+    Type:        "cfm.orchestration.vpa.dispose"
 }
 ```
