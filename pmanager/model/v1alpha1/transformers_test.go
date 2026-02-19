@@ -82,13 +82,14 @@ func TestToAPIActivityDefinition_NilInput(t *testing.T) {
 
 func TestToOrchestrationDefinition(t *testing.T) {
 	tests := []struct {
-		name                    string
-		orchestrationDefinition *OrchestrationTemplate
-		expected                []*api.OrchestrationDefinition
+		name                  string
+		orchestrationTemplate *OrchestrationTemplate
+		expected              []*api.OrchestrationDefinition
 	}{
 		{
 			name: "complete orchestration definition",
-			orchestrationDefinition: &OrchestrationTemplate{
+			orchestrationTemplate: &OrchestrationTemplate{
+				ID:          "test-template-id",
 				Description: "Test",
 				Schema:      map[string]any{"version": "v1"},
 				Activities: map[string][]ActivityDto{
@@ -114,6 +115,7 @@ func TestToOrchestrationDefinition(t *testing.T) {
 			expected: []*api.OrchestrationDefinition{
 				{
 					Type:        model.OrchestrationType("foo.bar.kubernetes"),
+					TemplateRef: "test-template-id",
 					Description: "Test",
 					Active:      true,
 					Schema:      map[string]any{"version": "v1"},
@@ -133,6 +135,7 @@ func TestToOrchestrationDefinition(t *testing.T) {
 				{
 					Type:        model.OrchestrationType(DefaultActivityDiscriminator),
 					Description: "Test",
+					TemplateRef: "test-template-id",
 					Active:      true,
 					Schema:      map[string]any{"version": "v1"},
 					Activities: []api.Activity{
@@ -149,24 +152,27 @@ func TestToOrchestrationDefinition(t *testing.T) {
 		},
 		{
 			name: "minimal orchestration definition",
-			orchestrationDefinition: &OrchestrationTemplate{
+			orchestrationTemplate: &OrchestrationTemplate{
+				ID:         "test-template-id",
 				Activities: map[string][]ActivityDto{},
 			},
 			expected: []*api.OrchestrationDefinition{
 				{
-					Active:     true,
-					Activities: []api.Activity{},
+					TemplateRef: "test-template-id",
+					Active:      true,
+					Activities:  []api.Activity{},
 				},
 			},
 		},
 		{
-			name:                    "empty orchestration definition",
-			orchestrationDefinition: &OrchestrationTemplate{},
-			expected:                []*api.OrchestrationDefinition{},
+			name:                  "empty orchestration definition",
+			orchestrationTemplate: &OrchestrationTemplate{},
+			expected:              []*api.OrchestrationDefinition{},
 		},
 		{
 			name: "single activity without dependencies",
-			orchestrationDefinition: &OrchestrationTemplate{
+			orchestrationTemplate: &OrchestrationTemplate{
+				ID: "test-template-id",
 				Activities: map[string][]ActivityDto{
 					"local": {{
 						ID:   "standalone-activity",
@@ -178,8 +184,9 @@ func TestToOrchestrationDefinition(t *testing.T) {
 				},
 			},
 			expected: []*api.OrchestrationDefinition{{
-				Type:   model.OrchestrationType("local"),
-				Active: true,
+				TemplateRef: "test-template-id",
+				Type:        model.OrchestrationType("local"),
+				Active:      true,
 				Activities: []api.Activity{
 					{
 						ID:            "standalone-activity",
@@ -196,7 +203,8 @@ func TestToOrchestrationDefinition(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ToOrchestrationDefinition(tt.orchestrationDefinition)
+			id, result := ToOrchestrationDefinition(tt.orchestrationTemplate)
+			assert.NotEmpty(t, id)
 			assert.Equal(t, tt.expected, result)
 			assert.ElementsMatch(t, tt.expected, result)
 		})
@@ -206,7 +214,8 @@ func TestToOrchestrationDefinition(t *testing.T) {
 func TestToAPIOrchestrationDefinition_NilInput(t *testing.T) {
 	// Test that the function handles nil input gracefully
 	assert.NotPanics(t, func() {
-		result := ToOrchestrationDefinition(nil)
+		id, result := ToOrchestrationDefinition(nil)
+		assert.Empty(t, id)
 		assert.Empty(t, result)
 	})
 }

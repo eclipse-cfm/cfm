@@ -74,7 +74,7 @@ func (h *PMHandler) createOrchestrationDefinition(w http.ResponseWriter, req *ht
 		return
 	}
 
-	definitions := v1alpha1.ToOrchestrationDefinition(&orchestrationTemplate)
+	templateRef, definitions := v1alpha1.ToOrchestrationDefinition(&orchestrationTemplate)
 	for _, def := range definitions {
 		_, err := h.definitionManager.CreateOrchestrationDefinition(req.Context(), def)
 		if err != nil {
@@ -83,7 +83,9 @@ func (h *PMHandler) createOrchestrationDefinition(w http.ResponseWriter, req *ht
 		}
 	}
 
-	h.Created(w)
+	h.ResponseCreated(w, struct {
+		ID string `json:"id"`
+	}{ID: templateRef})
 }
 
 func (h *PMHandler) createOrchestration(w http.ResponseWriter, req *http.Request) {
@@ -109,12 +111,12 @@ func (h *PMHandler) health(w http.ResponseWriter, _ *http.Request) {
 	h.ResponseOK(w, response)
 }
 
-func (h *PMHandler) deleteOrchestrationDefinition(w http.ResponseWriter, req *http.Request, oType string) {
+func (h *PMHandler) deleteOrchestrationDefinition(w http.ResponseWriter, req *http.Request, orchestrationType string) {
 	if h.InvalidMethod(w, req, http.MethodDelete) {
 		return
 	}
 
-	err := h.definitionManager.DeleteOrchestrationDefinition(req.Context(), model.OrchestrationType(oType))
+	err := h.definitionManager.DeleteOrchestrationDefinition(req.Context(), model.OrchestrationType(orchestrationType))
 	if err != nil {
 		h.HandleError(w, err)
 		return

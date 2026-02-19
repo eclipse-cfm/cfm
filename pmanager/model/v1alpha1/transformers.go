@@ -13,6 +13,7 @@
 package v1alpha1
 
 import (
+	"github.com/google/uuid"
 	"github.com/metaform/connector-fabric-manager/common/model"
 	"github.com/metaform/connector-fabric-manager/pmanager/api"
 )
@@ -42,9 +43,15 @@ func ToActivityDefinition(definition *ActivityDefinitionDto) *api.ActivityDefini
 }
 
 // ToOrchestrationDefinition converts an OrchestrationTemplate to one or several api.OrchestrationDefinition structures
-func ToOrchestrationDefinition(template *OrchestrationTemplate) []*api.OrchestrationDefinition {
+// and returns the template ref as string
+func ToOrchestrationDefinition(template *OrchestrationTemplate) (string, []*api.OrchestrationDefinition) {
 	if template == nil {
-		return []*api.OrchestrationDefinition{}
+		return "", []*api.OrchestrationDefinition{}
+	}
+
+	templateRef := template.ID
+	if templateRef == "" {
+		templateRef = uuid.New().String()
 	}
 
 	// determine number of orchestrations
@@ -56,6 +63,7 @@ func ToOrchestrationDefinition(template *OrchestrationTemplate) []*api.Orchestra
 			Active:      true,
 			Schema:      template.Schema,
 			Activities:  make([]api.Activity, 0),
+			TemplateRef: templateRef,
 		})
 	}
 
@@ -82,11 +90,12 @@ func ToOrchestrationDefinition(template *OrchestrationTemplate) []*api.Orchestra
 			Active:      true,
 			Schema:      template.Schema,
 			Activities:  convertedActivities,
+			TemplateRef: templateRef,
 		}
 
 		convertedOrchestrationDefs = append(convertedOrchestrationDefs, &orchestrationDef)
 	}
-	return convertedOrchestrationDefs
+	return templateRef, convertedOrchestrationDefs
 }
 
 func ToOrchestrationDefinitionDto(definition *api.OrchestrationDefinition) *OrchestrationDefinitionDto {
