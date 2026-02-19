@@ -41,26 +41,26 @@ func ToActivityDefinition(definition *ActivityDefinitionDto) *api.ActivityDefini
 	}
 }
 
-// ToOrchestrationDefinition converts an OrchestrationDefinitionDto to one or several api.OrchestrationDefinition structures
-func ToOrchestrationDefinition(definition *OrchestrationDefinitionDto) []*api.OrchestrationDefinition {
-	if definition == nil {
+// ToOrchestrationDefinition converts an OrchestrationTemplate to one or several api.OrchestrationDefinition structures
+func ToOrchestrationDefinition(template *OrchestrationTemplate) []*api.OrchestrationDefinition {
+	if template == nil {
 		return []*api.OrchestrationDefinition{}
 	}
 
 	// determine number of orchestrations
 	convertedOrchestrationDefs := make([]*api.OrchestrationDefinition, 0)
 
-	if definition.Activities != nil && len(definition.Activities) == 0 {
+	if template.Activities != nil && len(template.Activities) == 0 {
 		convertedOrchestrationDefs = append(convertedOrchestrationDefs, &api.OrchestrationDefinition{
-			Description: definition.Description,
+			Description: template.Description,
 			Active:      true,
-			Schema:      definition.Schema,
+			Schema:      template.Schema,
 			Activities:  make([]api.Activity, 0),
 		})
 	}
 
 	// generate one api.OrchestrationDefinition for each entry
-	for orchType, activities := range definition.Activities {
+	for orchType, activities := range template.Activities {
 
 		// convert activity DTOs to activities
 		convertedActivities := make([]api.Activity, len(activities))
@@ -75,12 +75,12 @@ func ToOrchestrationDefinition(definition *OrchestrationDefinitionDto) []*api.Or
 			convertedActivities[i] = activity
 		}
 
-		// create orchestration definition
+		// create orchestration template
 		orchestrationDef := api.OrchestrationDefinition{
 			Type:        model.OrchestrationType(orchType),
-			Description: definition.Description,
+			Description: template.Description,
 			Active:      true,
-			Schema:      definition.Schema,
+			Schema:      template.Schema,
 			Activities:  convertedActivities,
 		}
 

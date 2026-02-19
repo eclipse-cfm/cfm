@@ -39,7 +39,7 @@ func CreateTestActivityDefinition(apiClient *ApiClient) error {
 }
 
 func CreateTestOrchestrationDefinitions(apiClient *ApiClient) error {
-	requestBody := pv1alpha1.OrchestrationDefinitionDto{
+	requestBody := pv1alpha1.OrchestrationTemplate{
 		Activities: map[string][]pv1alpha1.ActivityDto{
 			model.VPADeployType.String(): {{
 				ID:   "activity1",
@@ -53,7 +53,7 @@ func CreateTestOrchestrationDefinitions(apiClient *ApiClient) error {
 		return err
 	}
 
-	requestBody = pv1alpha1.OrchestrationDefinitionDto{
+	requestBody = pv1alpha1.OrchestrationTemplate{
 		Activities: map[string][]pv1alpha1.ActivityDto{
 			model.VPADisposeType.String(): {{
 				ID:   "activity1",

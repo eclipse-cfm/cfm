@@ -47,6 +47,13 @@ type OrchestrationDefinitionDto struct {
 	Activities  map[string][]ActivityDto `json:"activities" validate:"required,min=1"`
 }
 
+type OrchestrationTemplate struct {
+	Description string                   `json:"description,omitempty"`
+	Schema      map[string]any           `json:"schema,omitempty"`
+	ID          string                   `json:"id"`
+	Activities  map[string][]ActivityDto `json:"activities" validate:"required,min=1"`
+}
+
 type OrchestrationEntry struct {
 	ID                string                  `json:"id"`
 	CorrelationID     string                  `json:"correlationId"`

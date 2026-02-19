@@ -83,12 +83,12 @@ func TestToAPIActivityDefinition_NilInput(t *testing.T) {
 func TestToOrchestrationDefinition(t *testing.T) {
 	tests := []struct {
 		name                    string
-		orchestrationDefinition *OrchestrationDefinitionDto
+		orchestrationDefinition *OrchestrationTemplate
 		expected                []*api.OrchestrationDefinition
 	}{
 		{
 			name: "complete orchestration definition",
-			orchestrationDefinition: &OrchestrationDefinitionDto{
+			orchestrationDefinition: &OrchestrationTemplate{
 				Description: "Test",
 				Schema:      map[string]any{"version": "v1"},
 				Activities: map[string][]ActivityDto{
@@ -149,7 +149,7 @@ func TestToOrchestrationDefinition(t *testing.T) {
 		},
 		{
 			name: "minimal orchestration definition",
-			orchestrationDefinition: &OrchestrationDefinitionDto{
+			orchestrationDefinition: &OrchestrationTemplate{
 				Activities: map[string][]ActivityDto{},
 			},
 			expected: []*api.OrchestrationDefinition{
@@ -161,12 +161,12 @@ func TestToOrchestrationDefinition(t *testing.T) {
 		},
 		{
 			name:                    "empty orchestration definition",
-			orchestrationDefinition: &OrchestrationDefinitionDto{},
+			orchestrationDefinition: &OrchestrationTemplate{},
 			expected:                []*api.OrchestrationDefinition{},
 		},
 		{
 			name: "single activity without dependencies",
-			orchestrationDefinition: &OrchestrationDefinitionDto{
+			orchestrationDefinition: &OrchestrationTemplate{
 				Activities: map[string][]ActivityDto{
 					"local": {{
 						ID:   "standalone-activity",

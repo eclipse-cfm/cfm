@@ -69,12 +69,12 @@ func (h *PMHandler) createOrchestrationDefinition(w http.ResponseWriter, req *ht
 		return
 	}
 
-	var definition v1alpha1.OrchestrationDefinitionDto
-	if !h.ReadPayload(w, req, &definition) {
+	var orchestrationTemplate v1alpha1.OrchestrationTemplate
+	if !h.ReadPayload(w, req, &orchestrationTemplate) {
 		return
 	}
 
-	definitions := v1alpha1.ToOrchestrationDefinition(&definition)
+	definitions := v1alpha1.ToOrchestrationDefinition(&orchestrationTemplate)
 	for _, def := range definitions {
 		_, err := h.definitionManager.CreateOrchestrationDefinition(req.Context(), def)
 		if err != nil {

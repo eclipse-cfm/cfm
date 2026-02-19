@@ -102,13 +102,13 @@ func generateOrchestrationDefinitionEndpoints(r spec.Generator) {
 	orchestration.Get("",
 		option.Summary("Get Orchestration Definitions"),
 		option.Description("Returns all Orchestration Definitions"),
-		option.Response(http.StatusOK, []v1alpha1.OrchestrationDefinitionDto{}),
+		option.Response(http.StatusOK, []v1alpha1.OrchestrationTemplate{}),
 	)
 
 	orchestration.Post("",
 		option.Summary("Create an Orchestration Definition"),
 		option.Description("Create a new Orchestration Definition"),
-		option.Request(v1alpha1.OrchestrationDefinitionDto{}),
+		option.Request(v1alpha1.OrchestrationTemplate{}),
 		option.Response(http.StatusCreated, nil),
 	)
 
