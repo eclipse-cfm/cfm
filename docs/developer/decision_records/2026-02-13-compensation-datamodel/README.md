@@ -25,17 +25,18 @@ in mind:
 
 On the `OrchestrationDefinition` API, the following changes must be made:
 
-- there is only one `OrchestrationDefinition` for both deploy and dispose activities
-- the `OrchestrationDefinition` loses the `type` field
-- each activity is listed under its appropriate `discriminator`, which is used as key in the map. While there are
-  well-defined discriminator values (`cfm.orchestration.vpa.deploy` and `cfm.orchestration.vpa.dispose`), in the future
-  these discriminators may be extended.
+- introduction of an `OrchestrationTemplate`, that is used to generate `OrchestrationDefinition` objects. It contains a
+  list of activities, grouped by an orchestration type/discriminator.
+- one `OrchestrationDefinition` is created for each orchestration type, containing all relevant activities
+- each activity is listed under its appropriate `orchestrationType`/`discriminator`, which is used as key in the map.
+  While there are well-defined discriminator values (`cfm.orchestration.vpa.deploy` and
+  `cfm.orchestration.vpa.dispose`), in the future these discriminators may be extended.
 - necessary checks:
-  - grouping by activity type, each activity `type` should be unique within each group. A warning is issued if
+    - grouping by activity type, each activity `type` should be unique within each group. A warning is issued if
       violated. This check can be disabled with a configuration flag.
-  - If an orchestration definition does not contain at least one `...deploy` activity, a warning is issued.
+    - If an orchestration template does not contain at least one `...deploy` activity, a warning is issued.
 
-The following snippet illustrates the changes to the `OrchestrationDefinition` API data model:
+The following snippet shows the `OrchestrationTemplate` object:
 
 ```json
 {
@@ -77,9 +78,9 @@ The following snippet illustrates the changes to the `OrchestrationDefinition` A
 
 ### Changes to the internal data model
 
-When converting the `OrchestrationDefinition` DTO to the internal representation (entity), the changes described above
-must be reflected there. When generating an `Orchestration` from an `OrchestrationDefinition`, the following adaptations
-must be made:
+When converting the `OrchestrationTemplate` DTO to the internal representation (`OrchestrationDefinition` entity),
+the changes described above must be reflected there. When generating an `Orchestration` from an
+`OrchestrationDefinition`, the following adaptations must be made:
 
 - group all activities by discriminator
 - create a new orchestration definition instance for each group
@@ -105,17 +106,17 @@ The following pseudocode shows the conversion procedure:
 refId := uuid.New().String()
 deployActivities := filterActivitiesByDiscriminator(definition.Activities, "cfm.orchestration.vpa.deploy")
 deployOchestration := api.Orchestration{
-  //...
-  CompensationRefId: refId,
-  Activities: deployActivities,
-  Type:        "cfm.orchestration.vpa.deploy"
+//...
+CompensationRefId: refId,
+Activities: deployActivities,
+Type:        "cfm.orchestration.vpa.deploy"
 }
 
 disposeActivities := filterActivitiesByDiscriminator(definition.Activities, "cfm.orchestration.vpa.dispose")
 disposeOchestration := api.Orchestration{
- //...
-    CompensationRefId: refId,
-    Activities: disposeActivities,
-    Type:        "cfm.orchestration.vpa.dispose"
+//...
+CompensationRefId: refId,
+Activities: disposeActivities,
+Type:        "cfm.orchestration.vpa.dispose"
 }
 ```
