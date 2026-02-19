@@ -29,7 +29,7 @@ func main() {
 	r := spec.NewRouter(
 		option.WithTitle("Provision Manager API"),
 		option.WithVersion("0.0.1"),
-		option.WithDescription("API for managing Orchestrations, Orchestration Definitions, and Activity Definitions"),
+		option.WithDescription("API for managing Orchestrations, Orchestration Definitions, and ActivityDto Definitions"),
 		option.WithServer("http://localhost:8080", option.ServerDescription("Development server")),
 	)
 
@@ -77,21 +77,21 @@ func generateActivityDefinitionEndpoints(r spec.Generator) {
 	activity := r.Group("/api/v1alpha1/activity-definitions")
 
 	activity.Get("",
-		option.Summary("Get Activity Definitions"),
-		option.Description("Returns all Activity Definitions"),
-		option.Response(http.StatusOK, []v1alpha1.ActivityDefinition{}),
+		option.Summary("Get ActivityDto Definitions"),
+		option.Description("Returns all ActivityDto Definitions"),
+		option.Response(http.StatusOK, []v1alpha1.ActivityDefinitionDto{}),
 	)
 
 	activity.Post("",
-		option.Summary("Create an Activity Definition"),
-		option.Description("Create a new Activity Definition"),
-		option.Request(v1alpha1.ActivityDefinition{}),
+		option.Summary("Create an ActivityDto Definition"),
+		option.Description("Create a new ActivityDto Definition"),
+		option.Request(v1alpha1.ActivityDefinitionDto{}),
 		option.Response(http.StatusCreated, nil),
 	)
 
 	activity.Delete("/{type}",
-		option.Summary("Delete an Activity Definition"),
-		option.Description("Delete a new Activity Definition"),
+		option.Summary("Delete an ActivityDto Definition"),
+		option.Description("Delete a new ActivityDto Definition"),
 		option.Request(new(TypeParam)),
 		option.Response(http.StatusOK, nil))
 }
@@ -102,13 +102,13 @@ func generateOrchestrationDefinitionEndpoints(r spec.Generator) {
 	orchestration.Get("",
 		option.Summary("Get Orchestration Definitions"),
 		option.Description("Returns all Orchestration Definitions"),
-		option.Response(http.StatusOK, []v1alpha1.OrchestrationDefinition{}),
+		option.Response(http.StatusOK, []v1alpha1.OrchestrationDefinitionDto{}),
 	)
 
 	orchestration.Post("",
 		option.Summary("Create an Orchestration Definition"),
 		option.Description("Create a new Orchestration Definition"),
-		option.Request(v1alpha1.OrchestrationDefinition{}),
+		option.Request(v1alpha1.OrchestrationDefinitionDto{}),
 		option.Response(http.StatusCreated, nil),
 	)
 

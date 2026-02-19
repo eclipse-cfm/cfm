@@ -44,7 +44,7 @@ func Test_VerifyDefinitionOperations(t *testing.T) {
 	waitTManager(t, client)
 	waitPManager(t, client)
 
-	var activityDefinitions []v1alpha1.ActivityDefinition
+	var activityDefinitions []v1alpha1.ActivityDefinitionDto
 
 	err = e2efixtures.CreateTestActivityDefinition(client)
 	require.NoError(t, err)
@@ -56,7 +56,7 @@ func Test_VerifyDefinitionOperations(t *testing.T) {
 	err = e2efixtures.CreateTestOrchestrationDefinitions(client)
 	require.NoError(t, err)
 
-	var orchestrationDefinitions []v1alpha1.OrchestrationDefinition
+	var orchestrationDefinitions []v1alpha1.OrchestrationDefinitionDto
 	err = client.GetPManager("orchestration-definitions", &orchestrationDefinitions)
 	require.NoError(t, err)
 	assert.Equal(t, 2, len(orchestrationDefinitions))
@@ -69,8 +69,11 @@ func Test_VerifyDefinitionOperations(t *testing.T) {
 	}
 
 	for _, definition := range orchestrationDefinitions {
-		err = client.DeleteToPManager(fmt.Sprintf("orchestration-definitions/%s", definition.Type))
-		require.NoError(t, err)
+		for key := range definition.Activities {
+			err = client.DeleteToPManager(fmt.Sprintf("orchestration-definitions/%s", key))
+			require.NoError(t, err)
+		}
+
 	}
 
 	orchestrationDefinitions = nil

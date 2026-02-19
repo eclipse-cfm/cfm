@@ -18,19 +18,22 @@ import (
 	"github.com/metaform/connector-fabric-manager/common/model"
 )
 
-type ActivityDefinition struct {
+const (
+	DefaultActivityDiscriminator = "default"
+)
+
+type ActivityDefinitionDto struct {
 	Type         string         `json:"type" validate:"required,modeltype"`
 	Description  string         `json:"description,omitempty"`
 	InputSchema  map[string]any `json:"inputSchema,omitempty"`
 	OutputSchema map[string]any `json:"outputSchema,omitempty"`
 }
 
-type Activity struct {
-	ID            string         `json:"id" validate:"required"`
-	Type          string         `json:"type" validate:"required,modeltype"`
-	Discriminator string         `json:"discriminator" validate:"false"`
-	Inputs        []MappingEntry `json:"inputs,omitempty"`
-	DependsOn     []string       `json:"dependsOn,omitempty"`
+type ActivityDto struct {
+	ID        string         `json:"id" validate:"required"`
+	Type      string         `json:"type" validate:"required,modeltype"`
+	Inputs    []MappingEntry `json:"inputs,omitempty"`
+	DependsOn []string       `json:"dependsOn,omitempty"`
 }
 
 type MappingEntry struct {
@@ -38,11 +41,10 @@ type MappingEntry struct {
 	Target string `json:"target" validate:"required"`
 }
 
-type OrchestrationDefinition struct {
-	Type        string         `json:"type" validate:"required,modeltype"`
-	Description string         `json:"description,omitempty"`
-	Schema      map[string]any `json:"schema,omitempty"`
-	Activities  []Activity     `json:"activities" validate:"required,min=1"`
+type OrchestrationDefinitionDto struct {
+	Description string                   `json:"description,omitempty"`
+	Schema      map[string]any           `json:"schema,omitempty"`
+	Activities  map[string][]ActivityDto `json:"activities" validate:"required,min=1"`
 }
 
 type OrchestrationEntry struct {
@@ -68,5 +70,5 @@ type Orchestration struct {
 }
 
 type OrchestrationStep struct {
-	Activities []Activity `json:"activities"`
+	Activities []ActivityDto `json:"activities"`
 }

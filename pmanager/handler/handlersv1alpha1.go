@@ -50,12 +50,12 @@ func (h *PMHandler) createActivityDefinition(w http.ResponseWriter, req *http.Re
 		return
 	}
 
-	var definition v1alpha1.ActivityDefinition
+	var definition v1alpha1.ActivityDefinitionDto
 	if !h.ReadPayload(w, req, &definition) {
 		return
 	}
 
-	_, err := h.definitionManager.CreateActivityDefinition(req.Context(), v1alpha1.ToAPIActivityDefinition(&definition))
+	_, err := h.definitionManager.CreateActivityDefinition(req.Context(), v1alpha1.ToActivityDefinition(&definition))
 	if err != nil {
 		h.HandleError(w, err)
 		return
@@ -69,15 +69,18 @@ func (h *PMHandler) createOrchestrationDefinition(w http.ResponseWriter, req *ht
 		return
 	}
 
-	var definition v1alpha1.OrchestrationDefinition
+	var definition v1alpha1.OrchestrationDefinitionDto
 	if !h.ReadPayload(w, req, &definition) {
 		return
 	}
 
-	_, err := h.definitionManager.CreateOrchestrationDefinition(req.Context(), v1alpha1.ToAPIOrchestrationDefinition(&definition))
-	if err != nil {
-		h.HandleError(w, err)
-		return
+	definitions := v1alpha1.ToOrchestrationDefinition(&definition)
+	for _, def := range definitions {
+		_, err := h.definitionManager.CreateOrchestrationDefinition(req.Context(), def)
+		if err != nil {
+			h.HandleError(w, err)
+			return
+		}
 	}
 
 	h.Created(w)
@@ -171,9 +174,9 @@ func (h *PMHandler) getActivityDefinitions(w http.ResponseWriter, req *http.Requ
 		h.HandleError(w, err)
 		return
 	}
-	converted := make([]v1alpha1.ActivityDefinition, len(definitions))
+	converted := make([]v1alpha1.ActivityDefinitionDto, len(definitions))
 	for i, def := range definitions {
-		converted[i] = *v1alpha1.ToActivityDefinition(&def)
+		converted[i] = *v1alpha1.ToActivityDefinitionDto(&def)
 	}
 
 	h.ResponseOK(w, converted)
@@ -188,9 +191,9 @@ func (h *PMHandler) getOrchestrationDefinitions(w http.ResponseWriter, req *http
 		h.HandleError(w, err)
 		return
 	}
-	converted := make([]v1alpha1.OrchestrationDefinition, len(definitions))
+	converted := make([]v1alpha1.OrchestrationDefinitionDto, len(definitions))
 	for i, def := range definitions {
-		converted[i] = *v1alpha1.ToOrchestrationDefinition(&def)
+		converted[i] = *v1alpha1.ToOrchestrationDefinitionDto(&def)
 	}
 
 	h.ResponseOK(w, converted)

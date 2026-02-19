@@ -17,11 +17,11 @@ import (
 	"github.com/metaform/connector-fabric-manager/pmanager/api"
 )
 
-func ToActivityDefinition(definition *api.ActivityDefinition) *ActivityDefinition {
+func ToActivityDefinitionDto(definition *api.ActivityDefinition) *ActivityDefinitionDto {
 	if definition == nil {
-		return &ActivityDefinition{}
+		return &ActivityDefinitionDto{}
 	}
-	return &ActivityDefinition{
+	return &ActivityDefinitionDto{
 		Type:         string(definition.Type),
 		Description:  definition.Description,
 		InputSchema:  definition.InputSchema,
@@ -29,7 +29,7 @@ func ToActivityDefinition(definition *api.ActivityDefinition) *ActivityDefinitio
 	}
 }
 
-func ToAPIActivityDefinition(definition *ActivityDefinition) *api.ActivityDefinition {
+func ToActivityDefinition(definition *ActivityDefinitionDto) *api.ActivityDefinition {
 	if definition == nil {
 		return &api.ActivityDefinition{}
 	}
@@ -41,50 +41,75 @@ func ToAPIActivityDefinition(definition *ActivityDefinition) *api.ActivityDefini
 	}
 }
 
-func ToAPIOrchestrationDefinition(definition *OrchestrationDefinition) *api.OrchestrationDefinition {
+// ToOrchestrationDefinition converts an OrchestrationDefinitionDto to one or several api.OrchestrationDefinition structures
+func ToOrchestrationDefinition(definition *OrchestrationDefinitionDto) []*api.OrchestrationDefinition {
 	if definition == nil {
-		return &api.OrchestrationDefinition{}
-	}
-	apiActivities := make([]api.Activity, len(definition.Activities))
-	for i, activity := range definition.Activities {
-		apiActivities[i] = api.Activity{
-			ID:            activity.ID,
-			Type:          api.ActivityType(activity.Type),
-			Discriminator: api.Discriminator(activity.Discriminator),
-			Inputs:        ToAPIMappingEntries(activity.Inputs),
-			DependsOn:     activity.DependsOn,
-		}
+		return []*api.OrchestrationDefinition{}
 	}
 
-	return &api.OrchestrationDefinition{
-		Type:        model.OrchestrationType(definition.Type),
-		Description: definition.Description,
-		Active:      true, // Default to active as the model doesn't have this field
-		Schema:      definition.Schema,
-		Activities:  apiActivities,
+	// determine number of orchestrations
+	convertedOrchestrationDefs := make([]*api.OrchestrationDefinition, 0)
+
+	if definition.Activities != nil && len(definition.Activities) == 0 {
+		convertedOrchestrationDefs = append(convertedOrchestrationDefs, &api.OrchestrationDefinition{
+			Description: definition.Description,
+			Active:      true,
+			Schema:      definition.Schema,
+			Activities:  make([]api.Activity, 0),
+		})
 	}
+
+	// generate one api.OrchestrationDefinition for each entry
+	for orchType, activities := range definition.Activities {
+
+		// convert activity DTOs to activities
+		convertedActivities := make([]api.Activity, len(activities))
+		for i, activityDto := range activities {
+			activity := api.Activity{
+				ID:            activityDto.ID,
+				Type:          api.ActivityType(activityDto.Type),
+				Discriminator: api.Discriminator(orchType),
+				Inputs:        ToAPIMappingEntries(activityDto.Inputs),
+				DependsOn:     activityDto.DependsOn,
+			}
+			convertedActivities[i] = activity
+		}
+
+		// create orchestration definition
+		orchestrationDef := api.OrchestrationDefinition{
+			Type:        model.OrchestrationType(orchType),
+			Description: definition.Description,
+			Active:      true,
+			Schema:      definition.Schema,
+			Activities:  convertedActivities,
+		}
+
+		convertedOrchestrationDefs = append(convertedOrchestrationDefs, &orchestrationDef)
+	}
+	return convertedOrchestrationDefs
 }
 
-func ToOrchestrationDefinition(definition *api.OrchestrationDefinition) *OrchestrationDefinition {
+func ToOrchestrationDefinitionDto(definition *api.OrchestrationDefinition) *OrchestrationDefinitionDto {
 	if definition == nil {
-		return &OrchestrationDefinition{}
-	}
-	apiActivities := make([]Activity, len(definition.Activities))
-	for i, activity := range definition.Activities {
-		apiActivities[i] = Activity{
-			ID:            activity.ID,
-			Type:          string(activity.Type),
-			Discriminator: string(activity.Discriminator),
-			Inputs:        ToMappingEntries(activity.Inputs),
-			DependsOn:     activity.DependsOn,
-		}
+		return &OrchestrationDefinitionDto{}
 	}
 
-	return &OrchestrationDefinition{
-		Type:        string(definition.Type),
+	// for each individual activity discriminator, create one map entry
+	convertedActivities := make(map[string][]ActivityDto)
+
+	for _, activity := range definition.Activities {
+		convertedActivities[activity.Discriminator.String()] = append(convertedActivities[activity.Discriminator.String()], ActivityDto{
+			ID:        activity.ID,
+			Type:      string(activity.Type),
+			Inputs:    ToMappingEntries(activity.Inputs),
+			DependsOn: activity.DependsOn,
+		})
+	}
+
+	return &OrchestrationDefinitionDto{
 		Description: definition.Description,
 		Schema:      definition.Schema,
-		Activities:  apiActivities,
+		Activities:  convertedActivities,
 	}
 }
 
@@ -146,15 +171,14 @@ func toSteps(steps []api.OrchestrationStep) []OrchestrationStep {
 	return result
 }
 
-func toActivities(activities []api.Activity) []Activity {
-	result := make([]Activity, len(activities))
+func toActivities(activities []api.Activity) []ActivityDto {
+	result := make([]ActivityDto, len(activities))
 	for i, activity := range activities {
-		result[i] = Activity{
-			ID:            activity.ID,
-			Type:          string(activity.Type),
-			Discriminator: string(activity.Discriminator),
-			Inputs:        toMappingEntries(activity.Inputs),
-			DependsOn:     activity.DependsOn,
+		result[i] = ActivityDto{
+			ID:        activity.ID,
+			Type:      string(activity.Type),
+			Inputs:    toMappingEntries(activity.Inputs),
+			DependsOn: activity.DependsOn,
 		}
 	}
 	return result
