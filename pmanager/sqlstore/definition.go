@@ -44,7 +44,7 @@ func newPostgresDefinitionStore() api.DefinitionStore {
 }
 
 func newOrchestrationStore() store.EntityStore[*api.OrchestrationDefinition] {
-	columnNames := []string{"id", "type", "version", "description", "active", "schema", "activities"}
+	columnNames := []string{"id", "type", "version", "description", "active", "schema", "activities", "templateref"}
 	builder := sqlstore.NewPostgresJSONBBuilder().WithJSONBFieldTypes(map[string]sqlstore.JSONBFieldType{
 		"schema":     sqlstore.JSONBFieldTypeArrayOfObjects,
 		"activities": sqlstore.JSONBFieldTypeArrayOfObjects,
@@ -273,6 +273,7 @@ func orchestrationEntityToRecord(definition *api.OrchestrationDefinition) (*sqls
 	record.Values["version"] = definition.Version
 	record.Values["description"] = definition.Description
 	record.Values["active"] = definition.Active
+	record.Values["templateref"] = definition.TemplateRef
 
 	if definition.Schema != nil {
 		bytes, err := json.Marshal(definition.Schema)
@@ -329,6 +330,12 @@ func recordToOrchestrationEntity(tx *sql.Tx, record *sqlstore.DatabaseRecord) (*
 		if err := json.Unmarshal(bytes, &definition.Activities); err != nil {
 			return nil, err
 		}
+	}
+
+	if templateref, ok := record.Values["templateref"].(string); ok {
+		definition.TemplateRef = templateref
+	} else {
+		return nil, fmt.Errorf("invalid orchestration definition templateref reading record")
 	}
 	return definition, nil
 }

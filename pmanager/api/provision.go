@@ -147,7 +147,7 @@ type ActivityContext interface {
 
 type DefinitionManager interface {
 	CreateOrchestrationDefinition(ctx context.Context, definition *OrchestrationDefinition) (*OrchestrationDefinition, error)
-	DeleteOrchestrationDefinition(ctx context.Context, atype model.OrchestrationType) error
+	DeleteOrchestrationDefinition(ctx context.Context, templateRef string) error
 	GetOrchestrationDefinitions(ctx context.Context) ([]OrchestrationDefinition, error)
 
 	CreateActivityDefinition(ctx context.Context, definition *ActivityDefinition) (*ActivityDefinition, error)

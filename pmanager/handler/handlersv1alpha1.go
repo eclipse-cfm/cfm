@@ -111,12 +111,12 @@ func (h *PMHandler) health(w http.ResponseWriter, _ *http.Request) {
 	h.ResponseOK(w, response)
 }
 
-func (h *PMHandler) deleteOrchestrationDefinition(w http.ResponseWriter, req *http.Request, orchestrationType string) {
+func (h *PMHandler) deleteOrchestrationDefinition(w http.ResponseWriter, req *http.Request, templateRef string) {
 	if h.InvalidMethod(w, req, http.MethodDelete) {
 		return
 	}
 
-	err := h.definitionManager.DeleteOrchestrationDefinition(req.Context(), model.OrchestrationType(orchestrationType))
+	err := h.definitionManager.DeleteOrchestrationDefinition(req.Context(), templateRef)
 	if err != nil {
 		h.HandleError(w, err)
 		return

@@ -49,7 +49,8 @@ func createOrchestrationDefinitionsTable(db *sql.DB) error {
 			description TEXT,
 			active BOOLEAN DEFAULT FALSE,
 			"schema" JSONB,
-			activities JSONB
+			activities JSONB,
+		    templateref TEXT
 		);
 		CREATE INDEX IF NOT EXISTS idx_orchestration_type ON orchestration_definitions(TYPE)
 	`, cfmOrchestrationDefinitionsTable))

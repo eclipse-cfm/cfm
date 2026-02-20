@@ -119,6 +119,7 @@ func ToOrchestrationDefinitionDto(definition *api.OrchestrationDefinition) *Orch
 		Description: definition.Description,
 		Schema:      definition.Schema,
 		Activities:  convertedActivities,
+		TemplateRef: definition.TemplateRef,
 	}
 }
 

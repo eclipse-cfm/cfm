@@ -45,18 +45,8 @@ func CreateTestOrchestrationDefinitions(apiClient *ApiClient) error {
 				ID:   "activity1",
 				Type: "test-activity",
 			}},
-		},
-	}
-
-	err := apiClient.PostToPManager("orchestration-definitions", requestBody)
-	if err != nil {
-		return err
-	}
-
-	requestBody = pv1alpha1.OrchestrationTemplate{
-		Activities: map[string][]pv1alpha1.ActivityDto{
 			model.VPADisposeType.String(): {{
-				ID:   "activity1",
+				ID:   "activity2",
 				Type: "test-activity",
 			}},
 		},

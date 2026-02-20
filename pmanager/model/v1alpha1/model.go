@@ -45,6 +45,7 @@ type OrchestrationDefinitionDto struct {
 	Description string                   `json:"description,omitempty"`
 	Schema      map[string]any           `json:"schema,omitempty"`
 	Activities  map[string][]ActivityDto `json:"activities" validate:"required,min=1"`
+	TemplateRef string
 }
 
 type OrchestrationTemplate struct {
