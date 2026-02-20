@@ -83,9 +83,7 @@ func (h *PMHandler) createOrchestrationDefinition(w http.ResponseWriter, req *ht
 		}
 	}
 
-	h.ResponseCreated(w, struct {
-		ID string `json:"id"`
-	}{ID: templateRef})
+	h.ResponseCreated(w, v1alpha1.IDResponse{ID: templateRef, Description: "ID of the Orchestration Template"})
 }
 
 func (h *PMHandler) createOrchestration(w http.ResponseWriter, req *http.Request) {
@@ -199,4 +197,16 @@ func (h *PMHandler) getOrchestrationDefinitions(w http.ResponseWriter, req *http
 	}
 
 	h.ResponseOK(w, converted)
+}
+
+func (h *PMHandler) getOrchestrationDefinitionsByTemplate(w http.ResponseWriter, req *http.Request, templateRef string) {
+	if h.InvalidMethod(w, req, http.MethodGet) {
+		return
+	}
+	w.WriteHeader(http.StatusNotImplemented)
+	_, err := w.Write([]byte("Getting OrchestrationDefinitions by templateRef is not yet implemented!"))
+	if err != nil {
+		return
+	}
+
 }

@@ -110,13 +110,20 @@ func (h *HandlerServiceAssembly) registerOrchestrationDefinitionRoutes(router ch
 	router.Route("/orchestration-definitions", func(r chi.Router) {
 		r.Get("/", handler.getOrchestrationDefinitions)
 		r.Post("/", handler.createOrchestrationDefinition)
-		r.Route("/{templateRef}", func(r chi.Router) {
+		r.Route("/{templateRef}", func(r chi.Router) { // delete-by-template-id
 			r.Delete("/", func(w http.ResponseWriter, req *http.Request) {
 				templateRef, found := handler.ExtractPathVariable(w, req, "templateRef")
 				if !found {
 					return
 				}
 				handler.deleteOrchestrationDefinition(w, req, templateRef)
+			})
+			r.Get("/", func(w http.ResponseWriter, request *http.Request) {
+				templateRef, found := handler.ExtractPathVariable(w, request, "templateRef")
+				if !found {
+					return
+				}
+				handler.getOrchestrationDefinitionsByTemplate(w, request, templateRef)
 			})
 		})
 	})
