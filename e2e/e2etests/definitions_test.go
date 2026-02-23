@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"testing"
 
+	. "github.com/metaform/connector-fabric-manager/common/collection"
 	"github.com/metaform/connector-fabric-manager/common/natsfixtures"
 	"github.com/metaform/connector-fabric-manager/common/sqlstore"
 	"github.com/metaform/connector-fabric-manager/e2e/e2efixtures"
@@ -44,7 +45,7 @@ func Test_VerifyDefinitionOperations(t *testing.T) {
 	waitTManager(t, client)
 	waitPManager(t, client)
 
-	var activityDefinitions []v1alpha1.ActivityDefinition
+	var activityDefinitions []v1alpha1.ActivityDefinitionDto
 
 	err = e2efixtures.CreateTestActivityDefinition(client)
 	require.NoError(t, err)
@@ -56,7 +57,7 @@ func Test_VerifyDefinitionOperations(t *testing.T) {
 	err = e2efixtures.CreateTestOrchestrationDefinitions(client)
 	require.NoError(t, err)
 
-	var orchestrationDefinitions []v1alpha1.OrchestrationDefinition
+	var orchestrationDefinitions []v1alpha1.OrchestrationDefinitionDto
 	err = client.GetPManager("orchestration-definitions", &orchestrationDefinitions)
 	require.NoError(t, err)
 	assert.Equal(t, 2, len(orchestrationDefinitions))
@@ -68,8 +69,23 @@ func Test_VerifyDefinitionOperations(t *testing.T) {
 		require.Contains(t, err.Error(), "referenced by an orchestration definition")
 	}
 
-	for _, definition := range orchestrationDefinitions {
-		err = client.DeleteToPManager(fmt.Sprintf("orchestration-definitions/%s", definition.Type))
+	keys := Distinct(Map(From(orchestrationDefinitions), func(o v1alpha1.OrchestrationDefinitionDto) string {
+		return o.TemplateRef
+	}))
+
+	keySlice := Collect(keys)
+	assert.Len(t, keySlice, 1)
+
+	// assert getting orch-defs by template-ref
+	key := keySlice[0]
+
+	err = client.GetPManager(fmt.Sprintf("orchestration-definitions/%s", key), &orchestrationDefinitions)
+	require.NoError(t, err)
+	assert.Len(t, orchestrationDefinitions, 2)
+
+	// delete all orch-defs by templateRef
+	for key := range keys {
+		err = client.DeleteToPManager(fmt.Sprintf("orchestration-definitions/%s", key))
 		require.NoError(t, err)
 	}
 

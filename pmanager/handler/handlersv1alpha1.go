@@ -15,6 +15,7 @@ package handler
 import (
 	"net/http"
 
+	. "github.com/metaform/connector-fabric-manager/common/collection"
 	"github.com/metaform/connector-fabric-manager/common/handler"
 	"github.com/metaform/connector-fabric-manager/common/model"
 	"github.com/metaform/connector-fabric-manager/common/store"
@@ -50,12 +51,12 @@ func (h *PMHandler) createActivityDefinition(w http.ResponseWriter, req *http.Re
 		return
 	}
 
-	var definition v1alpha1.ActivityDefinition
+	var definition v1alpha1.ActivityDefinitionDto
 	if !h.ReadPayload(w, req, &definition) {
 		return
 	}
 
-	_, err := h.definitionManager.CreateActivityDefinition(req.Context(), v1alpha1.ToAPIActivityDefinition(&definition))
+	_, err := h.definitionManager.CreateActivityDefinition(req.Context(), v1alpha1.ToActivityDefinition(&definition))
 	if err != nil {
 		h.HandleError(w, err)
 		return
@@ -69,18 +70,21 @@ func (h *PMHandler) createOrchestrationDefinition(w http.ResponseWriter, req *ht
 		return
 	}
 
-	var definition v1alpha1.OrchestrationDefinition
-	if !h.ReadPayload(w, req, &definition) {
+	var orchestrationTemplate v1alpha1.OrchestrationTemplate
+	if !h.ReadPayload(w, req, &orchestrationTemplate) {
 		return
 	}
 
-	_, err := h.definitionManager.CreateOrchestrationDefinition(req.Context(), v1alpha1.ToAPIOrchestrationDefinition(&definition))
-	if err != nil {
-		h.HandleError(w, err)
-		return
+	templateRef, definitions := v1alpha1.ToOrchestrationDefinition(&orchestrationTemplate)
+	for _, def := range definitions {
+		_, err := h.definitionManager.CreateOrchestrationDefinition(req.Context(), def)
+		if err != nil {
+			h.HandleError(w, err)
+			return
+		}
 	}
 
-	h.Created(w)
+	h.ResponseCreated(w, v1alpha1.IDResponse{ID: templateRef, Description: "ID of the Orchestration Template"})
 }
 
 func (h *PMHandler) createOrchestration(w http.ResponseWriter, req *http.Request) {
@@ -106,12 +110,12 @@ func (h *PMHandler) health(w http.ResponseWriter, _ *http.Request) {
 	h.ResponseOK(w, response)
 }
 
-func (h *PMHandler) deleteOrchestrationDefinition(w http.ResponseWriter, req *http.Request, oType string) {
+func (h *PMHandler) deleteOrchestrationDefinition(w http.ResponseWriter, req *http.Request, templateRef string) {
 	if h.InvalidMethod(w, req, http.MethodDelete) {
 		return
 	}
 
-	err := h.definitionManager.DeleteOrchestrationDefinition(req.Context(), model.OrchestrationType(oType))
+	err := h.definitionManager.DeleteOrchestrationDefinition(req.Context(), templateRef)
 	if err != nil {
 		h.HandleError(w, err)
 		return
@@ -171,9 +175,9 @@ func (h *PMHandler) getActivityDefinitions(w http.ResponseWriter, req *http.Requ
 		h.HandleError(w, err)
 		return
 	}
-	converted := make([]v1alpha1.ActivityDefinition, len(definitions))
+	converted := make([]v1alpha1.ActivityDefinitionDto, len(definitions))
 	for i, def := range definitions {
-		converted[i] = *v1alpha1.ToActivityDefinition(&def)
+		converted[i] = *v1alpha1.ToActivityDefinitionDto(&def)
 	}
 
 	h.ResponseOK(w, converted)
@@ -188,10 +192,28 @@ func (h *PMHandler) getOrchestrationDefinitions(w http.ResponseWriter, req *http
 		h.HandleError(w, err)
 		return
 	}
-	converted := make([]v1alpha1.OrchestrationDefinition, len(definitions))
+	converted := make([]v1alpha1.OrchestrationDefinitionDto, len(definitions))
 	for i, def := range definitions {
-		converted[i] = *v1alpha1.ToOrchestrationDefinition(&def)
+		converted[i] = *v1alpha1.ToOrchestrationDefinitionDto(&def)
 	}
 
 	h.ResponseOK(w, converted)
+}
+
+func (h *PMHandler) getOrchestrationDefinitionsByTemplate(w http.ResponseWriter, req *http.Request, templateRef string) {
+	if h.InvalidMethod(w, req, http.MethodGet) {
+		return
+	}
+
+	defs, err := h.definitionManager.GetOrchestrationDefinitionsByTemplate(req.Context(), templateRef)
+	if err != nil {
+		h.HandleError(w, err)
+		return
+	}
+
+	dtos := Collect(Map(From(defs), func(def api.OrchestrationDefinition) v1alpha1.OrchestrationDefinitionDto {
+		return *v1alpha1.ToOrchestrationDefinitionDto(&def)
+	}))
+
+	h.ResponseOK(w, dtos)
 }

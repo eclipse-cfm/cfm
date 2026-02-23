@@ -39,15 +39,17 @@ func TestPostgresDefinitionStore_FindOrchestrationDefinition(t *testing.T) {
 		Version:     1,
 		Description: "Test provisioning orchestration",
 		Active:      true,
+		TemplateRef: "template1",
 	}
 
 	_, err := testDB.Exec(
-		"INSERT INTO orchestration_definitions (id, type, version, description, active) VALUES ($1, $2, $3, $4, $5)",
+		"INSERT INTO orchestration_definitions (id, type, version, description, active,templateref) VALUES ($1, $2, $3, $4, $5, $6)",
 		definition.Type,
 		definition.Type,
 		definition.Version,
 		definition.Description,
 		definition.Active,
+		definition.TemplateRef,
 	)
 	require.NoError(t, err)
 

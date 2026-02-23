@@ -49,7 +49,7 @@ func main() {
 }
 
 func generateOrchestrationEndpoints(r spec.Generator) {
-	orchestrations := r.Group("/api/v1alpha1/orchestrations")
+	orchestrations := r.Group("/api/v1alpha1/orchestrations", option.GroupTags("Orchestration"))
 
 	orchestrations.Post("",
 		option.Summary("Execute an Orchestration"),
@@ -74,18 +74,18 @@ func generateOrchestrationEndpoints(r spec.Generator) {
 }
 
 func generateActivityDefinitionEndpoints(r spec.Generator) {
-	activity := r.Group("/api/v1alpha1/activity-definitions")
+	activity := r.Group("/api/v1alpha1/activity-definitions", option.GroupTags("ActivityDefinition"))
 
 	activity.Get("",
 		option.Summary("Get Activity Definitions"),
 		option.Description("Returns all Activity Definitions"),
-		option.Response(http.StatusOK, []v1alpha1.ActivityDefinition{}),
+		option.Response(http.StatusOK, []v1alpha1.ActivityDefinitionDto{}),
 	)
 
 	activity.Post("",
 		option.Summary("Create an Activity Definition"),
 		option.Description("Create a new Activity Definition"),
-		option.Request(v1alpha1.ActivityDefinition{}),
+		option.Request(v1alpha1.ActivityDefinitionDto{}),
 		option.Response(http.StatusCreated, nil),
 	)
 
@@ -97,31 +97,45 @@ func generateActivityDefinitionEndpoints(r spec.Generator) {
 }
 
 func generateOrchestrationDefinitionEndpoints(r spec.Generator) {
-	orchestration := r.Group("/api/v1alpha1/orchestration-definitions")
+	orchestration := r.Group("/api/v1alpha1/orchestration-definitions", option.GroupTags("OrchestrationDefinition"))
 
 	orchestration.Get("",
 		option.Summary("Get Orchestration Definitions"),
 		option.Description("Returns all Orchestration Definitions"),
-		option.Response(http.StatusOK, []v1alpha1.OrchestrationDefinition{}),
+		option.Response(http.StatusOK, []v1alpha1.OrchestrationTemplate{}),
 	)
+
+	orchestration.Get("/{templateRef}",
+		option.Request(new(TemplateRefParam)),
+		option.Summary("Get all Orchestration Definitions by template ID"),
+		option.Description("Get all Orchestration Definitions that were generated based on the given template ID"),
+		option.Response(http.StatusOK, []v1alpha1.OrchestrationDefinitionDto{}),
+		option.Response(http.StatusNotFound, nil, option.ContentDescription("No OrchestrationDefinition "+
+			"with the given `templateRef` was found")))
 
 	orchestration.Post("",
-		option.Summary("Create an Orchestration Definition"),
-		option.Description("Create a new Orchestration Definition"),
-		option.Request(v1alpha1.OrchestrationDefinition{}),
-		option.Response(http.StatusCreated, nil),
+		option.Summary("Create Orchestration Definition(s) from an OrchestrationTemplate"),
+		option.Description("Create Orchestration Definition(s) from an OrchestrationTemplate. The `id` field of "+
+			"the response contains a unique identifier (_template ID_ or _template-ref_), by which the generated Orchestration Definitions are referenced."),
+		option.Request(v1alpha1.OrchestrationTemplate{}),
+		option.Response(http.StatusCreated, v1alpha1.IDResponse{}),
 	)
 
-	orchestration.Delete("/{type}",
-		option.Summary("Delete an Orchestration Definition"),
-		option.Description("Delete a new Orchestration Definition"),
-		option.Request(new(TypeParam)),
-		option.Response(http.StatusOK, nil))
+	orchestration.Delete("/{templateRef}",
+		option.Summary("Delete all Orchestration Definitions for the given template ID"),
+		option.Description("Delete all Orchestration Definitions that were generated based on the given template ID"),
+		option.Request(new(TemplateRefParam)),
+		option.Response(http.StatusOK, nil),
+		option.Response(http.StatusNotFound, nil, option.ContentDescription("No OrchestrationDefinition "+
+			"with the given `templateRef` was found")))
 
 }
 
 type TypeParam struct {
 	ID string `path:"type" required:"true"`
+}
+type TemplateRefParam struct {
+	TemplateRef string `path:"templateRef" required:"true"`
 }
 
 type IDParam struct {

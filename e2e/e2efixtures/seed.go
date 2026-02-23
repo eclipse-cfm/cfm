@@ -39,30 +39,16 @@ func CreateTestActivityDefinition(apiClient *ApiClient) error {
 }
 
 func CreateTestOrchestrationDefinitions(apiClient *ApiClient) error {
-	requestBody := pv1alpha1.OrchestrationDefinition{
-		Type: model.VPADeployType.String(),
-		Activities: []pv1alpha1.Activity{
-			{
-				ID:            "activity1",
-				Type:          "test-activity",
-				Discriminator: "deploy",
-			},
-		},
-	}
-
-	err := apiClient.PostToPManager("orchestration-definitions", requestBody)
-	if err != nil {
-		return err
-	}
-
-	requestBody = pv1alpha1.OrchestrationDefinition{
-		Type: model.VPADisposeType.String(),
-		Activities: []pv1alpha1.Activity{
-			{
-				ID:            "activity1",
-				Type:          "test-activity",
-				Discriminator: "dispose",
-			},
+	requestBody := pv1alpha1.OrchestrationTemplate{
+		Activities: map[string][]pv1alpha1.ActivityDto{
+			model.VPADeployType.String(): {{
+				ID:   "activity1",
+				Type: "test-activity",
+			}},
+			model.VPADisposeType.String(): {{
+				ID:   "activity2",
+				Type: "test-activity",
+			}},
 		},
 	}
 

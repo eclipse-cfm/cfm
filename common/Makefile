@@ -15,7 +15,7 @@ COVER_PROFILE=coverage.out
 
 # Run all tests
 test:
-	go test -v ./...
+	gotestsum --format pkgname-and-test-fails
 
 # Run tests with coverage
 test-coverage:

@@ -76,6 +76,7 @@ func (h *HandlerServiceAssembly) registerOrchestrationRoutes(router chi.Router, 
 				if !found {
 					return
 				}
+				//todo: shouldn't this delete the orchestration?
 				handler.deleteOrchestrationDefinition(w, req, id)
 			})
 			r.Get("/", func(w http.ResponseWriter, req *http.Request) {
@@ -109,13 +110,20 @@ func (h *HandlerServiceAssembly) registerOrchestrationDefinitionRoutes(router ch
 	router.Route("/orchestration-definitions", func(r chi.Router) {
 		r.Get("/", handler.getOrchestrationDefinitions)
 		r.Post("/", handler.createOrchestrationDefinition)
-		r.Route("/{orchestrationType}", func(r chi.Router) {
+		r.Route("/{templateRef}", func(r chi.Router) { // delete-by-template-id
 			r.Delete("/", func(w http.ResponseWriter, req *http.Request) {
-				definitionType, found := handler.ExtractPathVariable(w, req, "orchestrationType")
+				templateRef, found := handler.ExtractPathVariable(w, req, "templateRef")
 				if !found {
 					return
 				}
-				handler.deleteOrchestrationDefinition(w, req, definitionType)
+				handler.deleteOrchestrationDefinition(w, req, templateRef)
+			})
+			r.Get("/", func(w http.ResponseWriter, request *http.Request) {
+				templateRef, found := handler.ExtractPathVariable(w, request, "templateRef")
+				if !found {
+					return
+				}
+				handler.getOrchestrationDefinitionsByTemplate(w, request, templateRef)
 			})
 		})
 	})

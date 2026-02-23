@@ -160,6 +160,7 @@ func (m *MappingEntry) UnmarshalJSON(data []byte) error {
 
 type OrchestrationDefinition struct {
 	Type        model.OrchestrationType `json:"type"`
+	TemplateRef string                  `json:"templateRef"`
 	Version     int64                   `json:"version"`
 	Description string                  `json:"description"`
 	Active      bool                    `json:"active"`

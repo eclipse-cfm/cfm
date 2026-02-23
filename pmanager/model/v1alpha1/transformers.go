@@ -13,15 +13,16 @@
 package v1alpha1
 
 import (
+	"github.com/google/uuid"
 	"github.com/metaform/connector-fabric-manager/common/model"
 	"github.com/metaform/connector-fabric-manager/pmanager/api"
 )
 
-func ToActivityDefinition(definition *api.ActivityDefinition) *ActivityDefinition {
+func ToActivityDefinitionDto(definition *api.ActivityDefinition) *ActivityDefinitionDto {
 	if definition == nil {
-		return &ActivityDefinition{}
+		return &ActivityDefinitionDto{}
 	}
-	return &ActivityDefinition{
+	return &ActivityDefinitionDto{
 		Type:         string(definition.Type),
 		Description:  definition.Description,
 		InputSchema:  definition.InputSchema,
@@ -29,7 +30,7 @@ func ToActivityDefinition(definition *api.ActivityDefinition) *ActivityDefinitio
 	}
 }
 
-func ToAPIActivityDefinition(definition *ActivityDefinition) *api.ActivityDefinition {
+func ToActivityDefinition(definition *ActivityDefinitionDto) *api.ActivityDefinition {
 	if definition == nil {
 		return &api.ActivityDefinition{}
 	}
@@ -41,50 +42,84 @@ func ToAPIActivityDefinition(definition *ActivityDefinition) *api.ActivityDefini
 	}
 }
 
-func ToAPIOrchestrationDefinition(definition *OrchestrationDefinition) *api.OrchestrationDefinition {
-	if definition == nil {
-		return &api.OrchestrationDefinition{}
-	}
-	apiActivities := make([]api.Activity, len(definition.Activities))
-	for i, activity := range definition.Activities {
-		apiActivities[i] = api.Activity{
-			ID:            activity.ID,
-			Type:          api.ActivityType(activity.Type),
-			Discriminator: api.Discriminator(activity.Discriminator),
-			Inputs:        ToAPIMappingEntries(activity.Inputs),
-			DependsOn:     activity.DependsOn,
-		}
+// ToOrchestrationDefinition converts an OrchestrationTemplate to one or several api.OrchestrationDefinition structures
+// and returns the template ref as string
+func ToOrchestrationDefinition(template *OrchestrationTemplate) (string, []*api.OrchestrationDefinition) {
+	if template == nil {
+		return "", []*api.OrchestrationDefinition{}
 	}
 
-	return &api.OrchestrationDefinition{
-		Type:        model.OrchestrationType(definition.Type),
-		Description: definition.Description,
-		Active:      true, // Default to active as the model doesn't have this field
-		Schema:      definition.Schema,
-		Activities:  apiActivities,
+	templateRef := template.ID
+	if templateRef == "" {
+		templateRef = uuid.New().String()
 	}
+
+	// determine number of orchestrations
+	convertedOrchestrationDefs := make([]*api.OrchestrationDefinition, 0)
+
+	if template.Activities != nil && len(template.Activities) == 0 {
+		convertedOrchestrationDefs = append(convertedOrchestrationDefs, &api.OrchestrationDefinition{
+			Description: template.Description,
+			Active:      true,
+			Schema:      template.Schema,
+			Activities:  make([]api.Activity, 0),
+			TemplateRef: templateRef,
+		})
+	}
+
+	// generate one api.OrchestrationDefinition for each entry
+	for orchType, activities := range template.Activities {
+
+		// convert activity DTOs to activities
+		convertedActivities := make([]api.Activity, len(activities))
+		for i, activityDto := range activities {
+			activity := api.Activity{
+				ID:            activityDto.ID,
+				Type:          api.ActivityType(activityDto.Type),
+				Discriminator: api.Discriminator(orchType),
+				Inputs:        ToAPIMappingEntries(activityDto.Inputs),
+				DependsOn:     activityDto.DependsOn,
+			}
+			convertedActivities[i] = activity
+		}
+
+		// create orchestration template
+		orchestrationDef := api.OrchestrationDefinition{
+			Type:        model.OrchestrationType(orchType),
+			Description: template.Description,
+			Active:      true,
+			Schema:      template.Schema,
+			Activities:  convertedActivities,
+			TemplateRef: templateRef,
+		}
+
+		convertedOrchestrationDefs = append(convertedOrchestrationDefs, &orchestrationDef)
+	}
+	return templateRef, convertedOrchestrationDefs
 }
 
-func ToOrchestrationDefinition(definition *api.OrchestrationDefinition) *OrchestrationDefinition {
+func ToOrchestrationDefinitionDto(definition *api.OrchestrationDefinition) *OrchestrationDefinitionDto {
 	if definition == nil {
-		return &OrchestrationDefinition{}
-	}
-	apiActivities := make([]Activity, len(definition.Activities))
-	for i, activity := range definition.Activities {
-		apiActivities[i] = Activity{
-			ID:            activity.ID,
-			Type:          string(activity.Type),
-			Discriminator: string(activity.Discriminator),
-			Inputs:        ToMappingEntries(activity.Inputs),
-			DependsOn:     activity.DependsOn,
-		}
+		return &OrchestrationDefinitionDto{}
 	}
 
-	return &OrchestrationDefinition{
-		Type:        string(definition.Type),
+	// for each individual activity discriminator, create one map entry
+	convertedActivities := make(map[string][]ActivityDto)
+
+	for _, activity := range definition.Activities {
+		convertedActivities[activity.Discriminator.String()] = append(convertedActivities[activity.Discriminator.String()], ActivityDto{
+			ID:        activity.ID,
+			Type:      string(activity.Type),
+			Inputs:    ToMappingEntries(activity.Inputs),
+			DependsOn: activity.DependsOn,
+		})
+	}
+
+	return &OrchestrationDefinitionDto{
 		Description: definition.Description,
 		Schema:      definition.Schema,
-		Activities:  apiActivities,
+		Activities:  convertedActivities,
+		TemplateRef: definition.TemplateRef,
 	}
 }
 
@@ -146,15 +181,14 @@ func toSteps(steps []api.OrchestrationStep) []OrchestrationStep {
 	return result
 }
 
-func toActivities(activities []api.Activity) []Activity {
-	result := make([]Activity, len(activities))
+func toActivities(activities []api.Activity) []ActivityDto {
+	result := make([]ActivityDto, len(activities))
 	for i, activity := range activities {
-		result[i] = Activity{
-			ID:            activity.ID,
-			Type:          string(activity.Type),
-			Discriminator: string(activity.Discriminator),
-			Inputs:        toMappingEntries(activity.Inputs),
-			DependsOn:     activity.DependsOn,
+		result[i] = ActivityDto{
+			ID:        activity.ID,
+			Type:      string(activity.Type),
+			Inputs:    toMappingEntries(activity.Inputs),
+			DependsOn: activity.DependsOn,
 		}
 	}
 	return result

@@ -17,7 +17,8 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/metaform/connector-fabric-manager/common/model"
+	"github.com/metaform/connector-fabric-manager/common/collection"
+	"github.com/metaform/connector-fabric-manager/common/query"
 	"github.com/metaform/connector-fabric-manager/common/store"
 	"github.com/metaform/connector-fabric-manager/common/types"
 	"github.com/metaform/connector-fabric-manager/pmanager/api"
@@ -55,29 +56,34 @@ func (d definitionManager) CreateOrchestrationDefinition(ctx context.Context, de
 	})
 }
 
-func (d definitionManager) DeleteOrchestrationDefinition(
-	// TODO this method should check outstanding orchestrations when the orchestration index is implemented
-	ctx context.Context,
-	orchestrationType model.OrchestrationType) error {
+func (d definitionManager) DeleteOrchestrationDefinition(ctx context.Context, templateRef string) error {
 
 	return d.trxContext.Execute(ctx, func(ctx context.Context) error {
-		exists, err := d.store.ExistsOrchestrationDefinition(ctx, orchestrationType)
+
+		templateRefPredicate := query.Eq("templateRef", templateRef)
+		defs, err := collection.CollectAll(d.store.FindOrchestrationDefinitionsByPredicate(ctx, templateRefPredicate))
+
 		if err != nil {
-			return types.NewRecoverableWrappedError(err, "failed to check orchestration definition for type %s", orchestrationType)
+			return types.NewRecoverableWrappedError(err, "failed to check orchestration definition for template-ref %s", templateRef)
 		}
-		if !exists {
+		if len(defs) == 0 {
 			return types.ErrNotFound
 		}
-
-		deleted, err := d.store.DeleteOrchestrationDefinition(ctx, orchestrationType)
-		if err != nil {
-			return types.NewRecoverableWrappedError(err, "failed to delete orchestration definition for type %s", orchestrationType)
-		}
-		if !deleted {
-			return types.NewClientError("unable to delete orchestration definition type %s", orchestrationType)
+		for _, def := range defs {
+			deleted, err := d.store.DeleteOrchestrationDefinition(ctx, def.Type)
+			if err != nil {
+				return types.NewRecoverableWrappedError(err, "failed to delete orchestration definition for template-ref %s", templateRef)
+			}
+			if !deleted {
+				return types.NewClientError("unable to delete orchestration definition template-ref %s", templateRef)
+			}
 		}
 		return nil
 	})
+}
+
+func (d definitionManager) GetOrchestrationDefinitionsByTemplate(ctx context.Context, templateRef string) ([]api.OrchestrationDefinition, error) {
+	return d.QueryOrchestrationDefinitions(ctx, query.Eq("templateRef", templateRef))
 }
 
 func (d definitionManager) GetOrchestrationDefinitions(ctx context.Context) ([]api.OrchestrationDefinition, error) {
@@ -90,6 +96,21 @@ func (d definitionManager) GetOrchestrationDefinitions(ctx context.Context) ([]a
 		result = definitions
 		return nil
 	})
+	return result, err
+}
+
+func (d definitionManager) QueryOrchestrationDefinitions(ctx context.Context, predicate query.Predicate) ([]api.OrchestrationDefinition, error) {
+	var result []api.OrchestrationDefinition
+
+	err := d.trxContext.Execute(ctx, func(ctx context.Context) error {
+		definitions, err := collection.CollectAll(d.store.FindOrchestrationDefinitionsByPredicate(ctx, predicate))
+		if err != nil {
+			return err
+		}
+		result = definitions
+		return nil
+	})
+
 	return result, err
 }
 

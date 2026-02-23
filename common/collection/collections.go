@@ -12,7 +12,10 @@
 
 package collection
 
-import "iter"
+import (
+	"iter"
+	"slices"
+)
 
 // CollectAll collects all sequence elements into a slice.
 func CollectAll[T any](seq iter.Seq2[T, error]) ([]T, error) {
@@ -52,4 +55,45 @@ func DerefSlice[T any](ptrs []*T) []T {
 		}
 	}
 	return values
+}
+
+// From convert a slice of objects to an iter.Seq2
+func From[T any](slice []T) iter.Seq[T] {
+	return slices.Values(slice)
+}
+
+// Map apply a function to each element of the sequence and return a new sequence with the results
+func Map[T any, R any](seq iter.Seq[T], fn func(T) R) iter.Seq[R] {
+	return func(yield func(R) bool) {
+		for v := range seq {
+			if !yield(fn(v)) {
+				return
+			}
+		}
+	}
+}
+
+// Distinct returns a new sequence with only unique elements
+func Distinct[T any](seq iter.Seq[T]) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		seen := make(map[any]struct{})
+		for v := range seq {
+			if _, ok := seen[v]; ok {
+				continue
+			}
+			seen[v] = struct{}{}
+			if !yield(v) {
+				return
+			}
+		}
+	}
+}
+
+// Collect returns a slice with all elements of the sequence
+func Collect[T any](seq iter.Seq[T]) []T {
+	var out []T
+	for v := range seq {
+		out = append(out, v)
+	}
+	return out
 }

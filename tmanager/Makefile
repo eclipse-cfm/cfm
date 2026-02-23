@@ -29,7 +29,7 @@ generate-docs:
 
 # Run tests
 test:
-	go test -v ./...
+	gotestsum --format pkgname-and-test-fails
 
 # Clean build artifacts
 clean:

@@ -85,7 +85,7 @@ build-all:
 # Test Commands - Delegate to Service Makefiles
 #==============================================================================
 
-test:
+test: install-gotestsum
 	@echo "Testing all services..."
 	$(MAKE) -C $(COMMON_DIR) test
 	$(MAKE) -C $(PMANAGER_DIR) test
@@ -148,7 +148,10 @@ clean:
 install-mockery:
 	go install github.com/vektra/mockery/v2@latest
 
-install-tools: install-mockery
+install-gotestsum:
+	go install gotest.tools/gotestsum@latest
+
+install-tools: install-mockery install-gotestsum
 	@echo "Installing tools for all services..."
 	$(MAKE) -C $(PMANAGER_DIR) install-tools
 	$(MAKE) -C $(TMANAGER_DIR) install-tools
