@@ -67,11 +67,13 @@ type OrchestrationEntry struct {
 	StateTimestamp    time.Time               `json:"stateTimestamp"`
 	CreatedTimestamp  time.Time               `json:"createdTimestamp"`
 	OrchestrationType model.OrchestrationType `json:"orchestrationType"`
+	DefinitionID      string                  `json:"definitionId"`
 }
 
 type Orchestration struct {
 	ID                string                  `json:"id"`
 	CorrelationID     string                  `json:"correlationId"`
+	DefinitionID      string                  `json:"definitionId"`
 	State             int                     `json:"state"`
 	StateTimestamp    time.Time               `json:"stateTimestamp"`
 	CreatedTimestamp  time.Time               `json:"createdTimestamp"`

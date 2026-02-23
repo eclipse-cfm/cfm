@@ -17,7 +17,10 @@ import (
 	"errors"
 	"iter"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
+	memorystore2 "github.com/metaform/connector-fabric-manager/common/memorystore"
 	"github.com/metaform/connector-fabric-manager/common/model"
 	"github.com/metaform/connector-fabric-manager/common/query"
 	cstore "github.com/metaform/connector-fabric-manager/common/store"
@@ -28,7 +31,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDefinitionManager_CreateOrchestrationDefinition_Success(t *testing.T) {
+func TestCreateOrchestrationDefinition_Success(t *testing.T) {
 
 	store := memorystore.NewDefinitionStore()
 	manager := definitionManager{
@@ -71,7 +74,7 @@ func TestDefinitionManager_CreateOrchestrationDefinition_Success(t *testing.T) {
 	assert.Equal(t, len(orchestrationDef.Activities), len(result.Activities), "Activities count should match")
 }
 
-func TestDefinitionManager_CreateOrchestrationDefinition_MissingActivityDefinition(t *testing.T) {
+func TestCreateOrchestrationDefinition_MissingActivityDefinition(t *testing.T) {
 
 	store := memorystore.NewDefinitionStore()
 	manager := definitionManager{
@@ -107,7 +110,7 @@ func TestDefinitionManager_CreateOrchestrationDefinition_MissingActivityDefiniti
 		"Error message should mention the missing activity type")
 }
 
-func TestDefinitionManager_CreateOrchestrationDefinition_MultipleMissingActivityDefinitions(t *testing.T) {
+func TestCreateOrchestrationDefinition_MultipleMissingActivityDefinitions(t *testing.T) {
 	store := memorystore.NewDefinitionStore()
 	manager := definitionManager{
 		trxContext: cstore.NoOpTransactionContext{},
@@ -162,7 +165,7 @@ func TestDefinitionManager_CreateOrchestrationDefinition_MultipleMissingActivity
 	assert.Contains(t, err.Error(), "missing-activity-2", "Error should mention second missing activity")
 }
 
-func TestDefinitionManager_CreateOrchestrationDefinition_EmptyActivities(t *testing.T) {
+func TestCreateOrchestrationDefinition_EmptyActivities(t *testing.T) {
 	store := memorystore.NewDefinitionStore()
 	manager := definitionManager{
 		trxContext: cstore.NoOpTransactionContext{},
@@ -185,7 +188,7 @@ func TestDefinitionManager_CreateOrchestrationDefinition_EmptyActivities(t *test
 	assert.Equal(t, 0, len(result.Activities), "Should have 0 activities")
 }
 
-func TestDefinitionManager_CreateOrchestrationDefinition_StoreError(t *testing.T) {
+func TestCreateOrchestrationDefinition_StoreError(t *testing.T) {
 	store := memorystore.NewDefinitionStore()
 	manager := definitionManager{
 		trxContext: cstore.NoOpTransactionContext{},
@@ -214,7 +217,7 @@ func TestDefinitionManager_CreateOrchestrationDefinition_StoreError(t *testing.T
 	require.True(t, errors.Is(err, types.ErrConflict), "Error should be a ConflictError")
 }
 
-func TestDefinitionManager_CreateActivityDefinition_Success(t *testing.T) {
+func TestCreateActivityDefinition_Success(t *testing.T) {
 	store := memorystore.NewDefinitionStore()
 	manager := definitionManager{
 		trxContext: cstore.NoOpTransactionContext{},
@@ -239,7 +242,7 @@ func TestDefinitionManager_CreateActivityDefinition_Success(t *testing.T) {
 	assert.Equal(t, activityDef.OutputSchema, result.OutputSchema, "OutputSchema should match")
 }
 
-func TestDefinitionManager_CreateActivityDefinition_Duplicate(t *testing.T) {
+func TestCreateActivityDefinition_Duplicate(t *testing.T) {
 	store := memorystore.NewDefinitionStore()
 	manager := definitionManager{
 		trxContext: cstore.NoOpTransactionContext{},
@@ -266,7 +269,7 @@ func TestDefinitionManager_CreateActivityDefinition_Duplicate(t *testing.T) {
 	require.True(t, errors.Is(err, types.ErrConflict), "Error should be a ConflictError")
 }
 
-func TestDefinitionManager_Integration_CompleteWorkflow(t *testing.T) {
+func TestIntegration_CompleteWorkflow(t *testing.T) {
 	store := memorystore.NewDefinitionStore()
 	manager := definitionManager{
 		trxContext: cstore.NoOpTransactionContext{},
@@ -347,11 +350,12 @@ func TestDefinitionManager_Integration_CompleteWorkflow(t *testing.T) {
 	assert.Equal(t, api.ActivityType("deploy"), retrievedActivity2.Type, "Retrieved activity type should match")
 }
 
-func TestDefinitionManager_DeleteOrchestrationDefinition_Success(t *testing.T) {
+func TestDeleteOrchestrationDefinition_Success(t *testing.T) {
 	store := memorystore.NewDefinitionStore()
 	manager := definitionManager{
-		trxContext: cstore.NoOpTransactionContext{},
-		store:      store,
+		trxContext:         cstore.NoOpTransactionContext{},
+		store:              store,
+		orchestrationStore: memorystore2.NewInMemoryEntityStore[*api.OrchestrationEntry](),
 	}
 
 	orchestrationDef := &api.OrchestrationDefinition{
@@ -377,7 +381,7 @@ func TestDefinitionManager_DeleteOrchestrationDefinition_Success(t *testing.T) {
 	assert.False(t, exists, "Orchestration definition should no longer exist")
 }
 
-func TestDefinitionManager_DeleteOrchestrationDefinition_NotFound(t *testing.T) {
+func TestDeleteOrchestrationDefinition_NotFound(t *testing.T) {
 	store := memorystore.NewDefinitionStore()
 	manager := definitionManager{
 		trxContext: cstore.NoOpTransactionContext{},
@@ -391,7 +395,7 @@ func TestDefinitionManager_DeleteOrchestrationDefinition_NotFound(t *testing.T) 
 	assert.True(t, errors.Is(err, types.ErrNotFound), "Error should be ErrNotFound")
 }
 
-func TestDefinitionManager_DeleteOrchestrationDefinition_ExistsCheckError(t *testing.T) {
+func TestDeleteOrchestrationDefinition_ExistsCheckError(t *testing.T) {
 	mockStore := newMockDefinitionStore()
 	mockStore.simulateError("findByPredicate")
 	manager := definitionManager{
@@ -408,13 +412,14 @@ func TestDefinitionManager_DeleteOrchestrationDefinition_ExistsCheckError(t *tes
 		"Error message should indicate existence check failure")
 }
 
-func TestDefinitionManager_DeleteOrchestrationDefinition_DeleteError(t *testing.T) {
+func TestDeleteOrchestrationDefinition_DeleteError(t *testing.T) {
 	mockStore := newMockDefinitionStore()
 	mockStore.setOrchestrationDefinition(api.OrchestrationDefinition{})
 	mockStore.simulateError("deleteOrchestration")
 	manager := definitionManager{
-		trxContext: cstore.NoOpTransactionContext{},
-		store:      mockStore,
+		trxContext:         cstore.NoOpTransactionContext{},
+		store:              mockStore,
+		orchestrationStore: memorystore2.NewInMemoryEntityStore[*api.OrchestrationEntry](),
 	}
 
 	ctx := context.Background()
@@ -426,13 +431,14 @@ func TestDefinitionManager_DeleteOrchestrationDefinition_DeleteError(t *testing.
 		"Error message should indicate deletion failure")
 }
 
-func TestDefinitionManager_DeleteOrchestrationDefinition_DeleteReturnsFalse(t *testing.T) {
+func TestDeleteOrchestrationDefinition_DeleteReturnsFalse(t *testing.T) {
 	mockStore := newMockDefinitionStore()
 	mockStore.setOrchestrationDefinition(api.OrchestrationDefinition{})
 	mockStore.setDeleteOrchestrationDefinitionReturned(false)
 	manager := definitionManager{
-		trxContext: cstore.NoOpTransactionContext{},
-		store:      mockStore,
+		trxContext:         cstore.NoOpTransactionContext{},
+		store:              mockStore,
+		orchestrationStore: memorystore2.NewInMemoryEntityStore[*api.OrchestrationEntry](),
 	}
 
 	ctx := context.Background()
@@ -444,11 +450,12 @@ func TestDefinitionManager_DeleteOrchestrationDefinition_DeleteReturnsFalse(t *t
 		"Error message should indicate deletion failed")
 }
 
-func TestDefinitionManager_DeleteOrchestrationDefinition_Multiple(t *testing.T) {
+func TestDeleteOrchestrationDefinition_Multiple(t *testing.T) {
 	store := memorystore.NewDefinitionStore()
 	manager := definitionManager{
-		trxContext: cstore.NoOpTransactionContext{},
-		store:      store,
+		trxContext:         cstore.NoOpTransactionContext{},
+		store:              store,
+		orchestrationStore: memorystore2.NewInMemoryEntityStore[*api.OrchestrationEntry](),
 	}
 
 	ctx := context.Background()
@@ -514,7 +521,47 @@ func TestDefinitionManager_DeleteOrchestrationDefinition_Multiple(t *testing.T) 
 	assert.True(t, exists, "Third orchestration should still exist")
 }
 
-func TestDefinitionManager_QueryOrchestrationDefinitions(t *testing.T) {
+func TestDeleteOrchestrationDefinition_WithOrchestrations(t *testing.T) {
+	store := memorystore.NewDefinitionStore()
+	orchestrationIndex := memorystore2.NewInMemoryEntityStore[*api.OrchestrationEntry]()
+	manager := definitionManager{
+		trxContext:         cstore.NoOpTransactionContext{},
+		store:              store,
+		orchestrationStore: orchestrationIndex,
+	}
+
+	orchestrationDef := &api.OrchestrationDefinition{
+		Type:        model.OrchestrationType("test-orchestration-to-delete"),
+		Description: "Orchestration to be deleted",
+		Active:      true,
+		Schema:      map[string]any{"type": "object"},
+		Activities:  []api.Activity{},
+		TemplateRef: "test-template-ref",
+	}
+
+	ctx := t.Context()
+
+	orchestrationDef, err := store.StoreOrchestrationDefinition(ctx, orchestrationDef)
+	require.NoError(t, err, "Failed to store orchestration definition")
+
+	_, err = orchestrationIndex.Create(ctx, &api.OrchestrationEntry{
+		ID:                uuid.NewString(),
+		Version:           0,
+		CorrelationID:     "test-correlationId",
+		State:             0,
+		StateTimestamp:    time.Time{},
+		CreatedTimestamp:  time.Time{},
+		OrchestrationType: model.VPADeployType,
+		DefinitionID:      orchestrationDef.GetID(),
+	})
+	require.NoError(t, err, "Failed to create orchestration entry")
+
+	err = manager.DeleteOrchestrationDefinition(ctx, orchestrationDef.TemplateRef)
+	require.Error(t, err, "Failed to delete orchestration definition")
+
+}
+
+func TestQueryOrchestrationDefinitions(t *testing.T) {
 
 	store := memorystore.NewDefinitionStore()
 	manager := definitionManager{
@@ -549,7 +596,7 @@ func TestDefinitionManager_QueryOrchestrationDefinitions(t *testing.T) {
 	assert.ElementsMatch(t, definitions, []api.OrchestrationDefinition{*orchestration1, *orchestration2})
 }
 
-func TestDefinitionManager_DeleteActivityDefinition_Success(t *testing.T) {
+func TestDeleteActivityDefinition_Success(t *testing.T) {
 	store := memorystore.NewDefinitionStore()
 	manager := definitionManager{
 		trxContext: cstore.NoOpTransactionContext{},
@@ -577,7 +624,7 @@ func TestDefinitionManager_DeleteActivityDefinition_Success(t *testing.T) {
 	assert.False(t, exists, "Activity definition should no longer exist")
 }
 
-func TestDefinitionManager_DeleteActivityDefinition_NotFound(t *testing.T) {
+func TestDeleteActivityDefinition_NotFound(t *testing.T) {
 	store := memorystore.NewDefinitionStore()
 	manager := definitionManager{
 		trxContext: cstore.NoOpTransactionContext{},
@@ -591,7 +638,7 @@ func TestDefinitionManager_DeleteActivityDefinition_NotFound(t *testing.T) {
 	assert.True(t, errors.Is(err, types.ErrNotFound), "Error should be ErrNotFound")
 }
 
-func TestDefinitionManager_DeleteActivityDefinition_ReferencedByOrchestration(t *testing.T) {
+func TestDeleteActivityDefinition_ReferencedByOrchestration(t *testing.T) {
 
 	store := memorystore.NewDefinitionStore()
 	manager := definitionManager{
@@ -645,7 +692,7 @@ func TestDefinitionManager_DeleteActivityDefinition_ReferencedByOrchestration(t 
 	assert.True(t, exists, "Activity definition should still exist after failed deletion")
 }
 
-func TestDefinitionManager_DeleteActivityDefinition_ExistsCheckError(t *testing.T) {
+func TestDeleteActivityDefinition_ExistsCheckError(t *testing.T) {
 	mockStore := newMockDefinitionStore()
 	mockStore.simulateError("existsActivity")
 	manager := definitionManager{
@@ -662,7 +709,7 @@ func TestDefinitionManager_DeleteActivityDefinition_ExistsCheckError(t *testing.
 		"Error message should indicate existence check failure")
 }
 
-func TestDefinitionManager_DeleteActivityDefinition_ReferenceCheckError(t *testing.T) {
+func TestDeleteActivityDefinition_ReferenceCheckError(t *testing.T) {
 	mockStore := newMockDefinitionStore()
 	mockStore.setActivityExists(true)
 	mockStore.simulateError("referenced")
@@ -681,7 +728,7 @@ func TestDefinitionManager_DeleteActivityDefinition_ReferenceCheckError(t *testi
 		"Error message should indicate reference check failure")
 }
 
-func TestDefinitionManager_DeleteActivityDefinition_DeleteError(t *testing.T) {
+func TestDeleteActivityDefinition_DeleteError(t *testing.T) {
 
 	mockStore := newMockDefinitionStore()
 	mockStore.setActivityExists(true)
@@ -700,7 +747,7 @@ func TestDefinitionManager_DeleteActivityDefinition_DeleteError(t *testing.T) {
 		"Error message should mention the operation that failed")
 }
 
-func TestDefinitionManager_DeleteActivityDefinition_DeleteReturnsFalse(t *testing.T) {
+func TestDeleteActivityDefinition_DeleteReturnsFalse(t *testing.T) {
 	mockStore := newMockDefinitionStore()
 	mockStore.setActivityExists(true)
 	mockStore.setDeleteActivityDefinitionReturned(false)
@@ -718,7 +765,7 @@ func TestDefinitionManager_DeleteActivityDefinition_DeleteReturnsFalse(t *testin
 		"Error message should indicate deletion failed")
 }
 
-func TestDefinitionManager_DeleteActivityDefinition_MultipleReferences(t *testing.T) {
+func TestDeleteActivityDefinition_MultipleReferences(t *testing.T) {
 
 	store := memorystore.NewDefinitionStore()
 	manager := definitionManager{
@@ -780,7 +827,7 @@ func TestDefinitionManager_DeleteActivityDefinition_MultipleReferences(t *testin
 		"Error message should indicate it's referenced")
 }
 
-func TestDefinitionManager_DeleteActivityDefinition_AfterOrchestrationDeletion(t *testing.T) {
+func TestDeleteActivityDefinition_AfterOrchestrationDeletion(t *testing.T) {
 
 	store := memorystore.NewDefinitionStore()
 	manager := definitionManager{

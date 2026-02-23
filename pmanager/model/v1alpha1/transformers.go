@@ -149,6 +149,7 @@ func ToOrchestrationEntry(entry *api.OrchestrationEntry) OrchestrationEntry {
 	return OrchestrationEntry{
 		ID:                entry.ID,
 		CorrelationID:     entry.CorrelationID,
+		DefinitionID:      entry.DefinitionID,
 		State:             int(entry.State),
 		StateTimestamp:    entry.StateTimestamp,
 		CreatedTimestamp:  entry.CreatedTimestamp,
@@ -160,6 +161,7 @@ func ToOrchestration(orchestration *api.Orchestration) Orchestration {
 	return Orchestration{
 		ID:                orchestration.ID,
 		CorrelationID:     orchestration.CorrelationID,
+		DefinitionID:      orchestration.DefinitionID,
 		State:             int(orchestration.State),
 		StateTimestamp:    orchestration.StateTimestamp,
 		CreatedTimestamp:  orchestration.CreatedTimestamp,

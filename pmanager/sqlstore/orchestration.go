@@ -24,9 +24,10 @@ import (
 )
 
 func newOrchestrationEntryStore() store.EntityStore[*api.OrchestrationEntry] {
-	columnNames := []string{"id", "version", "correlation_id", "state", "state_timestamp", "created_timestamp", "orchestration_type"}
+	columnNames := []string{"id", "version", "correlation_id", "definition_id", "state", "state_timestamp", "created_timestamp", "orchestration_type"}
 	builder := sqlstore.NewPostgresJSONBBuilder().
 		WithFieldMappings(map[string]string{"correlationId": "correlation_id",
+			"DefinitionID":      "definition_id",
 			"stateTimestamp":    "state_timestamp",
 			"createdTimestamp":  "created_timestamp",
 			"orchestrationType": "orchestration_type"})
@@ -43,65 +44,71 @@ func newOrchestrationEntryStore() store.EntityStore[*api.OrchestrationEntry] {
 }
 
 func recordToOrchestrationEntry(tx *sql.Tx, record *sqlstore.DatabaseRecord) (*api.OrchestrationEntry, error) {
-	profile := &api.OrchestrationEntry{}
+	entry := &api.OrchestrationEntry{}
 	if id, ok := record.Values["id"].(string); ok {
-		profile.ID = id
+		entry.ID = id
 	} else {
 		return nil, fmt.Errorf("invalid orchestration entry id reading record")
 	}
 
 	if version, ok := record.Values["version"].(int64); ok {
-		profile.Version = version
+		entry.Version = version
 	} else {
 		return nil, fmt.Errorf("invalid orchestration entry version reading record")
 	}
 
-	if version, ok := record.Values["correlation_id"].(string); ok {
-		profile.CorrelationID = version
+	if correlationId, ok := record.Values["correlation_id"].(string); ok {
+		entry.CorrelationID = correlationId
 	} else {
 		return nil, fmt.Errorf("invalid orchestration entry correlation_id reading record")
 	}
 
+	if definitionId, ok := record.Values["definition_id"].(string); ok {
+		entry.DefinitionID = definitionId
+	} else {
+		return nil, fmt.Errorf("invalid orchestration entry definition_id reading record")
+	}
+
 	if state, ok := record.Values["state"].(int64); ok {
-		profile.State = api.OrchestrationState(state)
+		entry.State = api.OrchestrationState(state)
 	} else {
 		return nil, fmt.Errorf("invalid orchestration entry state reading record")
 	}
 
 	if timestamp, ok := record.Values["state_timestamp"].(time.Time); ok {
-		profile.StateTimestamp = timestamp
+		entry.StateTimestamp = timestamp
 	} else {
 		return nil, fmt.Errorf("invalid orchestration entry state_timestamp reading record")
 	}
 
 	if timestamp, ok := record.Values["created_timestamp"].(time.Time); ok {
-		profile.CreatedTimestamp = timestamp
+		entry.CreatedTimestamp = timestamp
 	} else {
 		return nil, fmt.Errorf("invalid orchestration entry created_timestamp reading record")
 	}
 
 	if otype, ok := record.Values["orchestration_type"].(string); ok {
-		profile.OrchestrationType = model.OrchestrationType(otype)
+		entry.OrchestrationType = model.OrchestrationType(otype)
 	} else {
 		return nil, fmt.Errorf("invalid orchestration entry type reading record")
 	}
 
-	return profile, nil
+	return entry, nil
 
 }
 
-func orchestrationEntryToRecord(profile *api.OrchestrationEntry) (*sqlstore.DatabaseRecord, error) {
+func orchestrationEntryToRecord(orchestrationEntry *api.OrchestrationEntry) (*sqlstore.DatabaseRecord, error) {
 	record := &sqlstore.DatabaseRecord{
 		Values: make(map[string]any),
 	}
 
-	record.Values["id"] = profile.ID
-	record.Values["version"] = profile.Version
-	record.Values["correlation_id"] = profile.CorrelationID
-	record.Values["state"] = profile.State
-	record.Values["state_timestamp"] = profile.StateTimestamp
-	record.Values["created_timestamp"] = profile.CreatedTimestamp
-	record.Values["orchestration_type"] = profile.OrchestrationType
-
+	record.Values["id"] = orchestrationEntry.ID
+	record.Values["version"] = orchestrationEntry.Version
+	record.Values["correlation_id"] = orchestrationEntry.CorrelationID
+	record.Values["state"] = orchestrationEntry.State
+	record.Values["state_timestamp"] = orchestrationEntry.StateTimestamp
+	record.Values["created_timestamp"] = orchestrationEntry.CreatedTimestamp
+	record.Values["orchestration_type"] = orchestrationEntry.OrchestrationType
+	record.Values["definition_id"] = orchestrationEntry.DefinitionID
 	return record, nil
 }

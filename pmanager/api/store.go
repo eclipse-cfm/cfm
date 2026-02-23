@@ -49,13 +49,13 @@ type DefinitionStore interface {
 	// ExistsActivityDefinition returns true if an ActivityDefinition exists for the given type.
 	ExistsActivityDefinition(ctx context.Context, activityType ActivityType) (bool, error)
 
-	// StoreOrchestrationDefinition saves or updates a OrchestrationDefinition
+	// StoreOrchestrationDefinition saves or updates an OrchestrationDefinition
 	StoreOrchestrationDefinition(ctx context.Context, definition *OrchestrationDefinition) (*OrchestrationDefinition, error)
 
-	// StoreActivityDefinition saves or updates a ActivityDefinition
+	// StoreActivityDefinition saves or updates an ActivityDefinition
 	StoreActivityDefinition(ctx context.Context, definition *ActivityDefinition) (*ActivityDefinition, error)
 
-	// DeleteOrchestrationDefinition removes a OrchestrationDefinition for the given type, returning true if successful.
+	// DeleteOrchestrationDefinition removes an OrchestrationDefinition for the given type, returning true if successful.
 	DeleteOrchestrationDefinition(ctx context.Context, orchestrationType model.OrchestrationType) (bool, error)
 
 	ActivityDefinitionReferences(ctx context.Context, activityType ActivityType) ([]string, error)
@@ -78,6 +78,7 @@ type OrchestrationEntry struct {
 	StateTimestamp    time.Time               `json:"stateTimestamp"`
 	CreatedTimestamp  time.Time               `json:"createdTimestamp"`
 	OrchestrationType model.OrchestrationType `json:"orchestrationType"`
+	DefinitionID      string                  `json:"definitionId"`
 }
 
 func (o *OrchestrationEntry) GetID() string {

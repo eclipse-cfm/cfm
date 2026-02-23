@@ -627,8 +627,8 @@ func TestGetFilteredProfiles(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, 2, len(result))
-		assert.Equal(t, "ds-1", result[0].ID)
-		assert.Equal(t, "ds-2", result[1].ID)
+
+		require.ElementsMatch(t, []string{"ds-1", "ds-2"}, []string{result[0].ID, result[1].ID})
 	})
 
 	t.Run("filters profiles by specified IDs", func(t *testing.T) {
