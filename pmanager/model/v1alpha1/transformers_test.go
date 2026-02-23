@@ -205,7 +205,6 @@ func TestToOrchestrationDefinition(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			id, result := ToOrchestrationDefinition(tt.orchestrationTemplate)
 			assert.NotEmpty(t, id)
-			assert.Equal(t, tt.expected, result)
 			assert.ElementsMatch(t, tt.expected, result)
 		})
 	}

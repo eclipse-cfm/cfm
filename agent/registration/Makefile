@@ -24,7 +24,7 @@ build-server:
 
 # Run tests
 test:
-	gotestsum --format pkgname-and-test-fails
+	gotestsum --format github-actions ./... -count 1 -count 1
 
 # Clean build artifacts
 clean:

@@ -8,7 +8,7 @@ export CGO_ENABLED=0
 
 # Run all tests
 test:
-	gotestsum --format pkgname-and-test-fails
+	gotestsum --format github-actions ./... -count 1
 
 # Run tests with coverage
 test-coverage:
