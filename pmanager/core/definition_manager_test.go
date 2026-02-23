@@ -514,6 +514,41 @@ func TestDefinitionManager_DeleteOrchestrationDefinition_Multiple(t *testing.T) 
 	assert.True(t, exists, "Third orchestration should still exist")
 }
 
+func TestDefinitionManager_QueryOrchestrationDefinitions(t *testing.T) {
+
+	store := memorystore.NewDefinitionStore()
+	manager := definitionManager{
+		trxContext: cstore.NoOpTransactionContext{},
+		store:      store,
+	}
+	ctx := t.Context()
+	orchestration1 := &api.OrchestrationDefinition{
+		Type:        model.OrchestrationType("orchestration-1"),
+		Active:      true,
+		Schema:      map[string]any{"type": "object"},
+		Activities:  []api.Activity{},
+		TemplateRef: "template-1",
+	}
+	orchestration2 := &api.OrchestrationDefinition{
+		Type:        model.OrchestrationType("orchestration-2"),
+		Active:      true,
+		Schema:      map[string]any{"type": "object"},
+		Activities:  []api.Activity{},
+		TemplateRef: "template-1",
+	}
+	_, err := store.StoreOrchestrationDefinition(ctx, orchestration1)
+	require.NoError(t, err)
+	_, err = store.StoreOrchestrationDefinition(ctx, orchestration2)
+	require.NoError(t, err)
+
+	predicate := query.Contains("TemplateRef", "template")
+	definitions, err := manager.QueryOrchestrationDefinitions(ctx, predicate)
+	require.NoError(t, err)
+
+	assert.Len(t, definitions, 2)
+	assert.ElementsMatch(t, definitions, []api.OrchestrationDefinition{*orchestration1, *orchestration2})
+}
+
 func TestDefinitionManager_DeleteActivityDefinition_Success(t *testing.T) {
 	store := memorystore.NewDefinitionStore()
 	manager := definitionManager{

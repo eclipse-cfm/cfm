@@ -82,6 +82,10 @@ func (d definitionManager) DeleteOrchestrationDefinition(ctx context.Context, te
 	})
 }
 
+func (d definitionManager) GetOrchestrationDefinitionsByTemplate(ctx context.Context, templateRef string) ([]api.OrchestrationDefinition, error) {
+	return d.QueryOrchestrationDefinitions(ctx, query.Eq("templateRef", templateRef))
+}
+
 func (d definitionManager) GetOrchestrationDefinitions(ctx context.Context) ([]api.OrchestrationDefinition, error) {
 	var result []api.OrchestrationDefinition
 	err := d.trxContext.Execute(ctx, func(ctx context.Context) error {
@@ -92,6 +96,21 @@ func (d definitionManager) GetOrchestrationDefinitions(ctx context.Context) ([]a
 		result = definitions
 		return nil
 	})
+	return result, err
+}
+
+func (d definitionManager) QueryOrchestrationDefinitions(ctx context.Context, predicate query.Predicate) ([]api.OrchestrationDefinition, error) {
+	var result []api.OrchestrationDefinition
+
+	err := d.trxContext.Execute(ctx, func(ctx context.Context) error {
+		definitions, err := collection.CollectAll(d.store.FindOrchestrationDefinitionsByPredicate(ctx, predicate))
+		if err != nil {
+			return err
+		}
+		result = definitions
+		return nil
+	})
+
 	return result, err
 }
 

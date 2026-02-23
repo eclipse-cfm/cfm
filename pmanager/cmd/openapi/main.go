@@ -116,7 +116,7 @@ func generateOrchestrationDefinitionEndpoints(r spec.Generator) {
 	orchestration.Post("",
 		option.Summary("Create Orchestration Definition(s) from an OrchestrationTemplate"),
 		option.Description("Create Orchestration Definition(s) from an OrchestrationTemplate. The `id` field of "+
-			"the response contains a unique identifier, by which the generated Orchestration Definitions are referenced."),
+			"the response contains a unique identifier (_template ID_ or _template-ref_), by which the generated Orchestration Definitions are referenced."),
 		option.Request(v1alpha1.OrchestrationTemplate{}),
 		option.Response(http.StatusCreated, v1alpha1.IDResponse{}),
 	)

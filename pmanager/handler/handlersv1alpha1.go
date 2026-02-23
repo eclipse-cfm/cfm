@@ -18,6 +18,7 @@ import (
 	"github.com/metaform/connector-fabric-manager/common/handler"
 	"github.com/metaform/connector-fabric-manager/common/model"
 	"github.com/metaform/connector-fabric-manager/common/store"
+	. "github.com/metaform/connector-fabric-manager/common/stream"
 	"github.com/metaform/connector-fabric-manager/common/system"
 	"github.com/metaform/connector-fabric-manager/pmanager/api"
 	"github.com/metaform/connector-fabric-manager/pmanager/model/v1alpha1"
@@ -203,10 +204,16 @@ func (h *PMHandler) getOrchestrationDefinitionsByTemplate(w http.ResponseWriter,
 	if h.InvalidMethod(w, req, http.MethodGet) {
 		return
 	}
-	w.WriteHeader(http.StatusNotImplemented)
-	_, err := w.Write([]byte("Getting OrchestrationDefinitions by templateRef is not yet implemented!"))
+
+	defs, err := h.definitionManager.GetOrchestrationDefinitionsByTemplate(req.Context(), templateRef)
 	if err != nil {
+		h.HandleError(w, err)
 		return
 	}
 
+	dtos := Map(From(defs), func(def api.OrchestrationDefinition) v1alpha1.OrchestrationDefinitionDto {
+		return *v1alpha1.ToOrchestrationDefinitionDto(&def)
+	}).Collect()
+
+	h.ResponseOK(w, dtos)
 }

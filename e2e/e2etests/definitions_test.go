@@ -74,6 +74,16 @@ func Test_VerifyDefinitionOperations(t *testing.T) {
 			return o.TemplateRef
 		}).
 		Distinct()
+	assert.Len(t, keys.Collect(), 1)
+
+	// assert getting orch-defs by template-ref
+	key := keys.Collect()[0]
+
+	err = client.GetPManager(fmt.Sprintf("orchestration-definitions/%s", key), &orchestrationDefinitions)
+	require.NoError(t, err)
+	assert.Len(t, orchestrationDefinitions, 2)
+
+	// delete all orch-defs by templateRef
 	for key := range keys.Seq() {
 		err = client.DeleteToPManager(fmt.Sprintf("orchestration-definitions/%s", key))
 		require.NoError(t, err)
