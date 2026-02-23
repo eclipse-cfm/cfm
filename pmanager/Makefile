@@ -33,7 +33,7 @@ generate-docs:
 
 # Run tests
 test:
-	gotestsum --format github-actions ./... -count 1
+	$(TEST_CMD)
 
 # Clean build artifacts
 clean:

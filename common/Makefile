@@ -15,7 +15,7 @@ COVER_PROFILE=coverage.out
 
 # Run all tests
 test:
-	gotestsum --format github-actions ./... -count 1 ./...
+	$(TEST_CMD)
 
 # Run tests with coverage
 test-coverage:

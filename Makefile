@@ -21,6 +21,10 @@ E2E_DIR=e2e
 DOCKER_REGISTRY=ghcr.io/metaform/connector-fabric-manager/
 DOCKER_TAG=latest
 
+# TEST OUTPUT CONFIG
+TEST_FORMAT=dots-v2
+export TEST_CMD=gotestsum --format $(TEST_FORMAT) -- -count=1 ./...
+
 #==============================================================================
 # Help
 #==============================================================================
