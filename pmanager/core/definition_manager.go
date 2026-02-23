@@ -25,8 +25,9 @@ import (
 )
 
 type definitionManager struct {
-	trxContext store.TransactionContext
-	store      api.DefinitionStore
+	trxContext         store.TransactionContext
+	store              api.DefinitionStore
+	orchestrationStore store.EntityStore[*api.OrchestrationEntry]
 }
 
 func (d definitionManager) CreateOrchestrationDefinition(ctx context.Context, definition *api.OrchestrationDefinition) (*api.OrchestrationDefinition, error) {
@@ -70,6 +71,18 @@ func (d definitionManager) DeleteOrchestrationDefinition(ctx context.Context, te
 			return types.ErrNotFound
 		}
 		for _, def := range defs {
+
+			// check if any orchestration-definition has ongoing orchestrations
+			orchestrationEntry, err := d.orchestrationStore.FindFirstByPredicate(ctx, query.Eq("DefinitionID", def.GetID()))
+			if err != nil && !errors.Is(err, types.ErrNotFound) {
+				return types.NewRecoverableWrappedError(err, "failed to delete orchestration definition %s, because checking for ongoing orchestrations failed", def.GetID())
+			}
+			// todo: should we allow deleting orch-defs that have _completed_/_errored_ orchestrations?
+			if orchestrationEntry != nil {
+				return types.NewClientError("Cannot delete orchestration definition %s because it has ongoing orchestrations", def.GetID())
+			}
+
+			// execute deletion
 			deleted, err := d.store.DeleteOrchestrationDefinition(ctx, def.Type)
 			if err != nil {
 				return types.NewRecoverableWrappedError(err, "failed to delete orchestration definition for template-ref %s", templateRef)

@@ -69,7 +69,7 @@ func (p provisionManager) Start(ctx context.Context, manifest *model.Orchestrati
 		}
 
 		// Does not exist, create the orchestration
-		orch, err = api.InstantiateOrchestration(manifest.ID, manifest.CorrelationID, manifest.OrchestrationType, definition.Activities, manifest.Payload)
+		orch, err = api.InstantiateOrchestration(manifest.ID, manifest.CorrelationID, manifest.OrchestrationType, definition.GetID(), definition.Activities, manifest.Payload)
 		if err != nil {
 			return types.NewFatalWrappedError(err, "error instantiating orchestration for %s", manifestID)
 		}

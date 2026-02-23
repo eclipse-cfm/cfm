@@ -127,3 +127,7 @@ func IsFatal(err error) bool {
 	var fatalErr FatalError
 	return errors.As(err, &fatalErr) && fatalErr.IsFatal()
 }
+
+func NewValidationError(path string, message string) error {
+	return BadRequestError{Message: fmt.Sprintf("Validation error at path [%s]: %s", path, message)}
+}

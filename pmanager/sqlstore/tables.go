@@ -31,6 +31,7 @@ func createOrchestrationEntriesTable(db *sql.DB) error {
 			id VARCHAR(255) PRIMARY KEY,
 			version BIGINT NOT NULL,
 			correlation_id VARCHAR(255) NOT NULL ,
+		    definition_id VARCHAR(255) NOT NULL,
 			"state" INTEGER,
 			state_timestamp TIMESTAMP NOT NULL ,
 			created_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

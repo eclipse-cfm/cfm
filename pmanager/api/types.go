@@ -21,6 +21,7 @@ import (
 
 	"github.com/metaform/connector-fabric-manager/common/dag"
 	"github.com/metaform/connector-fabric-manager/common/model"
+	"github.com/metaform/connector-fabric-manager/common/types"
 )
 
 type OrchestrationState uint
@@ -37,8 +38,10 @@ const (
 //
 // As actions are completed, the orchestration system will update the Completed map.
 type Orchestration struct {
-	ID                string                  `json:"id"`
-	CorrelationID     string                  `json:"correlationId"`
+	ID            string `json:"id"`
+	CorrelationID string `json:"correlationId"`
+	// DefinitionID the unique ID of the orchestration definition that this orchestration is based on
+	DefinitionID      string                  `json:"definitionId"`
 	State             OrchestrationState      `json:"state"`
 	StateTimestamp    time.Time               `json:"stateTimestamp"`
 	CreatedTimestamp  time.Time               `json:"createdTimestamp"`
@@ -203,12 +206,11 @@ func (o *ActivityDefinition) IncrementVersion() {
 
 // InstantiateOrchestration creates and returns an initialized Orchestration based on the provided definition and inputs.
 // It validates activity dependencies and organizes activities into parallel execution steps based on those dependencies.
-func InstantiateOrchestration(
-	id string,
-	correlationID string,
-	orchestrationType model.OrchestrationType,
-	activities []Activity,
-	data map[string]any) (*Orchestration, error) {
+func InstantiateOrchestration(id string, correlationID string, orchestrationType model.OrchestrationType, definitionID string, activities []Activity, data map[string]any) (*Orchestration, error) {
+
+	if definitionID == "" {
+		return nil, types.NewValidationError("definitionID", "cannot be empty")
+	}
 
 	processingData := make(map[string]any)
 	for k, v := range data {
@@ -219,6 +221,7 @@ func InstantiateOrchestration(
 	orchestration := &Orchestration{
 		ID:                id,
 		CorrelationID:     correlationID,
+		DefinitionID:      definitionID,
 		OrchestrationType: orchestrationType,
 		State:             OrchestrationStateInitialized,
 		StateTimestamp:    now,

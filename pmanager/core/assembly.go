@@ -37,6 +37,7 @@ func (m PMCoreServiceAssembly) Requires() []system.ServiceType {
 func (m PMCoreServiceAssembly) Init(context *system.InitContext) error {
 	definitionStore := context.Registry.Resolve(api.DefinitionStoreKey).(api.DefinitionStore)
 	transactionContext := context.Registry.Resolve(store.TransactionContextKey).(store.TransactionContext)
+	orchestrationIndex := context.Registry.Resolve(api.OrchestrationIndexKey).(store.EntityStore[*api.OrchestrationEntry])
 
 	context.Registry.Register(api.ProvisionManagerKey, provisionManager{
 		orchestrator: context.Registry.Resolve(api.OrchestratorKey).(api.Orchestrator),
@@ -47,8 +48,9 @@ func (m PMCoreServiceAssembly) Init(context *system.InitContext) error {
 	})
 
 	context.Registry.Register(api.DefinitionManagerKey, definitionManager{
-		trxContext: transactionContext,
-		store:      definitionStore,
+		trxContext:         transactionContext,
+		store:              definitionStore,
+		orchestrationStore: orchestrationIndex,
 	})
 	return nil
 }
