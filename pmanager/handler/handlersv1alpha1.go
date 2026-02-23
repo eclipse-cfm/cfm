@@ -15,10 +15,10 @@ package handler
 import (
 	"net/http"
 
+	. "github.com/metaform/connector-fabric-manager/common/collection"
 	"github.com/metaform/connector-fabric-manager/common/handler"
 	"github.com/metaform/connector-fabric-manager/common/model"
 	"github.com/metaform/connector-fabric-manager/common/store"
-	. "github.com/metaform/connector-fabric-manager/common/stream"
 	"github.com/metaform/connector-fabric-manager/common/system"
 	"github.com/metaform/connector-fabric-manager/pmanager/api"
 	"github.com/metaform/connector-fabric-manager/pmanager/model/v1alpha1"
@@ -211,9 +211,9 @@ func (h *PMHandler) getOrchestrationDefinitionsByTemplate(w http.ResponseWriter,
 		return
 	}
 
-	dtos := Map(From(defs), func(def api.OrchestrationDefinition) v1alpha1.OrchestrationDefinitionDto {
+	dtos := Collect(Map(From(defs), func(def api.OrchestrationDefinition) v1alpha1.OrchestrationDefinitionDto {
 		return *v1alpha1.ToOrchestrationDefinitionDto(&def)
-	}).Collect()
+	}))
 
 	h.ResponseOK(w, dtos)
 }

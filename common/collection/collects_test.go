@@ -14,6 +14,7 @@ package collection
 
 import (
 	"errors"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -122,5 +123,237 @@ func TestCollectAll(t *testing.T) {
 		assert.NotNil(t, result[1])
 		assert.Equal(t, "test", result[1].Value)
 		assert.Nil(t, result[2])
+	})
+}
+
+func TestFrom(t *testing.T) {
+	t.Run("should create sequence from slice", func(t *testing.T) {
+		slice := []int{1, 2, 3, 4, 5}
+		seq := From(slice)
+
+		result := Collect(seq)
+
+		assert.Equal(t, slice, result)
+	})
+
+	t.Run("should create sequence from empty slice", func(t *testing.T) {
+		slice := []int{}
+		seq := From(slice)
+
+		result := Collect(seq)
+
+		assert.Empty(t, result)
+	})
+
+	t.Run("should work with different types", func(t *testing.T) {
+		slice := []string{"a", "b", "c"}
+		seq := From(slice)
+
+		result := Collect(seq)
+
+		assert.Equal(t, slice, result)
+	})
+}
+
+func TestSeq_Iteration(t *testing.T) {
+	t.Run("should iterate over sequence", func(t *testing.T) {
+		slice := []int{1, 2, 3}
+		seq := From(slice)
+
+		var result []int
+		for v := range seq {
+			result = append(result, v)
+		}
+
+		assert.Equal(t, slice, result)
+	})
+}
+
+func TestMap(t *testing.T) {
+	t.Run("should map int to string", func(t *testing.T) {
+		slice := []int{1, 2, 3, 4, 5}
+		seq := From(slice)
+		mapped := Map(seq, func(i int) string {
+			return strconv.Itoa(i)
+		})
+		result := Collect(mapped)
+		assert.Equal(t, []string{"1", "2", "3", "4", "5"}, result)
+	})
+
+	t.Run("should map int to int with transformation", func(t *testing.T) {
+		slice := []int{1, 2, 3, 4, 5}
+		seq := From(slice)
+		mapped := Map(seq, func(i int) int {
+			return i * 2
+		})
+		result := Collect(mapped)
+
+		assert.Equal(t, []int{2, 4, 6, 8, 10}, result)
+	})
+
+	t.Run("should work with empty sequence", func(t *testing.T) {
+		slice := []int{}
+		seq := From(slice)
+		mapped := Map(seq, func(i int) string {
+			return strconv.Itoa(i)
+		})
+		result := Collect(mapped)
+
+		assert.Empty(t, result)
+	})
+
+	t.Run("should map string to struct", func(t *testing.T) {
+		type Person struct {
+			Name string
+		}
+
+		slice := []string{"Alice", "Bob", "Charlie"}
+		seq := From(slice)
+
+		mapped := Map(seq, func(name string) Person {
+			return Person{Name: name}
+		})
+		result := Collect(mapped)
+
+		expected := []Person{
+			{Name: "Alice"},
+			{Name: "Bob"},
+			{Name: "Charlie"},
+		}
+		assert.Equal(t, expected, result)
+	})
+
+	t.Run("should handle early termination", func(t *testing.T) {
+		slice := []int{1, 2, 3, 4, 5}
+		seq := From(slice)
+		mapped := Map(seq, func(i int) int {
+			return i * 2
+		})
+
+		var result []int
+		for v := range mapped {
+			result = append(result, v)
+			if v == 4 {
+				break
+			}
+		}
+
+		assert.Equal(t, []int{2, 4}, result)
+	})
+}
+
+func TestDistinct(t *testing.T) {
+	t.Run("should remove duplicate integers", func(t *testing.T) {
+		slice := []int{1, 2, 2, 3, 3, 3, 4, 5, 5}
+		seq := From(slice)
+
+		distinct := Distinct(seq)
+		result := Collect(distinct)
+
+		assert.ElementsMatch(t, []int{1, 2, 3, 4, 5}, result)
+	})
+
+	t.Run("should remove duplicate strings", func(t *testing.T) {
+		slice := []string{"a", "b", "a", "c", "b"}
+		seq := From(slice)
+
+		distinct := Distinct(seq)
+		result := Collect(distinct)
+
+		assert.ElementsMatch(t, []string{"a", "b", "c"}, result)
+	})
+
+	t.Run("should return same elements when all are unique", func(t *testing.T) {
+		slice := []int{1, 2, 3, 4, 5}
+		seq := From(slice)
+
+		distinct := Distinct(seq)
+		result := Collect(distinct)
+
+		assert.Equal(t, slice, result)
+	})
+
+	t.Run("should work with empty sequence", func(t *testing.T) {
+		slice := []int{}
+		seq := From(slice)
+
+		distinct := Distinct(seq)
+		result := Collect(distinct)
+
+		assert.Empty(t, result)
+	})
+
+	t.Run("should handle early termination", func(t *testing.T) {
+		slice := []int{1, 2, 2, 3, 4, 4, 5}
+		seq := From(slice)
+
+		distinct := Distinct(seq)
+
+		var result []int
+		for v := range distinct {
+			result = append(result, v)
+			if v == 3 {
+				break
+			}
+		}
+
+		assert.Equal(t, []int{1, 2, 3}, result)
+	})
+}
+
+func TestCollect(t *testing.T) {
+	t.Run("should collect all elements", func(t *testing.T) {
+		slice := []int{1, 2, 3, 4, 5}
+		seq := From(slice)
+
+		result := Collect(seq)
+
+		assert.Equal(t, slice, result)
+	})
+
+	t.Run("should collect empty sequence", func(t *testing.T) {
+		slice := []int{}
+		seq := From(slice)
+
+		result := Collect(seq)
+
+		assert.Empty(t, result)
+	})
+}
+
+func TestChainedOperations(t *testing.T) {
+	t.Run("should chain Map and Distinct", func(t *testing.T) {
+		slice := []int{1, 2, 2, 3, 3, 4}
+		seq := From(slice)
+
+		result := Collect(Distinct(Map(seq, func(i int) int {
+			return i * 2
+		})))
+
+		assert.ElementsMatch(t, []int{2, 4, 6, 8}, result)
+	})
+
+	t.Run("should chain Distinct and Map", func(t *testing.T) {
+		slice := []int{1, 2, 2, 3, 3, 4}
+		seq := From(slice)
+
+		distinct := Distinct(seq)
+		result := Collect(Map(distinct, func(i int) string {
+			return strconv.Itoa(i * 10)
+		}))
+
+		assert.ElementsMatch(t, []string{"10", "20", "30", "40"}, result)
+	})
+
+	t.Run("should chain multiple operations", func(t *testing.T) {
+		slice := []int{1, 2, 2, 3, 3, 4, 5, 5}
+		seq := From(slice)
+
+		result := Collect(Distinct(Map(
+			Distinct(seq),
+			func(i int) int { return i * 2 },
+		)))
+
+		assert.ElementsMatch(t, []int{2, 4, 6, 8, 10}, result)
 	})
 }
