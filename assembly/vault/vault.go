@@ -109,22 +109,27 @@ func (v *vaultClient) StoreSecret(ctx context.Context, path string, value string
 
 func (v *vaultClient) DeleteSecret(ctx context.Context, path string) error {
 	var err error
-	if v.softDelete {
-		_, err = v.client.Secrets.KvV2Delete(
-			ctx,
-			path,
-			v.getOptions()...,
-		)
-	} else {
-		_, err = v.client.Secrets.KvV2DeleteMetadataAndAllVersions(
-			ctx,
-			path,
-			v.getOptions()...,
-		)
-	}
+
+	_, err = v.client.Secrets.KvV2Delete(
+		ctx,
+		path,
+		v.getOptions()...,
+	)
 	if err != nil {
 		return fmt.Errorf("unable to delete secret at path %s: %w", path, err)
 	}
+
+	if !v.softDelete {
+		_, err := v.client.Secrets.KvV2DeleteMetadataAndAllVersions(
+			ctx,
+			path,
+			v.getOptions()...,
+		)
+		if err != nil {
+			return fmt.Errorf("unable to purge metadata and all versions at path %s: %w", path, err)
+		}
+	}
+
 	return nil
 }
 

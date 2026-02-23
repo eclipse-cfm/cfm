@@ -37,7 +37,26 @@ func TestStoreAndResolveSecret(t *testing.T) {
 	assert.Equalf(t, newSecretValue, retrievedValue, "Expected secret value %q, got %q", newSecretValue, retrievedValue)
 }
 
-func TestDeleteSecret(t *testing.T) {
+func TestDeleteSecret_WithSoftDelete(t *testing.T) {
+	ctx := context.Background()
+
+	client, cleanup := setupTestFixtures(ctx, t)
+	client.softDelete = true
+	defer cleanup()
+
+	secretToDelete := "secret-to-delete"
+	err := client.StoreSecret(ctx, secretToDelete, "delete-me")
+	require.NoError(t, err, "Failed to store secret")
+
+	err = client.DeleteSecret(ctx, secretToDelete)
+	require.NoError(t, err, "Failed to delete secret")
+
+	// Try to retrieve the deleted secret (should fail)
+	_, err = client.ResolveSecret(ctx, secretToDelete)
+	require.NotNil(t, err, "Expected error when retrieving deleted secret, but got none")
+}
+
+func TestDeleteSecret_NoSoftDelete(t *testing.T) {
 	ctx := context.Background()
 
 	client, cleanup := setupTestFixtures(ctx, t)

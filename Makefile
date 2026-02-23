@@ -5,6 +5,7 @@
 #==============================================================================
 
 # Service directories
+ASSEMBLY_DIR=assembly
 COMMON_DIR=common
 PMANAGER_DIR=pmanager
 TMANAGER_DIR=tmanager
@@ -95,6 +96,7 @@ test: install-gotestsum
 	$(MAKE) -C $(KEYCLOAK_DIR) test
 	$(MAKE) -C $(REG_DIR) test
 	$(MAKE) -C $(ONBOARDING_DIR) test
+	$(MAKE) -C $(ASSEMBLY_DIR) test
 
 test-common:
 	@echo "Testing common..."

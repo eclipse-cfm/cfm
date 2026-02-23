@@ -416,7 +416,13 @@ func createJwtRole(client *http.Client, vaultURL, keycloakHostname string, token
 	// Create a policy that allows reading from kv-v2
 	policyURL := fmt.Sprintf("%s/v1/sys/policies/acl/test-policy", vaultURL)
 	policyData := map[string]any{
-		"policy": fmt.Sprintf(`path "%s/data/*" {capabilities = ["create", "read", "update", "delete", "list"]}`, vaultPath),
+		"policy": fmt.Sprintf(`
+			path "%s/data/*" {
+			  capabilities = ["create", "read", "update", "delete", "list"]
+			}
+			path "%s/metadata/*" {
+			  capabilities = ["delete", "list", "read"]
+			}`, vaultPath, vaultPath),
 	}
 
 	if _, err := vaultRequest(client, policyURL, token, http.MethodPut, policyData); err != nil {
