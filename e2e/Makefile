@@ -11,7 +11,7 @@ build-test-agent:
 
 # Run all tests
 test:
-	gotestsum --format pkgname-and-test-fails
+	$(TEST_CMD)
 
 # Run tests with coverage
 test-coverage:

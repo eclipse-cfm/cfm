@@ -22,7 +22,7 @@ build-server:
 
 # Run tests
 test:
-	gotestsum --format pkgname-and-test-fails
+	$(TEST_CMD)
 
 # Clean build artifacts
 clean:

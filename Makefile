@@ -5,6 +5,7 @@
 #==============================================================================
 
 # Service directories
+ASSEMBLY_DIR=assembly
 COMMON_DIR=common
 PMANAGER_DIR=pmanager
 TMANAGER_DIR=tmanager
@@ -19,6 +20,10 @@ E2E_DIR=e2e
 # Docker settings
 DOCKER_REGISTRY=ghcr.io/metaform/connector-fabric-manager/
 DOCKER_TAG=latest
+
+# TEST OUTPUT CONFIG
+TEST_FORMAT=dots-v2
+export TEST_CMD=gotestsum --format $(TEST_FORMAT) -- -count=1 ./...
 
 #==============================================================================
 # Help
@@ -95,6 +100,7 @@ test: install-gotestsum
 	$(MAKE) -C $(KEYCLOAK_DIR) test
 	$(MAKE) -C $(REG_DIR) test
 	$(MAKE) -C $(ONBOARDING_DIR) test
+	$(MAKE) -C $(ASSEMBLY_DIR) test
 
 test-common:
 	@echo "Testing common..."

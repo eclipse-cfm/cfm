@@ -27,4 +27,4 @@ jobs:
         run: make generate-mocks
 
       - name: "Run tests"
-        run: make test
+        run: make test TEST_FORMAT=github-actions

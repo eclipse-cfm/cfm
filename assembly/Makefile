@@ -8,7 +8,7 @@ export CGO_ENABLED=0
 
 # Run all tests
 test:
-	gotestsum --format pkgname-and-test-fails
+	$(TEST_CMD)
 
 # Run tests with coverage
 test-coverage:
