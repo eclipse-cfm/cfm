@@ -93,8 +93,8 @@ const (
 	ActivityResultRetryError = -1
 	ActivityResultFatalError = -2
 
-	DeployDiscriminator  Discriminator = "deploy"
-	DisposeDiscriminator Discriminator = "dispose"
+	DeployDiscriminator  = Discriminator(model.VPADeployType)
+	DisposeDiscriminator = Discriminator(model.VPADisposeType)
 )
 
 type ActivityResult struct {
