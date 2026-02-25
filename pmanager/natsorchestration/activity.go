@@ -282,6 +282,7 @@ func (e *NatsActivityExecutor) handleFatalError(
 			o.ProcessingData = make(map[string]any)
 		}
 		o.ProcessingData["error"] = resultErr.Error()
+		orchestration = *o
 	}); err != nil {
 		e.Monitor.Warnf("Failed to mark orchestration %s as fatal: %v", orchestration.ID, err)
 	}
