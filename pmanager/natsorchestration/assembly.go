@@ -14,6 +14,7 @@ package natsorchestration
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/metaform/connector-fabric-manager/common/natsclient"
@@ -91,6 +92,20 @@ func (a *natsOrchestratorServiceAssembly) Init(ctx *system.InitContext) error {
 	}
 	a.subscription, err = a.natsClient.JetStream.Conn().Subscribe("$KV."+a.bucket+".>", func(msg *nats.Msg) {
 		watcher.onMessage(msg.Data, msg)
+	})
+
+	//_, err = a.natsClient.JetStream.Conn().Subscribe("$KV."+a.bucket+".>", func(msg *nats.Msg) {
+	_, err = a.natsClient.JetStream.Conn().Subscribe("event.cfm-orchestration-response", func(msg *nats.Msg) {
+		var orchestration api.Orchestration
+		err := json.Unmarshal(msg.Data, &orchestration)
+		if err != nil {
+			ctx.LogMonitor.Warnf("not an Orchestration message. %s", err)
+			return
+		}
+		if orchestration.State == api.OrchestrationStateErrored {
+			ctx.LogMonitor.Infof("Orchestration error: %s is in state %s with error: %s", orchestration.ID, orchestration.State.String(), orchestration.ProcessingData["error"])
+
+		}
 	})
 
 	client := natsclient.NewMsgClient(natsClient)

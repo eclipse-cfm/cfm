@@ -91,6 +91,12 @@ type Query struct {
 	Limit     int64  `json:"limit"`
 }
 
+func None() Query {
+	return Query{
+		Predicate: "true",
+	}
+}
+
 func initValidator() *validator.Validate {
 	v := validator.New()
 

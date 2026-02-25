@@ -95,6 +95,7 @@ func createEntry(orchestration api.Orchestration) *api.OrchestrationEntry {
 		ID:                orchestration.ID,
 		OrchestrationType: orchestration.OrchestrationType,
 		CorrelationID:     orchestration.CorrelationID,
+		DefinitionID:      orchestration.DefinitionID,
 		State:             orchestration.State,
 		StateTimestamp:    orchestration.StateTimestamp,
 		CreatedTimestamp:  orchestration.CreatedTimestamp,

@@ -40,7 +40,7 @@ func Test_VerifyDefinitionOperations(t *testing.T) {
 	defer natsfixtures.TeardownNatsContainer(ctx, nt)
 	defer cleanup()
 
-	client := launchPlatform(t, nt.URI, dsn)
+	client := launchPlatformWithAgent(t, nt.URI, dsn)
 
 	waitTManager(t, client)
 	waitPManager(t, client)
