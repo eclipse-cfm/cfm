@@ -482,6 +482,48 @@ func TestEmptyAndNilInputs(t *testing.T) {
 	})
 }
 
+func TestNewAPICell_Defaults(t *testing.T) {
+	before := time.Now().UTC()
+
+	input := NewCell{
+		ExternalID: "ext-1",
+		Properties: map[string]any{"key": "value"},
+	}
+
+	result := NewAPICell(&input)
+
+	after := time.Now().UTC()
+
+	require.NotNil(t, result)
+	assert.NotEmpty(t, result.ID)
+	assert.Equal(t, int64(0), result.Version)
+	assert.Equal(t, api.DeploymentStateInitial, result.State)
+	assert.Equal(t, "ext-1", result.ExternalID)
+	assert.Contains(t, result.Properties, "key")
+
+	// StateTimestamp should default to approximately now
+	assert.False(t, result.StateTimestamp.IsZero(), "StateTimestamp should not be zero")
+	assert.True(t, !result.StateTimestamp.Before(before), "StateTimestamp should be >= test start time")
+	assert.True(t, !result.StateTimestamp.After(after), "StateTimestamp should be <= test end time")
+}
+
+func TestNewAPICell_ExplicitValues(t *testing.T) {
+	testTime := time.Date(2025, 8, 12, 20, 30, 45, 123000000, time.FixedZone("CET", 1*60*60))
+
+	input := NewCell{
+		State:          "active",
+		StateTimestamp: testTime,
+		ExternalID:     "ext-2",
+		Properties:     map[string]any{"key": "value"},
+	}
+
+	result := NewAPICell(&input)
+
+	require.NotNil(t, result)
+	assert.Equal(t, api.DeploymentStateActive, result.State)
+	assert.Equal(t, testTime.UTC(), result.StateTimestamp)
+}
+
 func TestToDataspaceProfile(t *testing.T) {
 	testTime := time.Date(2025, 1, 15, 10, 30, 45, 0, time.UTC)
 

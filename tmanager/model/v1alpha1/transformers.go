@@ -13,6 +13,8 @@
 package v1alpha1
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/metaform/connector-fabric-manager/common/model"
 	"github.com/metaform/connector-fabric-manager/tmanager/api"
@@ -211,7 +213,18 @@ func ToAPICell(input *Cell) *api.Cell {
 }
 
 func NewAPICell(input *NewCell) *api.Cell {
-	state, _ := api.ToDeploymentState(input.State)
+	state := api.DeploymentStateInitial
+	if input.State != "" {
+		if parsed, err := api.ToDeploymentState(input.State); err == nil {
+			state = parsed
+		}
+	}
+
+	stateTimestamp := input.StateTimestamp
+	if stateTimestamp.IsZero() {
+		stateTimestamp = time.Now()
+	}
+
 	return &api.Cell{
 		DeployableEntity: api.DeployableEntity{
 			Entity: api.Entity{
@@ -219,7 +232,7 @@ func NewAPICell(input *NewCell) *api.Cell {
 				Version: 0,
 			},
 			State:          state,
-			StateTimestamp: input.StateTimestamp.UTC(), // Force UTC
+			StateTimestamp: stateTimestamp.UTC(), // Force UTC
 		},
 		ExternalID: input.ExternalID,
 		Properties: api.ToProperties(input.Properties),
