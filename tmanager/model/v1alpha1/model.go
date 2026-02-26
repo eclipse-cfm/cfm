@@ -19,8 +19,8 @@ import (
 )
 
 type Entity struct {
-	ID      string `json:"id" required:"true"`
-	Version int64  `json:"version" required:"true"`
+	ID      string `json:"id"`
+	Version int64  `json:"version"`
 }
 
 type NewTenant struct {
@@ -34,8 +34,8 @@ type Tenant struct {
 
 type NewCell struct {
 	ExternalID     string         `json:"externalId"`
-	State          string         `json:"state" required:"true"`
-	StateTimestamp time.Time      `json:"stateTimestamp" required:"true"`
+	State          string         `json:"state,omitempty"`
+	StateTimestamp time.Time      `json:"stateTimestamp,omitempty"`
 	Properties     map[string]any `json:"properties,omitempty"`
 }
 
@@ -111,8 +111,8 @@ type VirtualParticipantAgent struct {
 
 type DeployableEntity struct {
 	Entity
-	State          string    `json:"state" required:"true"`
-	StateTimestamp time.Time `json:"stateTimestamp" required:"true"`
+	State          string    `json:"state"`
+	StateTimestamp time.Time `json:"stateTimestamp"`
 }
 
 type TenantPropertiesDiff struct {
