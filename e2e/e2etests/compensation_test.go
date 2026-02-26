@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/metaform/connector-fabric-manager/common/collection"
 	"github.com/metaform/connector-fabric-manager/common/model"
 	"github.com/metaform/connector-fabric-manager/common/natsfixtures"
 	"github.com/metaform/connector-fabric-manager/common/sqlstore"
@@ -25,6 +26,7 @@ import (
 	papi "github.com/metaform/connector-fabric-manager/pmanager/api"
 	"github.com/metaform/connector-fabric-manager/tmanager/api"
 	"github.com/metaform/connector-fabric-manager/tmanager/model/v1alpha1"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -49,8 +51,14 @@ func Test_VerifyAutoCompensation(t *testing.T) {
 	_, client := launchPlatform(t, nt.URI, dsn)
 
 	// launch a test agent that always fails -> triggers auto-compensation
+	disposed := false
 	go func() {
 		testLauncher.LaunchWithCallback(ctx.Done(), func(ctx papi.ActivityContext) papi.ActivityResult {
+			disc := ctx.Discriminator()
+			if disc == papi.DisposeDiscriminator {
+				disposed = true
+				return papi.ActivityResult{Result: papi.ActivityResultComplete}
+			}
 			return papi.ActivityResult{
 				Result:           papi.ActivityResultFatalError,
 				WaitOnReschedule: 0,
@@ -98,33 +106,40 @@ func Test_VerifyAutoCompensation(t *testing.T) {
 	for start := time.Now(); time.Since(start) < 5*time.Second; {
 		err = client.PostToPManagerWithResponse("orchestrations/query", model.None(), &orchestrations)
 		require.NoError(t, err)
-		if orchestrations != nil && len(orchestrations) == 1 {
+		if orchestrations != nil && len(orchestrations) >= 1 {
 			if orchestrations[0].State == papi.OrchestrationStateErrored {
 				break
 			}
 		}
 	}
 
-	require.Len(t, orchestrations, 1, "Expected 1 orchestrations to be present")
-	o := orchestrations[0]
-	require.Equal(t, papi.OrchestrationStateErrored, o.State)
+	require.GreaterOrEqual(t, len(orchestrations), 1, "Expected >= 1 orchestrations to be present")
 
-	// Verify all VPAs are errored out
+	states := collection.Collect(collection.Map(collection.From(orchestrations), func(o papi.OrchestrationEntry) papi.OrchestrationState {
+		return o.State
+	}))
+	require.Contains(t, states, papi.OrchestrationStateErrored)
+
+	// Verify that ultimately all VPAs are in the disposed state. this will only happen after the compensation orchestration is completed
 	var statusProfile v1alpha1.ParticipantProfile
-	deployCount := 0
+	disposeCount := 0
 	for start := time.Now(); time.Since(start) < 5*time.Second; {
 		err = client.GetTManager(fmt.Sprintf("tenants/%s/participant-profiles/%s", tenant.ID, participantProfile.ID), &statusProfile)
 		require.NoError(t, err)
+
 		for _, vpa := range statusProfile.VPAs {
-			if vpa.State == api.DeploymentStateError.String() {
-				deployCount++
+			if vpa.State == api.DeploymentStateDisposed.String() {
+				disposeCount++
+			} else {
+				t.Logf("VPA %s is in state %s", vpa.ID, vpa.State)
 			}
 		}
-		if deployCount == 3 {
+		if disposeCount == 3 {
 			break
 		}
 	}
-	require.Equal(t, 3, deployCount, "Expected 3 VPAs to be errored out")
+	require.Equal(t, 3, disposeCount, "Expected 3 VPAs to be disposed")
 
-	// verify that the compensation orchestration was started
+	// verify that the compensation orchestration ran
+	assert.True(t, disposed, "Expected dispose orchestration to be run")
 }

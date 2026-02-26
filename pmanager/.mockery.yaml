@@ -9,4 +9,9 @@ packages:
         config:
           filename: orchestrator_mock.go
           outpkg: mocks
-          dir: ./mocks
+          dir: ./api/mocks
+      ProvisionManager:
+        config:
+          filename: provision_mock.go
+          outpkg: mocks
+          dir: ./api/mocks

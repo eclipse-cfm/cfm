@@ -17,6 +17,8 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/google/uuid"
+	"github.com/metaform/connector-fabric-manager/common/model"
 	"github.com/metaform/connector-fabric-manager/common/store"
 	"github.com/metaform/connector-fabric-manager/common/system"
 	"github.com/metaform/connector-fabric-manager/common/types"
@@ -34,9 +36,10 @@ type MessageAck interface {
 // the Jetstream KV store is not optimized for queries. The Jetstream KV store is using an underlying stream and
 // the watcher consumers update messages, recording relevant changes in the index.
 type OrchestrationIndexWatcher struct {
-	index      store.EntityStore[*api.OrchestrationEntry]
-	trxContext store.TransactionContext
-	monitor    system.LogMonitor
+	index            store.EntityStore[*api.OrchestrationEntry]
+	trxContext       store.TransactionContext
+	monitor          system.LogMonitor
+	provisionManager api.ProvisionManager
 }
 
 func (w *OrchestrationIndexWatcher) onMessage(data []byte, msg MessageAck) {
@@ -58,7 +61,7 @@ func (w *OrchestrationIndexWatcher) onMessage(data []byte, msg MessageAck) {
 			return nil
 		}
 
-		entry := createEntry(orchestration)
+		entry := convertToEntry(orchestration)
 		if currentEntry != nil { // Found
 			// Only update if state and timestamp changed and not in a terminal state (messages may arrive out of order)
 			if (currentEntry.State == orchestration.State && orchestration.StateTimestamp == currentEntry.StateTimestamp) ||
@@ -73,6 +76,28 @@ func (w *OrchestrationIndexWatcher) onMessage(data []byte, msg MessageAck) {
 				_ = msg.Nak()
 				return nil
 			}
+
+			// the orchestration failed, kick off the compensation
+			if orchestration.State == api.OrchestrationStateErrored && orchestration.OrchestrationType != model.VPADisposeType {
+				w.monitor.Infof("Orchestration [%s] is in state [%s] with error: [%s]. Starting auto-compensation", orchestration.ID, orchestration.State.String(), orchestration.ProcessingData["error"])
+				correlationID := orchestration.CorrelationID //eg. participant profile id, etc.
+				pData := orchestration.ProcessingData        // stuff for the VPAs
+				manifest := model.OrchestrationManifest{
+					ID:                uuid.NewString(),
+					CorrelationID:     correlationID,
+					OrchestrationType: model.VPADisposeType,
+					Payload:           pData,
+				}
+				if w.provisionManager == nil {
+					panic("Watcher: provisionManager is nil")
+				}
+				compensation, err := w.provisionManager.Start(ctx, &manifest)
+				if err != nil {
+					return err
+				}
+				w.monitor.Infof("Launching Orchestration [%s] as compensation for [%s]", compensation.ID, orchestration.ID)
+			}
+
 			// w.monitor.Debugf("Orchestration index entry %s updated to state %s", orchestration.ID, orchestration.State)
 		} else {
 			_, err := w.index.Create(ctx, entry)
@@ -90,7 +115,7 @@ func (w *OrchestrationIndexWatcher) onMessage(data []byte, msg MessageAck) {
 	})
 }
 
-func createEntry(orchestration api.Orchestration) *api.OrchestrationEntry {
+func convertToEntry(orchestration api.Orchestration) *api.OrchestrationEntry {
 	entry := &api.OrchestrationEntry{
 		ID:                orchestration.ID,
 		OrchestrationType: orchestration.OrchestrationType,
