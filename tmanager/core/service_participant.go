@@ -333,7 +333,6 @@ func (h vpaCallbackHandler) handle(
 		case response.Success:
 			handler(profile, response)
 		default:
-			// TODO update VPA status
 			profile.Error = true
 			profile.ErrorDetail = response.ErrorDetail
 			handler(profile, response)

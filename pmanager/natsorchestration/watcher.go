@@ -19,6 +19,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/metaform/connector-fabric-manager/common/model"
+	"github.com/metaform/connector-fabric-manager/common/query"
 	"github.com/metaform/connector-fabric-manager/common/store"
 	"github.com/metaform/connector-fabric-manager/common/system"
 	"github.com/metaform/connector-fabric-manager/common/types"
@@ -36,10 +37,11 @@ type MessageAck interface {
 // the Jetstream KV store is not optimized for queries. The Jetstream KV store is using an underlying stream and
 // the watcher consumers update messages, recording relevant changes in the index.
 type OrchestrationIndexWatcher struct {
-	index            store.EntityStore[*api.OrchestrationEntry]
-	trxContext       store.TransactionContext
-	monitor          system.LogMonitor
-	provisionManager api.ProvisionManager
+	index             store.EntityStore[*api.OrchestrationEntry]
+	definitionManager api.DefinitionManager
+	trxContext        store.TransactionContext
+	monitor           system.LogMonitor
+	provisionManager  api.ProvisionManager
 }
 
 func (w *OrchestrationIndexWatcher) onMessage(data []byte, msg MessageAck) {
@@ -79,6 +81,16 @@ func (w *OrchestrationIndexWatcher) onMessage(data []byte, msg MessageAck) {
 
 			// the orchestration failed, kick off the compensation
 			if orchestration.State == api.OrchestrationStateErrored && orchestration.OrchestrationType != model.VPADisposeType {
+
+				exists, err := w.existsCompensationOrchestration(ctx, model.VPADisposeType, orchestration.DefinitionID)
+				if err != nil {
+					return err
+				}
+				if !exists {
+					w.monitor.Warnf("No compensation orchestration definition found for orchestration [%s]", orchestration.ID)
+					return nil
+				}
+
 				w.monitor.Infof("Orchestration [%s] is in state [%s] with error: [%s]. Starting auto-compensation", orchestration.ID, orchestration.State.String(), orchestration.ProcessingData["error"])
 				correlationID := orchestration.CorrelationID //eg. participant profile id, etc.
 				pData := orchestration.ProcessingData        // stuff for the VPAs
@@ -87,9 +99,6 @@ func (w *OrchestrationIndexWatcher) onMessage(data []byte, msg MessageAck) {
 					CorrelationID:     correlationID,
 					OrchestrationType: model.VPADisposeType,
 					Payload:           pData,
-				}
-				if w.provisionManager == nil {
-					panic("Watcher: provisionManager is nil")
 				}
 				compensation, err := w.provisionManager.Start(ctx, &manifest)
 				if err != nil {
@@ -113,6 +122,25 @@ func (w *OrchestrationIndexWatcher) onMessage(data []byte, msg MessageAck) {
 		}
 		return nil
 	})
+}
+
+// existsCompensationOrchestration verifies that another orchestration definition exists that was generated based on the same template
+// and that has the desired orchestration type
+func (w *OrchestrationIndexWatcher) existsCompensationOrchestration(ctx context.Context, orchestrationType model.OrchestrationType, orchestrationDefinitionID string) (bool, error) {
+	// get orchestration definition by ID
+	idPredicate := query.Eq("type", orchestrationDefinitionID)
+	definitions, err := w.definitionManager.QueryOrchestrationDefinitions(ctx, idPredicate)
+	if err != nil {
+		return false, err
+	}
+	if len(definitions) != 1 {
+		return false, types.NewFatalError("expected exactly one orchestration definition with ID %s, found %d", orchestrationDefinitionID, len(definitions))
+	}
+	templateRef := definitions[0].TemplateRef
+	templateRefPredicate := query.And(query.Eq("templateRef", templateRef), query.Eq("type", orchestrationType.String()))
+	compensationDefinitions, err := w.definitionManager.QueryOrchestrationDefinitions(ctx, templateRefPredicate)
+
+	return len(compensationDefinitions) == 1, err
 }
 
 func convertToEntry(orchestration api.Orchestration) *api.OrchestrationEntry {

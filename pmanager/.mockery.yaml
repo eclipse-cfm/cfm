@@ -15,3 +15,8 @@ packages:
           filename: provision_mock.go
           outpkg: mocks
           dir: ./api/mocks
+      DefinitionManager:
+        config:
+          filename: definition_manager_mock.go
+          outpkg: mocks
+          dir: ./api/mocks

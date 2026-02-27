@@ -34,7 +34,7 @@ import (
 func TestOnMessage_CreateNewEntry(t *testing.T) {
 	index := createTestStore(t)
 	trxContext := &store.NoOpTransactionContext{}
-	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{})
+	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{}, &mocks.MockDefinitionManager{})
 
 	orch := createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateRunning)
 	msg := createNatsMsg(t, orch)
@@ -54,7 +54,7 @@ func TestOnMessage_CreateNewEntry(t *testing.T) {
 func TestOnMessage_UpdateExistingEntry(t *testing.T) {
 	index := createTestStore(t)
 	trxContext := &store.NoOpTransactionContext{}
-	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{})
+	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{}, &mocks.MockDefinitionManager{})
 
 	ctx := context.Background()
 
@@ -80,7 +80,7 @@ func TestOnMessage_UpdateExistingEntry(t *testing.T) {
 func TestOnMessage_MalformedJSON(t *testing.T) {
 	index := createTestStore(t)
 	trxContext := &store.NoOpTransactionContext{}
-	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{})
+	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{}, &mocks.MockDefinitionManager{})
 
 	msg := &nats.Msg{Data: []byte("invalid json")}
 
@@ -97,7 +97,7 @@ func TestOnMessage_MalformedJSON(t *testing.T) {
 func TestOnMessage_UpdateWhenStateUnchangedTimestampDifferent(t *testing.T) {
 	index := createTestStore(t)
 	trxContext := &store.NoOpTransactionContext{}
-	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{})
+	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{}, &mocks.MockDefinitionManager{})
 
 	ctx := context.Background()
 
@@ -126,7 +126,7 @@ func TestOnMessage_UpdateWhenStateUnchangedTimestampDifferent(t *testing.T) {
 func TestOnMessage_IgnoreUpdatesWhenCompleted(t *testing.T) {
 	index := createTestStore(t)
 	trxContext := &store.NoOpTransactionContext{}
-	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{})
+	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{}, &mocks.MockDefinitionManager{})
 
 	ctx := context.Background()
 
@@ -157,7 +157,45 @@ func TestOnMessage_ErroredStateUpdate(t *testing.T) {
 	trxContext := &store.NoOpTransactionContext{}
 	pManager := &mocks.MockProvisionManager{}
 	pManager.On("Start", mock.Anything, mock.Anything).Return(&api.Orchestration{}, nil)
-	watcher := createTestWatcher(index, trxContext, pManager)
+	manager := mocks.MockDefinitionManager{}
+	manager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{}, nil)
+	watcher := createTestWatcher(index, trxContext, pManager, &manager)
+
+	ctx := context.Background()
+
+	// Create entry in Running state
+	orch1 := createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateRunning)
+	runningTime := time.Now()
+	orch1.StateTimestamp = runningTime
+	entry1 := convertToEntry(orch1)
+	_, err := index.Create(ctx, entry1)
+	require.NoError(t, err)
+
+	// Try to update to Errored state
+	orch2 := createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateErrored)
+	orch2.StateTimestamp = time.Now()
+	msg := createNatsMsg(t, orch2)
+
+	watcher.onMessage(msg.Data, msg)
+
+	// Verify state remains Running
+	entry, err := index.FindByID(ctx, "orch-1")
+	require.NoError(t, err)
+	assert.Equal(t, api.OrchestrationStateErrored, entry.State)
+}
+
+// Compensation should fail if there are too many compensation orchestration defs
+func TestOnMessage_ErrorWhenTooManyCompensationOrchs(t *testing.T) {
+	index := createTestStore(t)
+	trxContext := &store.NoOpTransactionContext{}
+	pManager := &mocks.MockProvisionManager{}
+	pManager.On("Start", mock.Anything, mock.Anything).Return(&api.Orchestration{}, nil)
+	manager := mocks.MockDefinitionManager{}
+	manager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{
+		{},
+		{},
+	}, nil)
+	watcher := createTestWatcher(index, trxContext, pManager, &manager)
 
 	ctx := context.Background()
 
@@ -186,7 +224,7 @@ func TestOnMessage_ErroredStateUpdate(t *testing.T) {
 func TestOnMessage_CreateMultipleEntries(t *testing.T) {
 	index := createTestStore(t)
 	trxContext := &store.NoOpTransactionContext{}
-	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{})
+	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{}, &mocks.MockDefinitionManager{})
 
 	ctx := context.Background()
 
@@ -220,7 +258,7 @@ func TestOnMessage_CreateMultipleEntries(t *testing.T) {
 func TestOnMessage_CorrectMetadataAfterCreate(t *testing.T) {
 	index := createTestStore(t)
 	trxContext := &store.NoOpTransactionContext{}
-	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{})
+	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{}, &mocks.MockDefinitionManager{})
 
 	ctx := context.Background()
 
@@ -255,7 +293,7 @@ func TestOnMessage_CorrectMetadataAfterCreate(t *testing.T) {
 func TestOnMessage_StateTransitionSequence(t *testing.T) {
 	index := createTestStore(t)
 	trxContext := &store.NoOpTransactionContext{}
-	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{})
+	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{}, &mocks.MockDefinitionManager{})
 
 	ctx := context.Background()
 
@@ -293,7 +331,7 @@ func TestOnMessage_StateTransitionSequence(t *testing.T) {
 func TestOnMessage_MultipleUpdatesToSameEntry(t *testing.T) {
 	index := createTestStore(t)
 	trxContext := &store.NoOpTransactionContext{}
-	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{})
+	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{}, &mocks.MockDefinitionManager{})
 
 	ctx := context.Background()
 
@@ -322,7 +360,7 @@ func TestOnMessage_MultipleUpdatesToSameEntry(t *testing.T) {
 func TestOnMessage_CorrelationIDPreserved(t *testing.T) {
 	index := createTestStore(t)
 	trxContext := &store.NoOpTransactionContext{}
-	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{})
+	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{}, &mocks.MockDefinitionManager{})
 
 	ctx := context.Background()
 
@@ -339,7 +377,7 @@ func TestOnMessage_CorrelationIDPreserved(t *testing.T) {
 func TestOnMessage_EntryPropertiesPreserved(t *testing.T) {
 	index := createTestStore(t)
 	trxContext := &store.NoOpTransactionContext{}
-	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{})
+	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{}, &mocks.MockDefinitionManager{})
 
 	ctx := context.Background()
 
@@ -379,14 +417,13 @@ func createTestStore(t *testing.T) store.EntityStore[*api.OrchestrationEntry] {
 	return memorystore.NewInMemoryEntityStore[*api.OrchestrationEntry]()
 }
 
-func createTestWatcher(index store.EntityStore[*api.OrchestrationEntry],
-	trxContext store.TransactionContext,
-	manager api.ProvisionManager) *OrchestrationIndexWatcher {
+func createTestWatcher(index store.EntityStore[*api.OrchestrationEntry], trxContext store.TransactionContext, manager api.ProvisionManager, definitionManager api.DefinitionManager) *OrchestrationIndexWatcher {
 	return &OrchestrationIndexWatcher{
-		index:            index,
-		trxContext:       trxContext,
-		monitor:          system.NoopMonitor{},
-		provisionManager: manager,
+		index:             index,
+		trxContext:        trxContext,
+		monitor:           system.NoopMonitor{},
+		provisionManager:  manager,
+		definitionManager: definitionManager,
 	}
 }
 

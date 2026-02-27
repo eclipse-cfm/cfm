@@ -93,12 +93,14 @@ func (a *natsOrchestratorServiceAssembly) Prepare(ctx *system.InitContext) error
 	trxContext := ctx.Registry.Resolve(store.TransactionContextKey).(store.TransactionContext)
 	// have to instantiate the watcher here, otherwise the provision manager would cause a cyclic dependency
 	provisionManager := ctx.Registry.Resolve(api.ProvisionManagerKey).(api.ProvisionManager)
-
+	definitionManager := ctx.Registry.Resolve(api.DefinitionManagerKey).(api.DefinitionManager)
+	
 	watcher := &OrchestrationIndexWatcher{
-		index:            index,
-		trxContext:       trxContext,
-		monitor:          ctx.LogMonitor,
-		provisionManager: provisionManager,
+		index:             index,
+		trxContext:        trxContext,
+		monitor:           ctx.LogMonitor,
+		provisionManager:  provisionManager,
+		definitionManager: definitionManager,
 	}
 	var err error
 	a.subscription, err = a.natsClient.JetStream.Conn().Subscribe("$KV."+a.bucket+".>", func(msg *nats.Msg) {
