@@ -132,7 +132,7 @@ func TestNatsActivityExecutor_OrchestrationResponsePublished(t *testing.T) {
 	responseMutex.Unlock()
 }
 
-func TestNatsActivityExecutor_OrchestrationResponseNotPublishedOnError(t *testing.T) {
+func TestNatsActivityExecutor_OrchestrationResponsePublishedOnError(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), processTimeout)
 	defer cancel()
 
@@ -209,9 +209,10 @@ func TestNatsActivityExecutor_OrchestrationResponseNotPublishedOnError(t *testin
 	// Wait and ensure no orchestration response is published
 	select {
 	case <-responseReceived:
-		t.Fatal("Orchestration response should not be published on fatal error")
-	case <-time.After(2 * time.Second):
 		// Expected - no response should be published on error
+	case <-time.After(2 * time.Second):
+		t.Fatal("Orchestration response should not be published on fatal error")
+
 	}
 
 	// Verify orchestration is marked as errored

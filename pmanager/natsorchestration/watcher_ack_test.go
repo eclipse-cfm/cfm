@@ -22,6 +22,7 @@ import (
 	"github.com/metaform/connector-fabric-manager/common/store"
 	"github.com/metaform/connector-fabric-manager/common/types"
 	"github.com/metaform/connector-fabric-manager/pmanager/api"
+	aMocks "github.com/metaform/connector-fabric-manager/pmanager/api/mocks"
 	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -31,7 +32,7 @@ import (
 func TestOnMessage_FindByIDError_NakCalledOnce(t *testing.T) {
 	mockStore := mocks.NewMockEntityStore[*api.OrchestrationEntry](t)
 	trxContext := &store.NoOpTransactionContext{}
-	watcher := createTestWatcher(mockStore, trxContext)
+	watcher := createTestWatcher(mockStore, trxContext, &aMocks.MockProvisionManager{}, &aMocks.MockDefinitionManager{})
 
 	expectedErr := errors.New("database connection failed")
 
@@ -55,7 +56,7 @@ func TestOnMessage_FindByIDError_NakCalledOnce(t *testing.T) {
 func TestOnMessage_CreateError_NakCalledNotAck(t *testing.T) {
 	mockStore := mocks.NewMockEntityStore[*api.OrchestrationEntry](t)
 	trxContext := &store.NoOpTransactionContext{}
-	watcher := createTestWatcher(mockStore, trxContext)
+	watcher := createTestWatcher(mockStore, trxContext, &aMocks.MockProvisionManager{}, &aMocks.MockDefinitionManager{})
 
 	expectedErr := errors.New("failed to write to database")
 
@@ -86,7 +87,7 @@ func TestOnMessage_CreateError_NakCalledNotAck(t *testing.T) {
 func TestOnMessage_UpdateError_NakCalledNotAck(t *testing.T) {
 	mockStore := mocks.NewMockEntityStore[*api.OrchestrationEntry](t)
 	trxContext := &store.NoOpTransactionContext{}
-	watcher := createTestWatcher(mockStore, trxContext)
+	watcher := createTestWatcher(mockStore, trxContext, &aMocks.MockProvisionManager{}, &aMocks.MockDefinitionManager{})
 
 	existingEntry := &api.OrchestrationEntry{
 		ID:                "orch-1",
@@ -126,7 +127,7 @@ func TestOnMessage_UpdateError_NakCalledNotAck(t *testing.T) {
 func TestOnMessage_FindByIDUnexpectedError_NakCalledImmediately(t *testing.T) {
 	mockStore := mocks.NewMockEntityStore[*api.OrchestrationEntry](t)
 	trxContext := &store.NoOpTransactionContext{}
-	watcher := createTestWatcher(mockStore, trxContext)
+	watcher := createTestWatcher(mockStore, trxContext, &aMocks.MockProvisionManager{}, &aMocks.MockDefinitionManager{})
 
 	unexpectedErr := errors.New("data corruption detected")
 
@@ -150,7 +151,7 @@ func TestOnMessage_FindByIDUnexpectedError_NakCalledImmediately(t *testing.T) {
 func TestOnMessage_SequentialErrors_EachNakOnce(t *testing.T) {
 	mockStore := mocks.NewMockEntityStore[*api.OrchestrationEntry](t)
 	trxContext := &store.NoOpTransactionContext{}
-	watcher := createTestWatcher(mockStore, trxContext)
+	watcher := createTestWatcher(mockStore, trxContext, &aMocks.MockProvisionManager{}, &aMocks.MockDefinitionManager{})
 
 	dbError := errors.New("database unavailable")
 
@@ -196,7 +197,7 @@ func TestOnMessage_SequentialErrors_EachNakOnce(t *testing.T) {
 func TestOnMessage_CreateTransientError_NakForRetry(t *testing.T) {
 	mockStore := mocks.NewMockEntityStore[*api.OrchestrationEntry](t)
 	trxContext := &store.NoOpTransactionContext{}
-	watcher := createTestWatcher(mockStore, trxContext)
+	watcher := createTestWatcher(mockStore, trxContext, &aMocks.MockProvisionManager{}, &aMocks.MockDefinitionManager{})
 
 	transientErr := errors.New("temporary lock timeout")
 
@@ -227,7 +228,7 @@ func TestOnMessage_CreateTransientError_NakForRetry(t *testing.T) {
 func TestOnMessage_UpdateStateConflict_NakForRetry(t *testing.T) {
 	mockStore := mocks.NewMockEntityStore[*api.OrchestrationEntry](t)
 	trxContext := &store.NoOpTransactionContext{}
-	watcher := createTestWatcher(mockStore, trxContext)
+	watcher := createTestWatcher(mockStore, trxContext, &aMocks.MockProvisionManager{}, &aMocks.MockDefinitionManager{})
 
 	existingEntry := &api.OrchestrationEntry{
 		ID:                "orch-1",
@@ -267,7 +268,7 @@ func TestOnMessage_UpdateStateConflict_NakForRetry(t *testing.T) {
 func TestOnMessage_SuccessfulCreate_AckCalledNotNak(t *testing.T) {
 	mockStore := mocks.NewMockEntityStore[*api.OrchestrationEntry](t)
 	trxContext := &store.NoOpTransactionContext{}
-	watcher := createTestWatcher(mockStore, trxContext)
+	watcher := createTestWatcher(mockStore, trxContext, &aMocks.MockProvisionManager{}, &aMocks.MockDefinitionManager{})
 
 	mockStore.EXPECT().
 		FindByID(mock.Anything, "orch-1").
@@ -296,7 +297,7 @@ func TestOnMessage_SuccessfulCreate_AckCalledNotNak(t *testing.T) {
 func TestOnMessage_SuccessfulUpdate_AckCalledNotNak(t *testing.T) {
 	mockStore := mocks.NewMockEntityStore[*api.OrchestrationEntry](t)
 	trxContext := &store.NoOpTransactionContext{}
-	watcher := createTestWatcher(mockStore, trxContext)
+	watcher := createTestWatcher(mockStore, trxContext, &aMocks.MockProvisionManager{}, &aMocks.MockDefinitionManager{})
 
 	existingEntry := &api.OrchestrationEntry{
 		ID:                "orch-1",
@@ -334,7 +335,7 @@ func TestOnMessage_SuccessfulUpdate_AckCalledNotNak(t *testing.T) {
 func TestOnMessage_MalformedJSON_AckCalled(t *testing.T) {
 	mockStore := mocks.NewMockEntityStore[*api.OrchestrationEntry](t)
 	trxContext := &store.NoOpTransactionContext{}
-	watcher := createTestWatcher(mockStore, trxContext)
+	watcher := createTestWatcher(mockStore, trxContext, &aMocks.MockProvisionManager{}, &aMocks.MockDefinitionManager{})
 
 	msg := NewMockMessage([]byte("invalid json"))
 

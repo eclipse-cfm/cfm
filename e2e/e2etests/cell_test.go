@@ -39,7 +39,7 @@ func Test_VerifyCellOperations(t *testing.T) {
 	require.NoError(t, err)
 	defer pg.Terminate(context.Background())
 
-	client := launchPlatform(t, nt.URI, dsn)
+	client := launchPlatformWithAgent(t, nt.URI, dsn)
 
 	waitTManager(t, client)
 

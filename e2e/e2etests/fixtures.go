@@ -21,7 +21,7 @@ import (
 
 	"github.com/metaform/connector-fabric-manager/common/fixtures"
 	"github.com/metaform/connector-fabric-manager/e2e/e2efixtures"
-	alauncher "github.com/metaform/connector-fabric-manager/e2e/testagent/launcher"
+	testLauncher "github.com/metaform/connector-fabric-manager/e2e/testagent/launcher"
 	"github.com/metaform/connector-fabric-manager/pmanager/api"
 	plauncher "github.com/metaform/connector-fabric-manager/pmanager/cmd/server/launcher"
 	tlauncher "github.com/metaform/connector-fabric-manager/tmanager/cmd/server/launcher"
@@ -34,7 +34,16 @@ const (
 	cfmBucket   = "cfm-bucket"
 )
 
-func launchPlatform(t *testing.T, natsURI string, pgDsn string) *e2efixtures.ApiClient {
+func launchPlatformWithAgent(t *testing.T, natsURI string, pgDsn string) *e2efixtures.ApiClient {
+	shutdownChannel, client := launchPlatform(t, natsURI, pgDsn)
+	go func() {
+		testLauncher.Launch(shutdownChannel)
+	}()
+
+	return client
+}
+
+func launchPlatform(t *testing.T, natsURI string, pgDsn string) (chan struct{}, *e2efixtures.ApiClient) {
 	_ = os.Setenv("TM_POSTGRES", "true")
 	_ = os.Setenv("TM_DSN", pgDsn)
 	_ = os.Setenv("TM_URI", natsURI)
@@ -65,10 +74,7 @@ func launchPlatform(t *testing.T, natsURI string, pgDsn string) *e2efixtures.Api
 		tlauncher.Launch(shutdownChannel)
 	}()
 
-	go func() {
-		alauncher.Launch(shutdownChannel)
-	}()
-	return e2efixtures.NewApiClient(fmt.Sprintf("http://localhost:%d/api/v1alpha1", tPort), fmt.Sprintf("http://localhost:%d/api/v1alpha1", pPort))
+	return shutdownChannel, e2efixtures.NewApiClient(fmt.Sprintf("http://localhost:%d/api/v1alpha1", tPort), fmt.Sprintf("http://localhost:%d/api/v1alpha1", pPort))
 }
 
 func waitTManager(t *testing.T, client *e2efixtures.ApiClient) {

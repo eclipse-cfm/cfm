@@ -14,6 +14,8 @@ package collection
 
 import (
 	"errors"
+	"iter"
+	"slices"
 	"strconv"
 	"testing"
 
@@ -356,4 +358,116 @@ func TestChainedOperations(t *testing.T) {
 
 		assert.ElementsMatch(t, []int{2, 4, 6, 8, 10}, result)
 	})
+}
+
+func TestFlatMap(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    iter.Seq[int]
+		mapper   func(int) iter.Seq[int]
+		expected []int
+	}{
+		{
+			name: "single level mapping",
+			input: func(yield func(int) bool) {
+				for _, v := range []int{1, 2, 3} {
+					if !yield(v) {
+						return
+					}
+				}
+			},
+			mapper: func(x int) iter.Seq[int] {
+				return func(yield func(int) bool) {
+					// Map each element to a pair of values (x, x*2).
+					for _, v := range []int{x, x * 2} {
+						if !yield(v) {
+							return
+						}
+					}
+				}
+			},
+			expected: []int{1, 2, 2, 4, 3, 6},
+		},
+		{
+			name: "map to empty sequence",
+			input: func(yield func(int) bool) {
+				for _, v := range []int{1, 2, 3} {
+					if !yield(v) {
+						return
+					}
+				}
+			},
+			mapper: func(x int) iter.Seq[int] {
+				// Always return an empty sequence
+				return func(yield func(int) bool) {}
+			},
+			expected: []int{},
+		},
+		{
+			name: "empty input sequence",
+			input: func(yield func(int) bool) {
+				// No elements to yield
+			},
+			mapper: func(x int) iter.Seq[int] {
+				return func(yield func(int) bool) {
+					if !yield(x * 2) {
+						return
+					}
+				}
+			},
+			expected: []int{},
+		},
+		{
+			name: "nested sequences",
+			input: func(yield func(int) bool) {
+				for _, v := range []int{1, 2} {
+					if !yield(v) {
+						return
+					}
+				}
+			},
+			mapper: func(x int) iter.Seq[int] {
+				return func(yield func(int) bool) {
+					// Map each element to three nested values.
+					for _, v := range []int{x, x * 2, x * 3} {
+						if !yield(v) {
+							return
+						}
+					}
+				}
+			},
+			expected: []int{1, 2, 3, 2, 4, 6},
+		},
+		{
+			name: "early termination in mapper",
+			input: func(yield func(int) bool) {
+				for _, v := range []int{1, 2, 3, 4} {
+					if !yield(v) {
+						return
+					}
+				}
+			},
+			mapper: func(x int) iter.Seq[int] {
+				return func(yield func(int) bool) {
+					if x > 2 {
+						return // Skip values greater than 2
+					}
+					for _, v := range []int{x, x * 10} {
+						if !yield(v) {
+							return
+						}
+					}
+				}
+			},
+			expected: []int{1, 10, 2, 20},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			seq := FlatMap(tc.input, tc.mapper)
+			actual := slices.Collect(seq)
+			require.ElementsMatch(t, tc.expected, actual)
+		})
+	}
 }
