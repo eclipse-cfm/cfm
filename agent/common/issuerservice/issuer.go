@@ -26,6 +26,7 @@ import (
 
 type ApiClient interface {
 	CreateHolder(did string, holderID string, name string) error
+	RevokeCredential(participantContextID string, credentialID string) error
 }
 
 type HttpApiClient struct {
@@ -74,6 +75,35 @@ func (i HttpApiClient) CreateHolder(did string, holderID string, name string) er
 
 	if resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("failed to create Holder on ApiClient: received status code %d, body: %s", resp.StatusCode, string(body))
+	}
+	return nil
+}
+
+func (i HttpApiClient) RevokeCredential(participantContextID string, credentialID string) error {
+	accessToken, err := i.TokenProvider.GetToken()
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf("%s/v1alpha/participants/%s/credentials/%s/revoke", i.BaseURL, participantContextID, credentialID)
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	resp, err := i.HttpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to revoke credential with ID '%s' for participant context '%s': %w", credentialID, participantContextID, err)
+	}
+	defer func() {
+		// drain and close response body to avoid connection/resource leak
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to revoke credential with ID '%s' for participant context '%s': received status code %d with message [%s]", credentialID, participantContextID, resp.StatusCode, string(body))
 	}
 	return nil
 }

@@ -15,8 +15,8 @@ package launcher
 import (
 	"net/http"
 
+	"github.com/metaform/connector-fabric-manager/agent/common/issuerservice"
 	"github.com/metaform/connector-fabric-manager/agent/registration/activity"
-	"github.com/metaform/connector-fabric-manager/agent/registration/issuerservice"
 	"github.com/metaform/connector-fabric-manager/assembly/httpclient"
 	"github.com/metaform/connector-fabric-manager/assembly/serviceapi"
 	"github.com/metaform/connector-fabric-manager/common/oauth2"

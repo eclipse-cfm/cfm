@@ -15,7 +15,7 @@ package activity
 import (
 	"fmt"
 
-	"github.com/metaform/connector-fabric-manager/agent/registration/issuerservice"
+	"github.com/metaform/connector-fabric-manager/agent/common/issuerservice"
 	"github.com/metaform/connector-fabric-manager/common/system"
 	"github.com/metaform/connector-fabric-manager/pmanager/api"
 )

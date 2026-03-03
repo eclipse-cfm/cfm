@@ -251,7 +251,9 @@ func (p KeyCloakActivityProcessor) handleDisposeAction(ctx api.ActivityContext) 
 	vaultAccessID := ctx.Values()[vaultAccessClientIDKey].(string)
 	if vaultAccessID != "" && apiAccessID != "" {
 		vaultErr := p.deleteClient(vaultAccessID)
+		p.monitor.Infof("deleted Vault Access client: %s", vaultAccessID)
 		apiErr := p.deleteClient(apiAccessID)
+		p.monitor.Infof("deleted API Access client: %s", apiAccessID)
 
 		var errors []error
 		if vaultErr != nil {

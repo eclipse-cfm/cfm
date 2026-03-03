@@ -101,3 +101,14 @@ func TestHttpApiClient_CreateHolder_ApiReturnsError(t *testing.T) {
 	err := client.CreateHolder("did:web:test-participant", "did:web:test-participant", "test holder")
 	require.ErrorContains(t, err, "failed to create Holder")
 }
+
+func TestHttpApiClient_RevokeCredential(t *testing.T) {
+	panic("Not yet implemented")
+}
+
+func TestHttpApiClient_RevokeCredential_ClientError(t *testing.T) {
+	panic("Not yet implemented")
+}
+func TestHttpApiClient_RevokeCredential_NotFound(t *testing.T) {
+	panic("Not yet implemented")
+}
