@@ -17,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/metaform/connector-fabric-manager/common/dag"
@@ -32,6 +33,20 @@ const (
 	OrchestrationStateCompleted   OrchestrationState = 2
 	OrchestrationStateErrored     OrchestrationState = 3
 )
+
+func (s OrchestrationState) String() string {
+	switch s {
+	case OrchestrationStateErrored:
+		return "Errored"
+	case OrchestrationStateCompleted:
+		return "Completed"
+	case OrchestrationStateInitialized:
+		return "Initialized"
+	case OrchestrationStateRunning:
+		return "Running"
+	}
+	return "Unknown, code: " + strconv.Itoa(int(s))
+}
 
 // Orchestration is a collection of activities that are executed to allocate resources in the system. Activities are
 // organized into parallel execution steps based on dependencies.

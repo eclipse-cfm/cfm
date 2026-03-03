@@ -36,17 +36,37 @@ func Launch(shutdown <-chan struct{}) {
 		ConfigPrefix: configPrefix,
 		ActivityType: activityType,
 		NewProcessor: func(ctx *natsagent.AgentContext) api.ActivityProcessor {
-			return &TestActivityProcessor{ctx.Monitor}
+			return &TestActivityProcessor{monitor: ctx.Monitor}
+		},
+	}
+	natsagent.LaunchAgent(shutdown, config)
+}
+
+func LaunchWithCallback(shutdown <-chan struct{}, callback func(ctx api.ActivityContext) api.ActivityResult) {
+	config := natsagent.LauncherConfig{
+		AgentName:    agentName,
+		ConfigPrefix: configPrefix,
+		ActivityType: activityType,
+		NewProcessor: func(ctx *natsagent.AgentContext) api.ActivityProcessor {
+			return &TestActivityProcessor{ctx.Monitor, callback}
 		},
 	}
 	natsagent.LaunchAgent(shutdown, config)
 }
 
 type TestActivityProcessor struct {
-	monitor system.LogMonitor
+	monitor  system.LogMonitor
+	callback func(ctx api.ActivityContext) api.ActivityResult
 }
 
 func (t TestActivityProcessor) Process(ctx api.ActivityContext) api.ActivityResult {
+	if t.callback != nil {
+		return t.callback(ctx)
+	}
+	return processDefault(ctx, t)
+}
+
+func processDefault(ctx api.ActivityContext, t TestActivityProcessor) api.ActivityResult {
 	if ctx.Discriminator() == api.DisposeDiscriminator {
 		// a disposal request
 		t.monitor.Infof("Processed dispose")

@@ -283,7 +283,7 @@ type vpaCallbackHandler struct {
 }
 
 func (h vpaCallbackHandler) handleDeploy(ctx context.Context, response model.OrchestrationResponse) error {
-	return h.handle(ctx, response, func(profile *api.ParticipantProfile, resp model.OrchestrationResponse) {
+	profileUpdater := func(profile *api.ParticipantProfile, resp model.OrchestrationResponse) {
 		// Place all output values under VPStateData key
 		vpaProps := make(map[string]any)
 		for key, value := range resp.Properties {
@@ -291,12 +291,17 @@ func (h vpaCallbackHandler) handleDeploy(ctx context.Context, response model.Orc
 		}
 		profile.Properties[model.VPAStateData] = vpaProps
 
+		targetState := api.DeploymentStateActive
+		if !resp.Success {
+			targetState = api.DeploymentStateError
+		}
 		for i, vpa := range profile.VPAs {
-			vpa.State = api.DeploymentStateActive
+			vpa.State = targetState
 			// TODO update timestamp based on returned data
 			profile.VPAs[i] = vpa // Use range index because vpa is a copy
 		}
-	})
+	}
+	return h.handle(ctx, response, profileUpdater)
 }
 
 func (h vpaCallbackHandler) handleDispose(ctx context.Context, response model.OrchestrationResponse) error {
@@ -328,9 +333,9 @@ func (h vpaCallbackHandler) handle(
 		case response.Success:
 			handler(profile, response)
 		default:
-			// TODO update VPA status
 			profile.Error = true
 			profile.ErrorDetail = response.ErrorDetail
+			handler(profile, response)
 		}
 		err = h.participantStore.Update(c, profile)
 		if err != nil {

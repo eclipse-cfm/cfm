@@ -6,6 +6,7 @@ import (
 	context "context"
 
 	api "github.com/metaform/connector-fabric-manager/pmanager/api"
+
 	mock "github.com/stretchr/testify/mock"
 )
 

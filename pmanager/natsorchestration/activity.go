@@ -231,7 +231,7 @@ func (e *NatsActivityExecutor) publishResponse(activityContext api.ActivityConte
 		ID:                uuid.New().String(),
 		ManifestID:        orchestration.ID,
 		CorrelationID:     orchestration.CorrelationID,
-		Success:           true,
+		Success:           orchestration.State != api.OrchestrationStateErrored,
 		OrchestrationType: orchestration.OrchestrationType,
 		Properties:        orchestration.OutputData,
 	}
@@ -278,8 +278,18 @@ func (e *NatsActivityExecutor) handleFatalError(
 			orchestration.OutputData[key] = value
 		}
 		o.SetState(api.OrchestrationStateErrored)
+		if o.ProcessingData == nil {
+			o.ProcessingData = make(map[string]any)
+		}
+		o.ProcessingData["error"] = resultErr.Error()
+		orchestration = *o
 	}); err != nil {
 		e.Monitor.Warnf("Failed to mark orchestration %s as fatal: %v", orchestration.ID, err)
+	}
+
+	err := e.publishResponse(activityContext, orchestration)
+	if err != nil {
+		return err
 	}
 
 	if err := message.Ack(); err != nil {

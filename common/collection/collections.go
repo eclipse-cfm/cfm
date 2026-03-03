@@ -73,6 +73,20 @@ func Map[T any, R any](seq iter.Seq[T], fn func(T) R) iter.Seq[R] {
 	}
 }
 
+// FlatMap applies a function to each element of the sequence, where the function returns a sequence,
+// and flattens all resulting sequences into a single sequence
+func FlatMap[T any, R any](seq iter.Seq[T], fn func(T) iter.Seq[R]) iter.Seq[R] {
+	return func(yield func(R) bool) {
+		for v := range seq {
+			for r := range fn(v) {
+				if !yield(r) {
+					return
+				}
+			}
+		}
+	}
+}
+
 // Distinct returns a new sequence with only unique elements
 func Distinct[T any](seq iter.Seq[T]) iter.Seq[T] {
 	return func(yield func(T) bool) {
