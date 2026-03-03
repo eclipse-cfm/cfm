@@ -200,41 +200,78 @@ func NewProcessor(config *Config) *KeyCloakActivityProcessor {
 
 func (p KeyCloakActivityProcessor) Process(ctx api.ActivityContext) api.ActivityResult {
 	if ctx.Discriminator() == api.DeployDiscriminator {
+		return p.handleDeployAction(ctx)
+	}
 
-		clientIDSlug := generateClientID()
-
-		// create Keycloak client for API access
-		participantContextID := clientIDSlug
-
-		apiClient, err := newKeycloakClientData(participantContextID, WithClientID(participantContextID), WithName("API Access Client"), WithDescription("Client for accessing the VPA's Administration APIs"), WithEnabled(true))
-		if err != nil {
-			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}
-		}
-		apiClientResult := p.provisionConfidentialClient(apiClient, ctx)
-		p.monitor.Infof("created API Access client: %s", apiClient.ClientId)
-		ctx.SetValue(apiAccessClientIDKey, apiClient.ClientId)
-		ctx.SetOutputValue(participantContextIDKey, participantContextID)
-		if apiClientResult.Result != api.ActivityResultComplete {
-			p.monitor.Warnw("Provisioning API Access client not complete. Result was %s, error: %s", apiClientResult.Result, apiClientResult.Error)
-			return apiClientResult
-		}
-
-		// create a Vault access client in Keycloak
-		vaultAccessClientID := clientIDSlug + "-vault"
-		vaultAccessClient, err := newKeycloakClientData(participantContextID, WithClientID(vaultAccessClientID), WithName("Vault Access Client"), WithDescription("Client for Vault to access Keycloak"), WithEnabled(true))
-		if err != nil {
-			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}
-		}
-		vaultClientResult := p.provisionConfidentialClient(vaultAccessClient, ctx)
-		p.monitor.Infof("created Vault Access client: %s", vaultAccessClient.ClientId)
-		ctx.SetValue(vaultAccessClientIDKey, vaultAccessClient.ClientId)
-
-		if vaultClientResult.Result != api.ActivityResultComplete {
-			p.monitor.Warnw("Provisioning Vault Access client not complete. Result was %s, error: %s", vaultClientResult.Result, vaultClientResult.Error)
-		}
-		return vaultClientResult
+	if ctx.Discriminator() == api.DisposeDiscriminator {
+		return p.handleDisposeAction(ctx)
 	}
 	return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("the '%s' discriminator is not supported", ctx.Discriminator())}
+}
+
+// handleDeployAction handles the deployment process, creating required Keycloak clients for API and Vault access.
+func (p KeyCloakActivityProcessor) handleDeployAction(ctx api.ActivityContext) api.ActivityResult {
+	clientIDSlug := generateClientID()
+
+	// create Keycloak client for API access
+	participantContextID := clientIDSlug
+
+	apiClient, err := newKeycloakClientData(participantContextID, WithClientID(participantContextID), WithName("API Access Client"), WithDescription("Client for accessing the VPA's Administration APIs"), WithEnabled(true))
+	if err != nil {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}
+	}
+	apiClientResult := p.provisionConfidentialClient(apiClient, ctx)
+	p.monitor.Infof("created API Access client: %s", apiClient.ClientId)
+	ctx.SetValue(apiAccessClientIDKey, apiClient.ClientId)
+	ctx.SetOutputValue(participantContextIDKey, participantContextID)
+	if apiClientResult.Result != api.ActivityResultComplete {
+		p.monitor.Warnw("Provisioning API Access client not complete. Result was %s, error: %s", apiClientResult.Result, apiClientResult.Error)
+		return apiClientResult
+	}
+
+	// create a Vault access client in Keycloak
+	vaultAccessClientID := clientIDSlug + "-vault"
+	vaultAccessClient, err := newKeycloakClientData(participantContextID, WithClientID(vaultAccessClientID), WithName("Vault Access Client"), WithDescription("Client for Vault to access Keycloak"), WithEnabled(true))
+	if err != nil {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}
+	}
+	vaultClientResult := p.provisionConfidentialClient(vaultAccessClient, ctx)
+	p.monitor.Infof("created Vault Access client: %s", vaultAccessClient.ClientId)
+	ctx.SetValue(vaultAccessClientIDKey, vaultAccessClient.ClientId)
+
+	if vaultClientResult.Result != api.ActivityResultComplete {
+		p.monitor.Warnw("Provisioning Vault Access client not complete. Result was %s, error: %s", vaultClientResult.Result, vaultClientResult.Error)
+	}
+	return vaultClientResult
+}
+
+// handleDisposeAction handles the disposal of Keycloak clients, removing API and Vault access clients if they exist.
+func (p KeyCloakActivityProcessor) handleDisposeAction(ctx api.ActivityContext) api.ActivityResult {
+	apiAccessID := ctx.Values()[apiAccessClientIDKey].(string)
+	vaultAccessID := ctx.Values()[vaultAccessClientIDKey].(string)
+	if vaultAccessID != "" && apiAccessID != "" {
+		vaultErr := p.deleteClient(vaultAccessID)
+		apiErr := p.deleteClient(apiAccessID)
+
+		var errors []error
+		if vaultErr != nil {
+			errors = append(errors, vaultErr)
+		}
+		if apiErr != nil {
+			errors = append(errors, apiErr)
+		}
+		if len(errors) > 0 {
+			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("could not roll back Keycloak clients: %v", errors)}
+		}
+		return api.ActivityResult{Result: api.ActivityResultComplete}
+	}
+
+	if apiAccessID == "" {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("could not roll back Keycloak API access client: the '%s' output value is not set", apiAccessClientIDKey)}
+	}
+	// implicitly, vaultAccessID is empty
+	return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("could not roll back Keycloak vault access client: the '%s' output value is not set", vaultAccessClientIDKey)}
+
 }
 
 // provisionConfidentialClient creates a confidential client in Keycloak and stores the client secret in Vault for use by
@@ -250,6 +287,38 @@ func (p KeyCloakActivityProcessor) provisionConfidentialClient(client *KeycloakC
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}
 	}
 	return api.ActivityResult{Result: api.ActivityResultComplete}
+}
+
+// deleteClient deletes a client in Keycloak. Important: pass the client ID, _not_ the internal UUID!
+func (p KeyCloakActivityProcessor) deleteClient(clientID string) error {
+
+	// the human-readable client-ID cannot be used to delete the client directly, we need to look up KC's internal UUID
+	clientUUID, err := p.getClientUUID(clientID)
+	// clientURL should be <HOST>/admin/realms/edcv/clients/<CLIENT_UID>
+	clientURL := fmt.Sprintf(clientUrl, p.keycloakURL, p.realm)
+	clientURL = fmt.Sprintf("%s/%s", clientURL, clientUUID)
+
+	req, err := http.NewRequest(http.MethodDelete, clientURL, nil)
+	if err != nil {
+		return fmt.Errorf("error creating client request: %w", err)
+	}
+
+	token, err := p.getToken()
+	if err != nil {
+		return fmt.Errorf("error authenticating with Keycloak: %w", err)
+	}
+	req.Header.Set(authHeader, fmt.Sprintf("Bearer %s", token))
+	resp, err := p.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("delete client request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 204 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("create client operation failed: status %d, body: %s", resp.StatusCode, string(body))
+	}
+	return nil
 }
 
 // createClient creates a confidential client with the specified secret
@@ -316,6 +385,41 @@ func (p KeyCloakActivityProcessor) getToken() (string, error) {
 	}
 
 	return tokenResp.AccessToken, nil
+}
+
+func (p KeyCloakActivityProcessor) getClientUUID(clientID string) (string, error) {
+	clientURL := fmt.Sprintf(clientUrl, p.keycloakURL, p.realm)
+	clientURL = fmt.Sprintf("%s?clientId=%s", clientURL, clientID)
+
+	token, err := p.getToken()
+	if err != nil {
+		return "", fmt.Errorf("error authenticating with Keycloak: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodGet, clientURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("error creating client request: %w", err)
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	resp, err := p.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("get client request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("get client operation failed: status %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	var clientResp []map[string]any
+	if err := json.Unmarshal(body, &clientResp); err != nil {
+		return "", fmt.Errorf("error decoding client response: %w", err)
+	}
+	if len(clientResp) != 1 {
+		return "", fmt.Errorf("expected to find 1 client for client-id '%s', found %d", clientID, len(clientResp))
+	}
+	return clientResp[0]["id"].(string), nil
 }
 
 // generateClientSecret generates a random secret using encoding.

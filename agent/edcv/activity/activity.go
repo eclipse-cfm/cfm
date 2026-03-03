@@ -18,7 +18,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/metaform/connector-fabric-manager/agent/common/identityhub"
 	"github.com/metaform/connector-fabric-manager/agent/edcv"
 	"github.com/metaform/connector-fabric-manager/agent/edcv/controlplane"
@@ -168,8 +167,4 @@ func (p EDCVActivityProcessor) extractWebDid(url string) (string, error) {
 	did = "did:web:" + did
 
 	return did, nil
-}
-
-func createParticipantContextID() string {
-	return uuid.New().String()
 }
