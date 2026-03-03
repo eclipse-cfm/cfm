@@ -82,29 +82,10 @@ func (w *OrchestrationIndexWatcher) onMessage(data []byte, msg MessageAck) {
 			// the orchestration failed, kick off the compensation
 			if orchestration.State == api.OrchestrationStateErrored && orchestration.OrchestrationType != model.VPADisposeType {
 
-				exists, err := w.existsCompensationOrchestration(ctx, model.VPADisposeType, orchestration.DefinitionID)
-				if err != nil {
-					return err
+				err2 := w.startCompensationOrchestration(ctx, orchestration, err)
+				if err2 != nil {
+					return err2
 				}
-				if !exists {
-					w.monitor.Warnf("No compensation orchestration definition found for orchestration [%s]", orchestration.ID)
-					return nil
-				}
-
-				w.monitor.Infof("Orchestration [%s] is in state [%s] with error: [%s]. Starting auto-compensation", orchestration.ID, orchestration.State.String(), orchestration.ProcessingData["error"])
-				correlationID := orchestration.CorrelationID //eg. participant profile id, etc.
-				pData := orchestration.ProcessingData        // stuff for the VPAs
-				manifest := model.OrchestrationManifest{
-					ID:                uuid.NewString(),
-					CorrelationID:     correlationID,
-					OrchestrationType: model.VPADisposeType,
-					Payload:           pData,
-				}
-				compensation, err := w.provisionManager.Start(ctx, &manifest)
-				if err != nil {
-					return err
-				}
-				w.monitor.Infof("Launching Orchestration [%s] as compensation for [%s]", compensation.ID, orchestration.ID)
 			}
 
 			// w.monitor.Debugf("Orchestration index entry %s updated to state %s", orchestration.ID, orchestration.State)
@@ -122,6 +103,38 @@ func (w *OrchestrationIndexWatcher) onMessage(data []byte, msg MessageAck) {
 		}
 		return nil
 	})
+}
+
+// startCompensationOrchestration initiates a compensation orchestration if a matching definition exists for the given orchestration.
+// an error is returned if no compensation orchestration definition exists, if the orchestration could not be started, or if the exists-check failed
+// de-duplication is handled by the ProvisionManager
+func (w *OrchestrationIndexWatcher) startCompensationOrchestration(ctx context.Context, orchestration api.Orchestration, err error) error {
+
+	exists, err := w.existsCompensationOrchestration(ctx, model.VPADisposeType, orchestration.DefinitionID)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		w.monitor.Warnf("No compensation orchestration definition found for orchestration [%s]", orchestration.ID)
+		return nil
+	}
+
+	w.monitor.Infof("Orchestration [%s] is in state [%s] with error: [%s]. Starting auto-compensation", orchestration.ID, orchestration.State.String(), orchestration.ProcessingData["error"])
+
+	correlationID := orchestration.CorrelationID //eg. participant profile id, etc.
+	pData := orchestration.ProcessingData        // stuff for the VPAs
+	manifest := model.OrchestrationManifest{
+		ID:                uuid.NewString(),
+		CorrelationID:     correlationID,
+		OrchestrationType: model.VPADisposeType,
+		Payload:           pData,
+	}
+	compensation, err := w.provisionManager.Start(ctx, &manifest)
+	if err != nil {
+		return err
+	}
+	w.monitor.Infof("Launching Orchestration [%s] as compensation for [%s]", compensation.ID, orchestration.ID)
+	return nil
 }
 
 // existsCompensationOrchestration verifies that another orchestration definition exists that was generated based on the same template

@@ -178,7 +178,6 @@ func TestOnMessage_ErroredStateUpdate(t *testing.T) {
 
 	watcher.onMessage(msg.Data, msg)
 
-	// Verify state remains Running
 	entry, err := index.FindByID(ctx, "orch-1")
 	require.NoError(t, err)
 	assert.Equal(t, api.OrchestrationStateErrored, entry.State)
