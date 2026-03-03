@@ -75,6 +75,16 @@ func (h *PMHandler) createOrchestrationDefinition(w http.ResponseWriter, req *ht
 		return
 	}
 
+	hasCompensation := false
+	for key, activities := range orchestrationTemplate.Activities {
+		if key == model.VPADisposeType.String() && len(activities) > 0 {
+			hasCompensation = true
+		}
+	}
+	if !hasCompensation {
+		h.Monitor.Warnf("Orchestration template does not contain a compensation activity. Compensation orchestration definitions will not be created for orchestration template [%s] and auto-rollback will not be available", orchestrationTemplate.ID)
+	}
+
 	templateRef, definitions := v1alpha1.ToOrchestrationDefinition(&orchestrationTemplate)
 	for _, def := range definitions {
 		_, err := h.definitionManager.CreateOrchestrationDefinition(req.Context(), def)
