@@ -512,6 +512,11 @@ type MockIssuerServiceApiClient struct {
 	expectedError error
 }
 
+func (m MockIssuerServiceApiClient) DeleteHolder(holderID string) error {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (m MockIssuerServiceApiClient) CreateHolder(did string, holderID string, name string) error {
 	return m.expectedError
 }

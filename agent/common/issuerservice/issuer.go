@@ -26,6 +26,7 @@ import (
 
 type ApiClient interface {
 	CreateHolder(did string, holderID string, name string) error
+	DeleteHolder(holderID string) error
 	RevokeCredential(participantContextID string, credentialID string) error
 }
 
@@ -34,6 +35,11 @@ type HttpApiClient struct {
 	TokenProvider token.TokenProvider
 	IssuerID      string
 	HttpClient    *http.Client
+}
+
+func (i HttpApiClient) DeleteHolder(holderID string) error {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (i HttpApiClient) CreateHolder(did string, holderID string, name string) error {
