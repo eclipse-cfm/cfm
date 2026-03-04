@@ -38,8 +38,32 @@ type HttpApiClient struct {
 }
 
 func (i HttpApiClient) DeleteHolder(holderID string) error {
-	//TODO implement me
-	panic("implement me")
+	accessToken, err := i.TokenProvider.GetToken()
+	if err != nil {
+		return fmt.Errorf("failed to get API access token: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/v1alpha/participants/%s/holders/%s", i.BaseURL, i.IssuerID, holderID)
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	resp, err := i.HttpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to delete Holder on IssuerService: %w", err)
+	}
+	defer func() {
+		// drain and close response body to avoid connection/resource leak
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to delete Holder on IssuerService: received status code %d, body: %s", resp.StatusCode, string(body))
+	}
+	return nil
 }
 
 func (i HttpApiClient) CreateHolder(did string, holderID string, name string) error {
@@ -69,7 +93,7 @@ func (i HttpApiClient) CreateHolder(did string, holderID string, name string) er
 
 	resp, err := i.HttpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to create Holder on ApiClient: %w", err)
+		return fmt.Errorf("failed to create Holder on IssuerService: %w", err)
 	}
 	defer func() {
 		// drain and close response body to avoid connection/resource leak
@@ -77,9 +101,8 @@ func (i HttpApiClient) CreateHolder(did string, holderID string, name string) er
 		_ = resp.Body.Close()
 	}()
 
-	body, _ := io.ReadAll(resp.Body)
-
 	if resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to create Holder on ApiClient: received status code %d, body: %s", resp.StatusCode, string(body))
 	}
 	return nil
@@ -91,7 +114,7 @@ func (i HttpApiClient) RevokeCredential(participantContextID string, credentialI
 		return err
 	}
 	url := fmt.Sprintf("%s/v1alpha/participants/%s/credentials/%s/revoke", i.BaseURL, participantContextID, credentialID)
-	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	req, err := http.NewRequest(http.MethodPost, url, nil)
 	if err != nil {
 		return err
 	}

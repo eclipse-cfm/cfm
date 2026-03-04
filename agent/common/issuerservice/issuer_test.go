@@ -103,12 +103,150 @@ func TestHttpApiClient_CreateHolder_ApiReturnsError(t *testing.T) {
 }
 
 func TestHttpApiClient_RevokeCredential(t *testing.T) {
-	panic("Not yet implemented")
+	template := "/v1alpha/participants/.*/credentials/.*/revoke"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		matched, _ := regexp.MatchString(template, r.URL.Path)
+		if matched && r.Method == http.MethodPost {
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken").Return("test token", nil)
+	client := HttpApiClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		IssuerID:      "test-issuer",
+		HttpClient:    &http.Client{},
+	}
+
+	err := client.RevokeCredential("did:web:test-participant", "test-credential-id")
+	require.NoError(t, err)
 }
 
 func TestHttpApiClient_RevokeCredential_ClientError(t *testing.T) {
-	panic("Not yet implemented")
+	template := "/v1alpha/participants/.*/credentials/.*/revoke"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		matched, _ := regexp.MatchString(template, r.URL.Path)
+		if matched && r.Method == http.MethodPost {
+			w.WriteHeader(http.StatusBadRequest)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken").Return("test token", nil)
+	client := HttpApiClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		IssuerID:      "test-issuer",
+		HttpClient:    &http.Client{},
+	}
+
+	err := client.RevokeCredential("did:web:test-participant", "test-credential-id")
+	require.ErrorContains(t, err, "failed to revoke credential")
 }
+
 func TestHttpApiClient_RevokeCredential_NotFound(t *testing.T) {
-	panic("Not yet implemented")
+	template := "/v1alpha/participants/.*/credentials/.*/revoke"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		matched, _ := regexp.MatchString(template, r.URL.Path)
+		if matched && r.Method == http.MethodPost {
+			w.WriteHeader(http.StatusNotFound)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken").Return("test token", nil)
+	client := HttpApiClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		IssuerID:      "test-issuer",
+		HttpClient:    &http.Client{},
+	}
+
+	err := client.RevokeCredential("did:web:test-participant", "test-credential-id")
+	require.ErrorContains(t, err, "failed to revoke credential")
+}
+
+func TestHttpApiClient_DeleteHolder(t *testing.T) {
+	template := "/v1alpha/participants/.*/holders/.*"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		matched, _ := regexp.MatchString(template, r.URL.Path)
+		if r.Method == http.MethodDelete && matched {
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken").Return("test token", nil)
+	client := HttpApiClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		IssuerID:      "test-issuer",
+		HttpClient:    &http.Client{},
+	}
+
+	err := client.DeleteHolder("did:web:test-participant")
+	require.NoError(t, err)
+}
+
+func TestHttpApiClient_DeleteHolder_NotFound(t *testing.T) {
+	template := "/v1alpha/participants/.*/holders/.*"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		matched, _ := regexp.MatchString(template, r.URL.Path)
+		if r.Method == http.MethodDelete && matched {
+			w.WriteHeader(http.StatusNotFound)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken").Return("test token", nil)
+	client := HttpApiClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		IssuerID:      "test-issuer",
+		HttpClient:    &http.Client{},
+	}
+
+	err := client.DeleteHolder("did:web:test-participant")
+	require.ErrorContains(t, err, "received status code 404")
+}
+func TestHttpApiClient_DeleteHolder_AuthError(t *testing.T) {
+	template := "/v1alpha/participants/.*/holders/.*"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		matched, _ := regexp.MatchString(template, r.URL.Path)
+		if r.Method == http.MethodDelete && matched {
+			w.WriteHeader(http.StatusUnauthorized)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken").Return("test token", nil)
+	client := HttpApiClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		IssuerID:      "test-issuer",
+		HttpClient:    &http.Client{},
+	}
+
+	err := client.DeleteHolder("did:web:test-participant")
+	require.ErrorContains(t, err, "received status code 401")
 }
