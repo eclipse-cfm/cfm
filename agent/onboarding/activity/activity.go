@@ -38,16 +38,12 @@ type credentialRequestData struct {
 }
 
 func (p OnboardingActivityProcessor) Process(ctx api.ActivityContext) api.ActivityResult {
-	var data onboardingData
-	if err := ctx.ReadValues(&data); err != nil {
-		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Onboarding activity for orchestration %s: %w", ctx.OID(), err)}
-	}
 
 	if ctx.Discriminator() == api.DeployDiscriminator {
-		return p.handleDeployAction(ctx, &data)
+		return p.handleDeployAction(ctx)
 	}
 	if ctx.Discriminator() == api.DisposeDiscriminator {
-		return p.handleDisposeAction(ctx, &data)
+		return p.handleDisposeAction(ctx)
 	}
 
 	return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("the '%s' discriminator is not supported", ctx.Discriminator())}
@@ -129,7 +125,7 @@ func (p OnboardingActivityProcessor) processNewRequest(ctx api.ActivityContext, 
 
 // handleDeployAction processes the deploy action for an onboarding activity by requesting the issuance of verifiable credentials.
 // if a credential request is in progress, the deploy action simply checks its status and reschedules itself.
-func (p OnboardingActivityProcessor) handleDeployAction(ctx api.ActivityContext, data *onboardingData) api.ActivityResult {
+func (p OnboardingActivityProcessor) handleDeployAction(ctx api.ActivityContext) api.ActivityResult {
 	var credentialRequest credentialRequestData
 	if err := ctx.ReadValues(&credentialRequest); err != nil {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Onboarding activity for orchestration %s: %w", ctx.OID(), err)}
@@ -137,7 +133,11 @@ func (p OnboardingActivityProcessor) handleDeployAction(ctx api.ActivityContext,
 
 	// no credential request was made yet -> make one
 	if "" == credentialRequest.HolderPID {
-		return p.processNewRequest(ctx, data, credentialRequest)
+		var data onboardingData
+		if err := ctx.ReadValues(&data); err != nil {
+			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Onboarding activity for orchestration %s: %w", ctx.OID(), err)}
+		}
+		return p.processNewRequest(ctx, &data, credentialRequest)
 	}
 	// holderPID exists, check the status of the issuance
 	return p.processExistingRequest(ctx, credentialRequest)
@@ -145,12 +145,18 @@ func (p OnboardingActivityProcessor) handleDeployAction(ctx api.ActivityContext,
 
 // handleDisposeAction revokes a credential using the IssuerService's Admin API. The credential is NOT deleted from the
 // holder wallet (IdentityHub).
-func (p OnboardingActivityProcessor) handleDisposeAction(ctx api.ActivityContext, data *onboardingData) api.ActivityResult {
+func (p OnboardingActivityProcessor) handleDisposeAction(ctx api.ActivityContext) api.ActivityResult {
 
 	var credentialRequest credentialRequestData
 	if err := ctx.ReadValues(&credentialRequest); err != nil {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Onboarding activity for orchestration %s: %w", ctx.OID(), err)}
 	}
+
+	var data onboardingData
+	if err := ctx.ReadValues(&data); err != nil {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Onboarding activity for orchestration %s: %w", ctx.OID(), err)}
+	}
+
 	participantContextID := credentialRequest.ParticipantContextID
 	// query credentials by type, using the IdentityAPI
 	var revocationErrors []error
