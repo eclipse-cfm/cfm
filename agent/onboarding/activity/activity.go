@@ -178,7 +178,7 @@ func (p OnboardingActivityProcessor) handleDisposeAction(ctx api.ActivityContext
 	}
 
 	if len(revocationErrors) > 0 {
-		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error revoking one or more credentials: %w", revocationErrors)}
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error revoking one or more credentials: %v", revocationErrors)}
 	}
 
 	return api.ActivityResult{Result: api.ActivityResultComplete}

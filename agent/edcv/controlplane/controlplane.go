@@ -78,12 +78,43 @@ type ParticipantContext struct {
 type ManagementAPIClient interface {
 	CreateParticipantContext(manifest ParticipantContext) error
 	CreateConfig(participantContextID string, config ParticipantContextConfig) error
+	DeleteConfig(participantContextID string) error
+	DeleteParticipantContext(participantContextID string) error
 }
 
 type HttpManagementAPIClient struct {
 	BaseURL       string
 	TokenProvider token.TokenProvider
 	HttpClient    *http.Client
+}
+
+func (h HttpManagementAPIClient) DeleteConfig(participantContextID string) error {
+	// fixme: there is no dedicated delete endpoint
+	return nil
+}
+
+func (h HttpManagementAPIClient) DeleteParticipantContext(participantContextID string) error {
+	accessToken, err := h.TokenProvider.GetToken()
+	if err != nil {
+		return fmt.Errorf("failed to get API access token: %w", err)
+	}
+
+	url := fmt.Sprintf("%s%s/%s", h.BaseURL, CreateParticipantURL, participantContextID)
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	resp, err := h.HttpClient.Do(req)
+	h.closeResponse(resp)
+	if err != nil {
+		return fmt.Errorf("failed to delete participant context on control plane: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to delete participant context on control plane: received status code %d, body: %s", resp.StatusCode, string(body))
+	}
+	return nil
 }
 
 func (h HttpManagementAPIClient) CreateParticipantContext(manifest ParticipantContext) error {

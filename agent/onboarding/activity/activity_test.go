@@ -48,8 +48,9 @@ func TestOnboardingActivityProcessor_Process_WhenNewRequest(t *testing.T) {
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -89,8 +90,9 @@ func TestOnboardingActivityProcessor_Process_WhenNewRequestError(t *testing.T) {
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -122,8 +124,9 @@ func TestOnboardingActivityProcessor_Process_WhenPendingRequestApiError(t *testi
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -155,8 +158,9 @@ func TestOnboardingActivityProcessor_Process_WhenPendingRequestIssued(t *testing
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -191,8 +195,9 @@ func TestOnboardingActivityProcessor_Process_WhenPendingRequestCreated(t *testin
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -225,8 +230,9 @@ func TestOnboardingActivityProcessor_Process_WhenPendingRequestRejected(t *testi
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -259,8 +265,9 @@ func TestOnboardingActivityProcessor_Process_WhenPendingRequestError(t *testing.
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -286,8 +293,9 @@ func TestOnboardingActivityProcessor_Process_WhenInvalidData(t *testing.T) {
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -318,8 +326,9 @@ func TestOnboardingActivityProcessor_Process_WhenInvalidStateReceived(t *testing
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -337,6 +346,16 @@ type MockIdentityHubClient struct {
 	expectedError error
 	expectedState string
 	expectedURL   string
+}
+
+func (m MockIdentityHubClient) QueryCredentialByType(participantContextID string, credentialType string) ([]identityhub.VerifiableCredentialResource, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockIdentityHubClient) DeleteParticipantContext(participantContextID string) error {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (m MockIdentityHubClient) CreateParticipantContext(identityhub.ParticipantManifest) (*identityhub.CreateParticipantContextResponse, error) {

@@ -145,6 +145,11 @@ type MockIssuerService struct {
 	recorded      regData
 }
 
+func (m *MockIssuerService) RevokeCredential(participantContextID string, credentialID string) error {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (m *MockIssuerService) CreateHolder(did string, holderID string, name string) error {
 	m.recorded.did = did
 	m.recorded.holderID = holderID

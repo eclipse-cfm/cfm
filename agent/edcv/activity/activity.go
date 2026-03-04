@@ -88,6 +88,18 @@ func (p EDCVActivityProcessor) Process(ctx api.ActivityContext) api.ActivityResu
 
 	participantContextId := data.ApiAccessClientID
 
+	if ctx.Discriminator() == api.DeployDiscriminator {
+		return p.handleDeployAction(ctx, data, participantContextId)
+	} else if ctx.Discriminator() == api.DisposeDiscriminator {
+		return p.handleDisposeAction(participantContextId)
+	}
+
+	return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("the '%s' discriminator is not supported", ctx.Discriminator())}
+
+}
+
+// handleDeployAction creates a participant context in IdentityHub and the control plane (incl. participant context config)
+func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data EDCVData, participantContextId string) api.ActivityResult {
 	// override if config is provided
 	if p.CredentialServiceURL != "" {
 		data.CredentialServiceURL = fmt.Sprintf(p.CredentialServiceURL, base64.RawURLEncoding.EncodeToString([]byte(participantContextId)))
@@ -153,6 +165,32 @@ func (p EDCVActivityProcessor) Process(ctx api.ActivityContext) api.ActivityResu
 	p.Monitor.Infof("EDCV activity for participant '%s' (client ID = %s) completed successfully", data.ParticipantID, data.ApiAccessClientID)
 	if err := p.VaultClient.DeleteSecret(ctx.Context(), data.VaultAccessClientID); err != nil {
 		p.Monitor.Warnf("failed to delete secret '%s': %v", data.VaultAccessClientID, err)
+	}
+	return api.ActivityResult{Result: api.ActivityResultComplete}
+}
+
+// handleDisposeAction deletes the participant context in IdentityHub and the control plane
+func (p EDCVActivityProcessor) handleDisposeAction(participantContextID string) api.ActivityResult {
+	var errors []error
+	// delete from IdentityHub
+	err := p.IdentityAPIClient.DeleteParticipantContext(participantContextID)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
+	// delete config from Control Plane
+	err = p.ManagementAPIClient.DeleteConfig(participantContextID)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
+	// delete participant context from Control Plane
+	err = p.ManagementAPIClient.DeleteParticipantContext(participantContextID)
+	if err != nil {
+		errors = append(errors, err)
+	}
+	if len(errors) > 0 {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("could not roll back EDC-V: %v", errors)}
 	}
 	return api.ActivityResult{Result: api.ActivityResultComplete}
 }
