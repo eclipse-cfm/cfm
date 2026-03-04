@@ -22,6 +22,7 @@ import (
 	"github.com/metaform/connector-fabric-manager/agent/edcv"
 	"github.com/metaform/connector-fabric-manager/agent/edcv/controlplane"
 	"github.com/metaform/connector-fabric-manager/assembly/serviceapi"
+	. "github.com/metaform/connector-fabric-manager/common/collection"
 	"github.com/metaform/connector-fabric-manager/common/system"
 	"github.com/metaform/connector-fabric-manager/common/token"
 	"github.com/metaform/connector-fabric-manager/pmanager/api"
@@ -190,7 +191,10 @@ func (p EDCVActivityProcessor) handleDisposeAction(participantContextID string) 
 		errors = append(errors, err)
 	}
 	if len(errors) > 0 {
-		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("could not roll back EDC-V: %v", errors)}
+		errorStrings := Collect(Map(From(errors), func(err error) string { return err.Error() }))
+		errStr := strings.Join(errorStrings, ", ")
+		p.Monitor.Warnf("one or more errors occurred while rolling back participant context '%s': [%s]", participantContextID, errStr)
+
 	}
 	return api.ActivityResult{Result: api.ActivityResultComplete}
 }

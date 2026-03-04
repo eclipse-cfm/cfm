@@ -110,11 +110,16 @@ func (h HttpManagementAPIClient) DeleteParticipantContext(participantContextID s
 	if err != nil {
 		return fmt.Errorf("failed to delete participant context on control plane: %w", err)
 	}
-	if resp.StatusCode != http.StatusOK {
+
+	switch resp.StatusCode {
+	case http.StatusNotFound:
+		return fmt.Errorf("participant context %s not found in control plane", participantContextID)
+	case http.StatusOK:
+		return nil
+	default:
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to delete participant context on control plane: received status code %d, body: %s", resp.StatusCode, string(body))
 	}
-	return nil
 }
 
 func (h HttpManagementAPIClient) CreateParticipantContext(manifest ParticipantContext) error {

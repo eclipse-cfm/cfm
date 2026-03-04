@@ -68,11 +68,15 @@ func (a HttpIdentityAPIClient) DeleteParticipantContext(participantContextID str
 	if err != nil {
 		return fmt.Errorf("failed to delete participant context on IdentityHub: %w", err)
 	}
-	if resp.StatusCode != http.StatusOK {
+	switch resp.StatusCode {
+	case http.StatusNotFound:
+		return fmt.Errorf("participant context %s not found in IdentityHub", participantContextID)
+	case http.StatusOK:
+		return nil
+	default:
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to delete participant context on IdentityHub: received status code %d, body: %s", resp.StatusCode, string(body))
 	}
-	return nil
 }
 
 func (a HttpIdentityAPIClient) QueryCredentialByType(participantContextID string, credentialType string) ([]VerifiableCredentialResource, error) {

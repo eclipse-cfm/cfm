@@ -170,7 +170,7 @@ func (p OnboardingActivityProcessor) handleDisposeAction(ctx api.ActivityContext
 		}
 
 		if len(credentials) == 0 {
-			p.Monitor.Infof("No credentials of type '%s' found for participant context '%s'", credentialType, participantContextID)
+			p.Monitor.Infof("Rollback: could not revoke credentials of type '%s': 0 found for participant context '%s'", credentialType, participantContextID)
 			return api.ActivityResult{Result: api.ActivityResultComplete}
 		}
 
