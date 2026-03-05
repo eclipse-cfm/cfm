@@ -404,8 +404,8 @@ func TestEDCVActivityProcessor_ProcessDispose_CtrlPlaneParticipantError(t *testi
 
 	result := processor.Process(activityContext)
 
-	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
-	assert.ErrorContains(t, result.Error, "some error")
+	// expect to complete successfully, to unblock subsequent agents
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 }
 
 func TestEDCVActivityProcessor_ProcessDispose_CtrlPlaneConfigError(t *testing.T) {
@@ -427,8 +427,8 @@ func TestEDCVActivityProcessor_ProcessDispose_CtrlPlaneConfigError(t *testing.T)
 
 	result := processor.Process(activityContext)
 
-	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
-	assert.ErrorContains(t, result.Error, "some error")
+	// expect to complete successfully, to unblock subsequent agents
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 }
 
 func TestEDCVActivityProcessor_ProcessDispose_IdentityHubError(t *testing.T) {
@@ -450,8 +450,8 @@ func TestEDCVActivityProcessor_ProcessDispose_IdentityHubError(t *testing.T) {
 
 	result := processor.Process(activityContext)
 
-	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
-	assert.ErrorContains(t, result.Error, "some error")
+	// expect to complete successfully, to unblock subsequent agents
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 }
 
 type MockVaultClient struct {

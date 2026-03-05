@@ -378,7 +378,7 @@ func TestDeleteParticipant_NotFound(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	require.ErrorContains(t, client.DeleteParticipantContext("test-participant"), "received status code 404")
+	require.ErrorContains(t, client.DeleteParticipantContext("test-participant"), "not found in control plane")
 }
 
 func TestDeleteParticipant_ServerError(t *testing.T) {
