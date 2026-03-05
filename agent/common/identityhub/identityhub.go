@@ -70,7 +70,7 @@ func (a HttpIdentityAPIClient) DeleteParticipantContext(participantContextID str
 	}
 	switch resp.StatusCode {
 	case http.StatusNotFound:
-		return fmt.Errorf("participant context %s not found in IdentityHub", participantContextID)
+		return fmt.Errorf("participant context %s not found in Identity", participantContextID)
 	case http.StatusOK:
 		return nil
 	default:

@@ -26,13 +26,12 @@ import (
 )
 
 const (
-	CreateParticipantURL                                       = "/v4alpha/participants"
+	CreateParticipantURL                                       = "/v5alpha/participants"
 	applicationJSON                                            = "application/json"
 	ParticipantContextStateCreated     ParticipantContextState = "CREATED"
 	ParticipantContextStateActivated   ParticipantContextState = "ACTIVATED"
 	ParticipantContextStateDeactivated ParticipantContextState = "DEACTIVATED"
 	contextConnector                                           = "https://w3id.org/edc/connector/management/v2"
-	contextConnectorVirtual                                    = "https://w3id.org/edc/virtual-connector/management/v2"
 )
 
 type ParticipantContextConfig struct {
@@ -129,7 +128,7 @@ func (h HttpManagementAPIClient) CreateParticipantContext(manifest ParticipantCo
 	}
 
 	jsonLdData := map[string]any{
-		"@context":   []string{contextConnector, contextConnectorVirtual},
+		"@context":   []string{contextConnector},
 		"@type":      "ParticipantContext",
 		"@id":        manifest.ParticipantContextID,
 		"identity":   manifest.Identifier,
@@ -158,7 +157,7 @@ func (h HttpManagementAPIClient) CreateParticipantContext(manifest ParticipantCo
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to create participant context on IdentityHub: received status code %d, body: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("failed to create participant context on control plane: received status code %d, body: %s", resp.StatusCode, string(body))
 	}
 
 	return nil
@@ -171,7 +170,7 @@ func (h HttpManagementAPIClient) CreateConfig(participantContextID string, confi
 	}
 
 	configData := map[string]any{
-		"@context":       []string{contextConnector, contextConnectorVirtual},
+		"@context":       []string{contextConnector},
 		"@type":          "ParticipantContextConfig",
 		"entries":        config.Entries,
 		"privateEntries": config.SecretEntries,
