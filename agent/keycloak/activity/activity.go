@@ -221,7 +221,7 @@ func (p KeyCloakActivityProcessor) handleDeployAction(ctx api.ActivityContext) a
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}
 	}
 	apiClientResult := p.provisionConfidentialClient(apiClient, ctx)
-	p.monitor.Infof("created API Access client: %s", apiClient.ClientId)
+	p.monitor.Debugf("created API Access client: %s", apiClient.ClientId)
 	ctx.SetValue(apiAccessClientIDKey, apiClient.ClientId)
 	ctx.SetOutputValue(participantContextIDKey, participantContextID)
 	if apiClientResult.Result != api.ActivityResultComplete {
@@ -236,7 +236,7 @@ func (p KeyCloakActivityProcessor) handleDeployAction(ctx api.ActivityContext) a
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}
 	}
 	vaultClientResult := p.provisionConfidentialClient(vaultAccessClient, ctx)
-	p.monitor.Infof("created Vault Access client: %s", vaultAccessClient.ClientId)
+	p.monitor.Debugf("created Vault Access client: %s", vaultAccessClient.ClientId)
 	ctx.SetValue(vaultAccessClientIDKey, vaultAccessClient.ClientId)
 
 	if vaultClientResult.Result != api.ActivityResultComplete {
@@ -251,9 +251,9 @@ func (p KeyCloakActivityProcessor) handleDisposeAction(ctx api.ActivityContext) 
 	vaultAccessID := ctx.Values()[vaultAccessClientIDKey].(string)
 	if vaultAccessID != "" && apiAccessID != "" {
 		vaultErr := p.deleteClient(vaultAccessID)
-		p.monitor.Infof("deleted Vault Access client: %s", vaultAccessID)
+		p.monitor.Debugf("deleted Vault Access client: %s", vaultAccessID)
 		apiErr := p.deleteClient(apiAccessID)
-		p.monitor.Infof("deleted API Access client: %s", apiAccessID)
+		p.monitor.Debugf("deleted API Access client: %s", apiAccessID)
 
 		var errors []error
 		if vaultErr != nil {

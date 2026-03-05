@@ -69,7 +69,6 @@ func (p RegistrationActivityProcessor) handleDeployAction(registrationData Regis
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating holder in ApiClient: %w", err)}
 	}
 
-	p.Monitor.Infof("Registration activity for participant '%s' completed successfully", registrationData.DID)
 	return api.ActivityResult{Result: api.ActivityResultComplete}
 }
 
@@ -80,6 +79,6 @@ func (p RegistrationActivityProcessor) handleDisposeAction(data RegistrationData
 		// todo: inspect error if it is retryable
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("registration rollback: error deleting holder in IssuerService: %w", err)}
 	}
-	p.Monitor.Infof("Registration rollback: activity for participant '%s' completed successfully", data.DID)
+	p.Monitor.Debugf("Registration rollback: activity for participant '%s' completed successfully", data.DID)
 	return api.ActivityResult{Result: api.ActivityResultComplete}
 }
