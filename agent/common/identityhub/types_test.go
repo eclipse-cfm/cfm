@@ -51,9 +51,9 @@ func TestCredentialRequest_Serialization(t *testing.T) {
 		HolderPID: "holder-123",
 		Credentials: []CredentialType{
 			{
-				Format: "ldp",
-				Type:   "VerifiableCredential",
-				ID:     "cred-1",
+				Format:                 "ldp",
+				Type:                   "VerifiableCredential",
+				CredentialDefinitionID: "cred-1",
 			},
 		},
 	}

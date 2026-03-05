@@ -15,6 +15,7 @@
 package identityhub
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -141,4 +142,47 @@ func TestIdentityAPIClient_BadRequest(t *testing.T) {
 		})
 	_, err := client.CreateParticipantContext(manifest)
 	require.ErrorContains(t, err, "foobar")
+}
+
+func TestHttpIdentityAPIClient_DeleteParticipantContext(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b64 := base64.RawURLEncoding.EncodeToString([]byte("test-id"))
+		if r.URL.Path == "/v1alpha/participants/"+b64 && r.Method == http.MethodDelete {
+			require.Equal(t, "Bearer token", r.Header.Get("Authorization"))
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken").Return("token", nil)
+	client := HttpIdentityAPIClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	err := client.DeleteParticipantContext("test-id")
+	require.NoError(t, err)
+}
+
+func TestHttpIdentityAPIClient_DeleteParticipantContext_NotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte("participant not found"))
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken").Return("token", nil)
+	client := HttpIdentityAPIClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	err := client.DeleteParticipantContext("test")
+	require.ErrorContains(t, err, "participant not found")
 }

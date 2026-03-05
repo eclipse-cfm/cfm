@@ -112,9 +112,9 @@ func NewParticipantManifest(
 }
 
 type CredentialType struct {
-	Format string `json:"format" validate:"required"`
-	Type   string `json:"type" validate:"required"`
-	ID     string `json:"id" validate:"required"`
+	Format                 string `json:"format" validate:"required"`
+	Type                   string `json:"type" validate:"required"`
+	CredentialDefinitionID string `json:"id" validate:"required"`
 }
 
 type CredentialRequest struct {

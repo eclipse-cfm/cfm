@@ -75,8 +75,9 @@ func TestEDCVActivityProcessor_Process_WithValidData(t *testing.T) {
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -264,8 +265,9 @@ func TestEDCVActivityProcessor_Process_MultipleUnknownFields(t *testing.T) {
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "activity-multi",
-		Type: "edcv",
+		ID:            "activity-multi",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-multi", activity, pd, outputData)
@@ -329,8 +331,9 @@ func TestEDCVActivityProcessor_Process_ManagementAPIFailure(t *testing.T) {
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -348,8 +351,9 @@ func TestEDCVActivityProcessor_Process_ManagementAPIFailureConfig(t *testing.T) 
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -358,6 +362,96 @@ func TestEDCVActivityProcessor_Process_ManagementAPIFailureConfig(t *testing.T) 
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	assert.ErrorContains(t, result.Error, "some error")
+}
+
+func TestEDCVActivityProcessor_ProcessDispose(t *testing.T) {
+	ih := MockIdentityHubClient{}
+	processor := NewProcessor(validConfig(WithIdentityHub(ih)))
+
+	ctx := context.Background()
+	outputData := make(map[string]any)
+
+	activity := api.Activity{
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DisposeDiscriminator,
+	}
+
+	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
+
+	result := processor.Process(activityContext)
+
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
+	assert.NoError(t, result.Error)
+}
+
+func TestEDCVActivityProcessor_ProcessDispose_CtrlPlaneParticipantError(t *testing.T) {
+	ih := MockIdentityHubClient{}
+	processor := NewProcessor(validConfig(WithIdentityHub(ih), WithControlPlane(MockManagementApiClient{
+		expectedParticipantError: fmt.Errorf("some error"),
+	})))
+
+	ctx := context.Background()
+	outputData := make(map[string]any)
+
+	activity := api.Activity{
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DisposeDiscriminator,
+	}
+
+	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
+
+	result := processor.Process(activityContext)
+
+	// expect to complete successfully, to unblock subsequent agents
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
+}
+
+func TestEDCVActivityProcessor_ProcessDispose_CtrlPlaneConfigError(t *testing.T) {
+	ih := MockIdentityHubClient{}
+	processor := NewProcessor(validConfig(WithIdentityHub(ih), WithControlPlane(MockManagementApiClient{
+		expectedConfigError: fmt.Errorf("some error"),
+	})))
+
+	ctx := context.Background()
+	outputData := make(map[string]any)
+
+	activity := api.Activity{
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DisposeDiscriminator,
+	}
+
+	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
+
+	result := processor.Process(activityContext)
+
+	// expect to complete successfully, to unblock subsequent agents
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
+}
+
+func TestEDCVActivityProcessor_ProcessDispose_IdentityHubError(t *testing.T) {
+	ih := MockIdentityHubClient{
+		expectedError: fmt.Errorf("some error"),
+	}
+	processor := NewProcessor(validConfig(WithIdentityHub(ih)))
+
+	ctx := context.Background()
+	outputData := make(map[string]any)
+
+	activity := api.Activity{
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DisposeDiscriminator,
+	}
+
+	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
+
+	result := processor.Process(activityContext)
+
+	// expect to complete successfully, to unblock subsequent agents
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 }
 
 type MockVaultClient struct {
@@ -410,7 +504,16 @@ func copyOf(m map[string]any) map[string]any {
 }
 
 type MockIdentityHubClient struct {
-	expectedError error
+	expectedError       error
+	expectedCredentials []identityhub.VerifiableCredentialResource
+}
+
+func (m MockIdentityHubClient) QueryCredentialByType(participantContextID string, credentialType string) ([]identityhub.VerifiableCredentialResource, error) {
+	return m.expectedCredentials, m.expectedError
+}
+
+func (m MockIdentityHubClient) DeleteParticipantContext(participantContextID string) error {
+	return m.expectedError
 }
 
 func (m MockIdentityHubClient) GetCredentialRequestState(string, string) (string, error) {
@@ -433,6 +536,14 @@ func (m MockIdentityHubClient) CreateParticipantContext(identityhub.ParticipantM
 type MockManagementApiClient struct {
 	expectedParticipantError error
 	expectedConfigError      error
+}
+
+func (m MockManagementApiClient) DeleteConfig(participantContextID string) error {
+	return m.expectedConfigError
+}
+
+func (m MockManagementApiClient) DeleteParticipantContext(participantContextID string) error {
+	return m.expectedParticipantError
 }
 
 func (m MockManagementApiClient) CreateParticipantContext(controlplane.ParticipantContext) error {
