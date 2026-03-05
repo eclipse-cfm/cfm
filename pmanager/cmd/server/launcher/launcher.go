@@ -15,7 +15,6 @@ package launcher
 import (
 	"fmt"
 
-	"github.com/metaform/connector-fabric-manager/assembly/httpclient"
 	"github.com/metaform/connector-fabric-manager/assembly/routing"
 	"github.com/metaform/connector-fabric-manager/common/runtime"
 	"github.com/metaform/connector-fabric-manager/common/store"
@@ -67,7 +66,6 @@ func Launch(shutdown <-chan struct{}) {
 
 	assembler := system.NewServiceAssembler(logMonitor, vConfig, mode)
 
-	assembler.Register(&httpclient.HttpClientServiceAssembly{})
 	assembler.Register(&routing.RouterServiceAssembly{})
 	assembler.Register(&handler.HandlerServiceAssembly{})
 
