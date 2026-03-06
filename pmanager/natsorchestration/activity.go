@@ -19,11 +19,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/natsclient"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/google/uuid"
-	"github.com/metaform/connector-fabric-manager/common/model"
-	"github.com/metaform/connector-fabric-manager/common/natsclient"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
 	"github.com/nats-io/nats.go/jetstream"
 )
 

@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/metaform/connector-fabric-manager/common/model"
+	"github.com/eclipse-cfm/cfm/common/model"
 )
 
 // Entity is the base type for all entities.

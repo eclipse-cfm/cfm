@@ -15,9 +15,9 @@ package activity
 import (
 	"fmt"
 
-	"github.com/metaform/connector-fabric-manager/agent/common/issuerservice"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
+	"github.com/eclipse-cfm/cfm/agent/common/issuerservice"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
 )
 
 type RegistrationActivityProcessor struct {

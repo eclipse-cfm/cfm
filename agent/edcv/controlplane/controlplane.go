@@ -21,8 +21,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/metaform/connector-fabric-manager/agent/edcv"
-	"github.com/metaform/connector-fabric-manager/common/token"
+	"github.com/eclipse-cfm/cfm/agent/edcv"
+	"github.com/eclipse-cfm/cfm/common/token"
 )
 
 const (

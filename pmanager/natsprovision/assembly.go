@@ -16,9 +16,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/metaform/connector-fabric-manager/common/natsclient"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
+	"github.com/eclipse-cfm/cfm/common/natsclient"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
 )
 
 type natsProvisionServiceAssembly struct {

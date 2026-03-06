@@ -16,11 +16,11 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/eclipse-cfm/cfm/common/sqlstore"
+	"github.com/eclipse-cfm/cfm/common/store"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
 	_ "github.com/lib/pq" // Register PostgreSQL driver
-	"github.com/metaform/connector-fabric-manager/common/sqlstore"
-	"github.com/metaform/connector-fabric-manager/common/store"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
 )
 
 const (
@@ -91,4 +91,3 @@ func createTables(db *sql.DB) error {
 
 	return nil
 }
-

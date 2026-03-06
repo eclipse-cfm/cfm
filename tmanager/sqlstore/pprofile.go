@@ -17,9 +17,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/metaform/connector-fabric-manager/common/sqlstore"
-	"github.com/metaform/connector-fabric-manager/common/store"
-	"github.com/metaform/connector-fabric-manager/tmanager/api"
+	"github.com/eclipse-cfm/cfm/common/sqlstore"
+	"github.com/eclipse-cfm/cfm/common/store"
+	"github.com/eclipse-cfm/cfm/tmanager/api"
 )
 
 func newParticipantProfileStore() store.EntityStore[*api.ParticipantProfile] {

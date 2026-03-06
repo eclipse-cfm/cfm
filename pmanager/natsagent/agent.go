@@ -17,10 +17,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/metaform/connector-fabric-manager/common/natsclient"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
-	"github.com/metaform/connector-fabric-manager/pmanager/natsorchestration"
+	"github.com/eclipse-cfm/cfm/common/natsclient"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
+	"github.com/eclipse-cfm/cfm/pmanager/natsorchestration"
 )
 
 const (

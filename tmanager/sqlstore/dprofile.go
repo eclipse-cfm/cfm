@@ -17,18 +17,18 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/metaform/connector-fabric-manager/common/sqlstore"
-	"github.com/metaform/connector-fabric-manager/common/store"
-	"github.com/metaform/connector-fabric-manager/tmanager/api"
+	"github.com/eclipse-cfm/cfm/common/sqlstore"
+	"github.com/eclipse-cfm/cfm/common/store"
+	"github.com/eclipse-cfm/cfm/tmanager/api"
 )
 
 func newDataspaceProfileStore() store.EntityStore[*api.DataspaceProfile] {
 	columnNames := []string{"id", "version", "dataspace_spec", "artifacts", "deployments", "properties"}
 	builder := sqlstore.NewPostgresJSONBBuilder().WithJSONBFieldTypes(map[string]sqlstore.JSONBFieldType{
-		"artifacts":     sqlstore.JSONBFieldTypeArrayOfScalars,
-		"deployments":   sqlstore.JSONBFieldTypeArrayOfObjects,
+		"artifacts":      sqlstore.JSONBFieldTypeArrayOfScalars,
+		"deployments":    sqlstore.JSONBFieldTypeArrayOfObjects,
 		"dataspace_spec": sqlstore.JSONBFieldTypeScalar,
-		"properties":    sqlstore.JSONBFieldTypeScalar,
+		"properties":     sqlstore.JSONBFieldTypeScalar,
 	})
 
 	estore := sqlstore.NewPostgresEntityStore[*api.DataspaceProfile](

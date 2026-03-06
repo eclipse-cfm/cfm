@@ -19,12 +19,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/metaform/connector-fabric-manager/common/fixtures"
-	"github.com/metaform/connector-fabric-manager/e2e/e2efixtures"
-	testLauncher "github.com/metaform/connector-fabric-manager/e2e/testagent/launcher"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
-	plauncher "github.com/metaform/connector-fabric-manager/pmanager/cmd/server/launcher"
-	tlauncher "github.com/metaform/connector-fabric-manager/tmanager/cmd/server/launcher"
+	"github.com/eclipse-cfm/cfm/common/fixtures"
+	"github.com/eclipse-cfm/cfm/e2e/e2efixtures"
+	testLauncher "github.com/eclipse-cfm/cfm/e2e/testagent/launcher"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
+	plauncher "github.com/eclipse-cfm/cfm/pmanager/cmd/server/launcher"
+	tlauncher "github.com/eclipse-cfm/cfm/tmanager/cmd/server/launcher"
 	"github.com/stretchr/testify/require"
 )
 

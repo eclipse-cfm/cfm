@@ -20,11 +20,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/metaform/connector-fabric-manager/agent/keycloak/launcher"
-	"github.com/metaform/connector-fabric-manager/assembly/vault"
-	"github.com/metaform/connector-fabric-manager/common/natsclient"
-	"github.com/metaform/connector-fabric-manager/common/natsfixtures"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
+	"github.com/eclipse-cfm/cfm/agent/keycloak/launcher"
+	"github.com/eclipse-cfm/cfm/assembly/vault"
+	"github.com/eclipse-cfm/cfm/common/natsclient"
+	"github.com/eclipse-cfm/cfm/common/natsfixtures"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go/network"
 )

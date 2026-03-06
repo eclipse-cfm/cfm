@@ -12,7 +12,7 @@
 
 package serviceapi
 
-import "github.com/metaform/connector-fabric-manager/common/system"
+import "github.com/eclipse-cfm/cfm/common/system"
 
 const (
 	HttpClientKey system.ServiceType = "httpclient:HttpClient"

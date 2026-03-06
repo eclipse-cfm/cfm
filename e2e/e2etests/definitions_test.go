@@ -17,11 +17,11 @@ import (
 	"fmt"
 	"testing"
 
-	. "github.com/metaform/connector-fabric-manager/common/collection"
-	"github.com/metaform/connector-fabric-manager/common/natsfixtures"
-	"github.com/metaform/connector-fabric-manager/common/sqlstore"
-	"github.com/metaform/connector-fabric-manager/e2e/e2efixtures"
-	"github.com/metaform/connector-fabric-manager/pmanager/model/v1alpha1"
+	. "github.com/eclipse-cfm/cfm/common/collection"
+	"github.com/eclipse-cfm/cfm/common/natsfixtures"
+	"github.com/eclipse-cfm/cfm/common/sqlstore"
+	"github.com/eclipse-cfm/cfm/e2e/e2efixtures"
+	"github.com/eclipse-cfm/cfm/pmanager/model/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

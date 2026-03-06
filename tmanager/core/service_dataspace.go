@@ -16,10 +16,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/common/collection"
+	"github.com/eclipse-cfm/cfm/common/store"
+	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/google/uuid"
-	"github.com/metaform/connector-fabric-manager/common/collection"
-	"github.com/metaform/connector-fabric-manager/common/store"
-	"github.com/metaform/connector-fabric-manager/tmanager/api"
 )
 
 type dataspaceProfileService struct {

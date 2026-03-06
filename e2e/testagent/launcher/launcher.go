@@ -13,11 +13,11 @@
 package launcher
 
 import (
-	"github.com/metaform/connector-fabric-manager/common/model"
-	"github.com/metaform/connector-fabric-manager/common/runtime"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
-	"github.com/metaform/connector-fabric-manager/pmanager/natsagent"
+	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/runtime"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
+	"github.com/eclipse-cfm/cfm/pmanager/natsagent"
 )
 
 const (

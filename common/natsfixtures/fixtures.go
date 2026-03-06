@@ -19,7 +19,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/metaform/connector-fabric-manager/common/natsclient"
+	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"

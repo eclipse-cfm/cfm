@@ -202,8 +202,8 @@ launcher:
 package launcher
 
 import (
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
 )
 
 type LauncherConfig struct {
@@ -226,12 +226,12 @@ The following is an example of an activity agent configuration:
 package launcher
 
 import (
-	"github.com/metaform/connector-fabric-manager/agent/edcv/activity"
-	"github.com/metaform/connector-fabric-manager/assembly/httpclient"
-	"github.com/metaform/connector-fabric-manager/assembly/serviceapi"
-	"github.com/metaform/connector-fabric-manager/assembly/vault"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/natsagent"
+	"github.com/eclipse-cfm/cfm/agent/edcv/activity"
+	"github.com/eclipse-cfm/cfm/assembly/httpclient"
+	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
+	"github.com/eclipse-cfm/cfm/assembly/vault"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/natsagent"
 )
 
 func LaunchAndWaitSignal(shutdown <-chan struct{}) {
@@ -272,7 +272,7 @@ desirable to require separate agents for each resource lifecycle operation. Acti
 ```
 package example
 
-import "github.com/metaform/connector-fabric-manager/pmanager/api"
+import "github.com/eclipse-cfm/cfm/pmanager/api"
 
 func (p ExampleProcessor) Process(ctx api.ActivityContext) api.ActivityResult {
 	if ctx.Discriminator() == api.DeployDiscriminator {

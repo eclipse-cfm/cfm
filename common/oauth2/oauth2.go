@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/metaform/connector-fabric-manager/common/runtime"
+	"github.com/eclipse-cfm/cfm/common/runtime"
 )
 
 const (

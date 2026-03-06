@@ -17,8 +17,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/metaform/connector-fabric-manager/common/model"
-	"github.com/metaform/connector-fabric-manager/pmanager/model/v1alpha1"
+	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/pmanager/model/v1alpha1"
 	"github.com/oaswrap/spec"
 	"github.com/oaswrap/spec/option"
 )

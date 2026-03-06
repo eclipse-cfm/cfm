@@ -17,7 +17,7 @@ package identityhub
 import (
 	"strings"
 
-	"github.com/metaform/connector-fabric-manager/agent/edcv"
+	"github.com/eclipse-cfm/cfm/agent/edcv"
 )
 
 const (

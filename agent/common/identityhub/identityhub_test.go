@@ -22,8 +22,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/metaform/connector-fabric-manager/agent/edcv"
-	"github.com/metaform/connector-fabric-manager/common/mocks"
+	"github.com/eclipse-cfm/cfm/agent/edcv"
+	"github.com/eclipse-cfm/cfm/common/mocks"
 	"github.com/stretchr/testify/require"
 )
 

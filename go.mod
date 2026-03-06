@@ -1,12 +1,12 @@
-module github.com/metaform/connector-fabric-manager
+module github.com/eclipse-cfm/cfm
 
 go 1.24.1
 
 replace (
-	github.com/metaform/connector-fabric-manager/assembly => ./assembly
-	github.com/metaform/connector-fabric-manager/common => ./common
-	github.com/metaform/connector-fabric-manager/pmanager => ./pmanager
-	github.com/metaform/connector-fabric-manager/tmanager => ./tmanager
+	github.com/eclipse-cfm/cfm/assembly => ./assembly
+	github.com/eclipse-cfm/cfm/common => ./common
+	github.com/eclipse-cfm/cfm/pmanager => ./pmanager
+	github.com/eclipse-cfm/cfm/tmanager => ./tmanager
 )
 
 require (

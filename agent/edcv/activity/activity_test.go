@@ -18,12 +18,12 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/metaform/connector-fabric-manager/agent/common/identityhub"
-	"github.com/metaform/connector-fabric-manager/agent/edcv/controlplane"
-	"github.com/metaform/connector-fabric-manager/common/model"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/common/types"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
+	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
+	"github.com/eclipse-cfm/cfm/agent/edcv/controlplane"
+	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/common/types"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -18,9 +18,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/metaform/connector-fabric-manager/common/system"
 	"github.com/spf13/viper"
 )
 

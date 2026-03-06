@@ -17,8 +17,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/metaform/connector-fabric-manager/common/model"
-	"github.com/metaform/connector-fabric-manager/tmanager/api"
+	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -16,10 +16,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/metaform/connector-fabric-manager/common/model"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
-	pv1alpha1 "github.com/metaform/connector-fabric-manager/pmanager/model/v1alpha1"
-	tv1alpha1 "github.com/metaform/connector-fabric-manager/tmanager/model/v1alpha1"
+	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
+	pv1alpha1 "github.com/eclipse-cfm/cfm/pmanager/model/v1alpha1"
+	tv1alpha1 "github.com/eclipse-cfm/cfm/tmanager/model/v1alpha1"
 )
 
 const (

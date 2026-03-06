@@ -23,13 +23,13 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/query"
+	"github.com/eclipse-cfm/cfm/common/store"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/common/types"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/metaform/connector-fabric-manager/common/model"
-	"github.com/metaform/connector-fabric-manager/common/query"
-	"github.com/metaform/connector-fabric-manager/common/store"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/common/types"
 )
 
 const contentType = "application/json"

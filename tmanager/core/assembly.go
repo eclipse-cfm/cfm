@@ -13,10 +13,10 @@
 package core
 
 import (
-	"github.com/metaform/connector-fabric-manager/common/model"
-	"github.com/metaform/connector-fabric-manager/common/store"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/tmanager/api"
+	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/store"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/tmanager/api"
 )
 
 type TMCoreServiceAssembly struct {
@@ -74,7 +74,7 @@ func (a *TMCoreServiceAssembly) Init(context *system.InitContext) error {
 
 	context.Registry.Register(api.CellServiceKey, cellService{
 		trxContext: trxContext,
-		cellStore:      cellStore,
+		cellStore:  cellStore,
 	})
 
 	context.Registry.Register(api.DataspaceProfileServiceKey, dataspaceProfileService{

@@ -17,9 +17,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
+	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/hashicorp/go-retryablehttp"
-	"github.com/metaform/connector-fabric-manager/assembly/serviceapi"
-	"github.com/metaform/connector-fabric-manager/common/system"
 )
 
 const (

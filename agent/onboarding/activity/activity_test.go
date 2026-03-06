@@ -17,9 +17,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/metaform/connector-fabric-manager/agent/common/identityhub"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
+	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/stretchr/testify/assert"
 )
 

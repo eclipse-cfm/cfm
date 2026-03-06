@@ -15,9 +15,9 @@ package core
 import (
 	"time"
 
+	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/google/uuid"
-	"github.com/metaform/connector-fabric-manager/common/model"
-	"github.com/metaform/connector-fabric-manager/tmanager/api"
 )
 
 // participantGenerator generates participant profiles and VPAs that can be deployed to cells.

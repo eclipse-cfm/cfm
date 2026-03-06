@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
+	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/google/uuid"
-	"github.com/metaform/connector-fabric-manager/assembly/serviceapi"
-	"github.com/metaform/connector-fabric-manager/common/system"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/network"

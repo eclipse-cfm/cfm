@@ -22,10 +22,10 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/google/uuid"
-	"github.com/metaform/connector-fabric-manager/assembly/serviceapi"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
 )
 
 const (

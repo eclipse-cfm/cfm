@@ -18,7 +18,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/metaform/connector-fabric-manager/common/sqlstore"
+	"github.com/eclipse-cfm/cfm/common/sqlstore"
 	"github.com/testcontainers/testcontainers-go"
 )
 

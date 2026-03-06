@@ -16,9 +16,9 @@ import (
 	"context"
 	"iter"
 
-	"github.com/metaform/connector-fabric-manager/common/query"
-	"github.com/metaform/connector-fabric-manager/common/store"
-	"github.com/metaform/connector-fabric-manager/common/system"
+	"github.com/eclipse-cfm/cfm/common/query"
+	"github.com/eclipse-cfm/cfm/common/store"
+	"github.com/eclipse-cfm/cfm/common/system"
 )
 
 const (

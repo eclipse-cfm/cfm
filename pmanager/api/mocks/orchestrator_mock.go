@@ -5,7 +5,7 @@ package mocks
 import (
 	context "context"
 
-	api "github.com/metaform/connector-fabric-manager/pmanager/api"
+	api "github.com/eclipse-cfm/cfm/pmanager/api"
 
 	mock "github.com/stretchr/testify/mock"
 )

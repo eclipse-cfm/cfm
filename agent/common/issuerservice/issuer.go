@@ -21,7 +21,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/metaform/connector-fabric-manager/common/token"
+	"github.com/eclipse-cfm/cfm/common/token"
 )
 
 type ApiClient interface {

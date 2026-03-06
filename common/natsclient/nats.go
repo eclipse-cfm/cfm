@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/metaform/connector-fabric-manager/common/system"
+	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 )

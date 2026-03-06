@@ -16,12 +16,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
+	"github.com/eclipse-cfm/cfm/agent/common/issuerservice"
+	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/google/uuid"
-	"github.com/metaform/connector-fabric-manager/agent/common/identityhub"
-	"github.com/metaform/connector-fabric-manager/agent/common/issuerservice"
-	"github.com/metaform/connector-fabric-manager/common/model"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
 )
 
 type OnboardingActivityProcessor struct {

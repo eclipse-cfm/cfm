@@ -15,13 +15,13 @@ package handler
 import (
 	"net/http"
 
-	. "github.com/metaform/connector-fabric-manager/common/collection"
-	"github.com/metaform/connector-fabric-manager/common/handler"
-	"github.com/metaform/connector-fabric-manager/common/model"
-	"github.com/metaform/connector-fabric-manager/common/store"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
-	"github.com/metaform/connector-fabric-manager/pmanager/model/v1alpha1"
+	. "github.com/eclipse-cfm/cfm/common/collection"
+	"github.com/eclipse-cfm/cfm/common/handler"
+	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/store"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
+	"github.com/eclipse-cfm/cfm/pmanager/model/v1alpha1"
 )
 
 type PMHandler struct {

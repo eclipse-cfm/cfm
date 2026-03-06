@@ -15,8 +15,8 @@ package core
 import (
 	"errors"
 
-	"github.com/metaform/connector-fabric-manager/common/model"
-	"github.com/metaform/connector-fabric-manager/tmanager/api"
+	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/tmanager/api"
 )
 
 // defaultCellSelector iterates through cells and dataspace profiles to find and return the first active cell; returns an

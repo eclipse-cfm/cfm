@@ -3,7 +3,7 @@ resolve-type-alias: false
 disable-version-string: true
 with-expecter: true
 packages:
-  github.com/metaform/connector-fabric-manager/pmanager/api:
+  github.com/eclipse-cfm/cfm/pmanager/api:
     interfaces:
       Orchestrator:
         config:

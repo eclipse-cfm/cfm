@@ -15,9 +15,9 @@ package natsprovision
 import (
 	"context"
 
-	"github.com/metaform/connector-fabric-manager/common/model"
-	"github.com/metaform/connector-fabric-manager/common/types"
-	"github.com/metaform/connector-fabric-manager/tmanager/api"
+	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/types"
+	"github.com/eclipse-cfm/cfm/tmanager/api"
 )
 
 // provisionCallbackDispatcher routes provision responses to the associated handler.

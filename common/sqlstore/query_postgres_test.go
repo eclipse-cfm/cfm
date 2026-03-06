@@ -17,8 +17,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/common/query"
 	_ "github.com/lib/pq"
-	"github.com/metaform/connector-fabric-manager/common/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

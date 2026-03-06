@@ -17,13 +17,13 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/query"
+	"github.com/eclipse-cfm/cfm/common/store"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/common/types"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/google/uuid"
-	"github.com/metaform/connector-fabric-manager/common/model"
-	"github.com/metaform/connector-fabric-manager/common/query"
-	"github.com/metaform/connector-fabric-manager/common/store"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/common/types"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
 	"github.com/nats-io/nats.go"
 )
 

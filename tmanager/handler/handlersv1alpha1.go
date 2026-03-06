@@ -15,12 +15,12 @@ package handler
 import (
 	"net/http"
 
-	"github.com/metaform/connector-fabric-manager/common/handler"
-	"github.com/metaform/connector-fabric-manager/common/query"
-	"github.com/metaform/connector-fabric-manager/common/store"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/tmanager/api"
-	"github.com/metaform/connector-fabric-manager/tmanager/model/v1alpha1"
+	"github.com/eclipse-cfm/cfm/common/handler"
+	"github.com/eclipse-cfm/cfm/common/query"
+	"github.com/eclipse-cfm/cfm/common/store"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/tmanager/api"
+	"github.com/eclipse-cfm/cfm/tmanager/model/v1alpha1"
 )
 
 type TMHandler struct {

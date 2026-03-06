@@ -15,7 +15,7 @@ package sqlstore
 import (
 	"testing"
 
-	"github.com/metaform/connector-fabric-manager/common/query"
+	"github.com/eclipse-cfm/cfm/common/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
