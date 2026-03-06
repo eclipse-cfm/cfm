@@ -15,7 +15,6 @@
 package identityhub
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -146,8 +145,8 @@ func TestIdentityAPIClient_BadRequest(t *testing.T) {
 
 func TestHttpIdentityAPIClient_DeleteParticipantContext(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		b64 := base64.RawURLEncoding.EncodeToString([]byte("test-id"))
-		if r.URL.Path == "/v1alpha/participants/"+b64 && r.Method == http.MethodDelete {
+		participantContextID := "test-id"
+		if r.URL.Path == "/v1alpha/participants/"+participantContextID && r.Method == http.MethodDelete {
 			require.Equal(t, "Bearer token", r.Header.Get("Authorization"))
 			w.WriteHeader(http.StatusOK)
 		} else {

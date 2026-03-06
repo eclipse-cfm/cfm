@@ -13,7 +13,6 @@
 package activity
 
 import (
-	"encoding/base64"
 	"fmt"
 
 	"github.com/metaform/connector-fabric-manager/agent/common/issuerservice"
@@ -63,7 +62,7 @@ func (p RegistrationActivityProcessor) handleDeployAction(registrationData Regis
 		registrationData.HolderName = registrationData.DID
 	}
 
-	holderID := base64.RawURLEncoding.EncodeToString([]byte(registrationData.DID))
+	holderID := registrationData.DID
 	if err := p.IssuerService.CreateHolder(registrationData.DID, holderID, registrationData.HolderName); err != nil {
 		// todo: inspect error if it is retryable
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating holder in ApiClient: %w", err)}
@@ -74,7 +73,7 @@ func (p RegistrationActivityProcessor) handleDeployAction(registrationData Regis
 
 func (p RegistrationActivityProcessor) handleDisposeAction(data RegistrationData) api.ActivityResult {
 
-	holderID := base64.RawURLEncoding.EncodeToString([]byte(data.DID))
+	holderID := data.DID
 	if err := p.IssuerService.DeleteHolder(holderID); err != nil {
 		// todo: inspect error if it is retryable
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("registration rollback: error deleting holder in IssuerService: %w", err)}
