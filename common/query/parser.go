@@ -23,7 +23,12 @@ import (
 // ParsePredicate parses a predicate string according to the grammar defined in Query.g4.
 // This function builds the predicate structure based on the ANTLR parse tree.
 // NOTE if the ANTLR grammar changes, the visiting logic in predicateBuilder will need to be updated.
+// An empty or whitespace-only input is treated as a match-all predicate (no filter).
 func ParsePredicate(input string) (Predicate, error) {
+	if strings.TrimSpace(input) == "" {
+		return &MatchAllPredicate{}, nil
+	}
+
 	is := antlr.NewInputStream(input)
 	lexer := NewQueryLexer(is)
 	stream := antlr.NewCommonTokenStream(lexer, 0)
