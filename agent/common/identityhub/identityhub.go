@@ -16,7 +16,6 @@ package identityhub
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -56,8 +55,7 @@ func (a HttpIdentityAPIClient) DeleteParticipantContext(participantContextID str
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
 
-	b64 := base64.RawURLEncoding.EncodeToString([]byte(participantContextID))
-	url := fmt.Sprintf("%s/v1alpha/participants/%s", a.BaseURL, b64)
+	url := fmt.Sprintf("%s/v1alpha/participants/%s", a.BaseURL, participantContextID)
 	req, err := http.NewRequest(http.MethodDelete, url, nil)
 	if err != nil {
 		return err
@@ -86,8 +84,7 @@ func (a HttpIdentityAPIClient) QueryCredentialByType(participantContextID string
 		return nil, fmt.Errorf("failed to get API access token: %w", err)
 	}
 
-	b64 := base64.RawURLEncoding.EncodeToString([]byte(participantContextID))
-	url := fmt.Sprintf("%s/v1alpha/participants/%s/credentials?type=%s", a.BaseURL, b64, credentialType)
+	url := fmt.Sprintf("%s/v1alpha/participants/%s/credentials?type=%s", a.BaseURL, participantContextID, credentialType)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -126,8 +123,7 @@ func (a HttpIdentityAPIClient) RequestCredentials(participantContextID string, c
 		return "", err
 	}
 
-	b64 := base64.RawURLEncoding.EncodeToString([]byte(participantContextID))
-	url := fmt.Sprintf("%s/v1alpha/participants/%s/credentials/request", a.BaseURL, b64)
+	url := fmt.Sprintf("%s/v1alpha/participants/%s/credentials/request", a.BaseURL, participantContextID)
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(payload))
 	if err != nil {
 		return "", err
@@ -159,8 +155,7 @@ func (a HttpIdentityAPIClient) GetCredentialRequestState(participantContextID st
 		return "", fmt.Errorf("failed to get API access token: %w", err)
 	}
 
-	b64 := base64.RawURLEncoding.EncodeToString([]byte(participantContextID))
-	url := fmt.Sprintf("%s/v1alpha/participants/%s/credentials/request/%s", a.BaseURL, b64, credentialRequestID)
+	url := fmt.Sprintf("%s/v1alpha/participants/%s/credentials/request/%s", a.BaseURL, participantContextID, credentialRequestID)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return "", err

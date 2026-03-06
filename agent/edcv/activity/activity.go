@@ -13,7 +13,6 @@
 package activity
 
 import (
-	"encoding/base64"
 	"fmt"
 	"net/http"
 	"strings"
@@ -103,7 +102,7 @@ func (p EDCVActivityProcessor) Process(ctx api.ActivityContext) api.ActivityResu
 func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data EDCVData, participantContextId string) api.ActivityResult {
 	// override if config is provided
 	if p.CredentialServiceURL != "" {
-		data.CredentialServiceURL = fmt.Sprintf(p.CredentialServiceURL, base64.RawURLEncoding.EncodeToString([]byte(participantContextId)))
+		data.CredentialServiceURL = fmt.Sprintf(p.CredentialServiceURL, participantContextId)
 	}
 	if p.ProtocolServiceURL != "" {
 		data.ProtocolServiceURL = fmt.Sprintf(p.ProtocolServiceURL, participantContextId)
