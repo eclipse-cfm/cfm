@@ -205,34 +205,67 @@ func SetupVault(vaultURL string, rootToken string, keycloakURL string, keycloakH
 	}, nil
 }
 
-func setupTestFixtures(ctx context.Context, t *testing.T) (*vaultClient, func()) {
-
+// startTestEnvOnce starts the required containers and prepares a Vault client once for the package tests.
+// It returns the client and a cleanup function to tear down resources.
+func startTestEnvOnce(ctx context.Context) (*vaultClient, func(), error) {
+	// create an isolated docker network
 	net, err := network.New(ctx)
 	if err != nil {
-		t.Fatalf("failed to create network: %s", err)
+		return nil, nil, fmt.Errorf("failed to create network: %w", err)
 	}
 
 	vaultContainerResult, err := StartVaultContainer(ctx, net.Name)
-	require.NoError(t, err, "Failed to start Vault container")
+	if err != nil {
+		return nil, nil, err
+	}
 
 	keycloakContainerResult, err := StartKeycloakContainer(ctx, net.Name)
-	require.NoError(t, err, "Failed to start Keycloak container")
+	if err != nil {
+		vaultContainerResult.Cleanup()
+		return nil, nil, err
+	}
 
 	clientId, clientSecret, err := createKeycloakUser(keycloakContainerResult.URL, keycloakAdminUser, keycloakAdminPassword)
-	require.NoError(t, err, "Failed to create Keycloak user")
+	if err != nil {
+		vaultContainerResult.Cleanup()
+		keycloakContainerResult.Cleanup()
+		return nil, nil, fmt.Errorf("failed to create Keycloak user: %w", err)
+	}
 
 	keycloakHostInternal := fmt.Sprintf("http://%s:%s", keycloakContainerResult.ContainerName, keycloakPort)
 	if err := setupVaultJwtAuth(vaultContainerResult.URL, vaultContainerResult.Token, keycloakHostInternal); err != nil {
-		t.Fatalf("Failed to setup Vault JWT auth: %v", err)
+		vaultContainerResult.Cleanup()
+		keycloakContainerResult.Cleanup()
+		return nil, nil, fmt.Errorf("failed to setup Vault JWT auth: %w", err)
 	}
 
 	client, err := createVaultClient(vaultContainerResult.URL, clientId, clientSecret, keycloakContainerResult.URL+"/realms/master/protocol/openid-connect/token")
 	if err != nil {
 		vaultContainerResult.Cleanup()
-		t.Fatalf("Failed to create Vault client: %v", err)
+		keycloakContainerResult.Cleanup()
+		return nil, nil, fmt.Errorf("failed to create Vault client: %w", err)
 	}
 
-	return client, vaultContainerResult.Cleanup
+	cleanup := func() {
+		if client != nil {
+			_ = client.Close()
+		}
+		if vaultContainerResult != nil && vaultContainerResult.Cleanup != nil {
+			vaultContainerResult.Cleanup()
+		}
+		if keycloakContainerResult != nil && keycloakContainerResult.Cleanup != nil {
+			keycloakContainerResult.Cleanup()
+		}
+		// Note: we intentionally don't remove the network explicitly; testcontainers will clean up with containers.
+	}
+
+	return client, cleanup, nil
+}
+
+func setupTestFixtures(ctx context.Context, t *testing.T) (*vaultClient, func()) {
+	client, cleanup, err := startTestEnvOnce(ctx)
+	require.NoError(t, err, "Failed to start test environment")
+	return client, cleanup
 }
 
 // createKeycloakUser creates a Keycloak client using the specified user and password and returns the client ID and secret. Implicitly
