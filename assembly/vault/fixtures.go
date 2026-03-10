@@ -70,8 +70,9 @@ func StartVaultContainer(ctx context.Context, networkName string) (*ContainerRes
 			"VAULT_DEV_ROOT_TOKEN_ID": vaultRootToken,
 		},
 		Cmd: []string{"server", "-dev"},
-		WaitingFor: wait.ForLog("WARNING! dev mode is enabled!").
-			WithStartupTimeout(containerStartupTime),
+		WaitingFor: wait.ForAll(
+			wait.ForLog("WARNING! dev mode is enabled!").WithStartupTimeout(containerStartupTime),
+			wait.ForExposedPort()),
 	}
 
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -123,7 +124,7 @@ func StartKeycloakContainer(ctx context.Context, networkName string) (*Container
 			"KC_HEALTH_ENABLED":           "true",
 		},
 		Cmd:        []string{"start-dev", "--health-enabled=true"},
-		WaitingFor: wait.ForLog("Profile dev activated"),
+		WaitingFor: wait.ForAll(wait.ForExposedPort(), wait.ForLog("Profile dev activated")),
 	}
 
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{

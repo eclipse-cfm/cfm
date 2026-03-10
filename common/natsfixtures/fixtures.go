@@ -69,7 +69,10 @@ trace: true
 	req := testcontainers.ContainerRequest{
 		Image:        natsImage,
 		ExposedPorts: []string{"0:4222/tcp"},
-		WaitingFor:   wait.ForLog("Server is ready"),
+		WaitingFor: wait.ForAll(
+			wait.ForExposedPort(),
+			wait.ForLog(".*Server is ready.*").AsRegexp(),
+		),
 		Files: []testcontainers.ContainerFile{
 			{
 				HostFilePath:      configFile,
