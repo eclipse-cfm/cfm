@@ -15,7 +15,6 @@ package launcher
 import (
 	"fmt"
 
-	"github.com/eclipse-cfm/cfm/assembly/httpclient"
 	"github.com/eclipse-cfm/cfm/assembly/routing"
 	"github.com/eclipse-cfm/cfm/common/runtime"
 	"github.com/eclipse-cfm/cfm/common/store"
