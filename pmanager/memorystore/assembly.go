@@ -13,9 +13,9 @@
 package memorystore
 
 import (
-	"github.com/metaform/connector-fabric-manager/common/memorystore"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
+	"github.com/eclipse-cfm/cfm/common/memorystore"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
 )
 
 type MemoryStoreServiceAssembly struct {

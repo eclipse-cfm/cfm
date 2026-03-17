@@ -16,9 +16,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/metaform/connector-fabric-manager/common/collection"
-	"github.com/metaform/connector-fabric-manager/common/query"
-	"github.com/metaform/connector-fabric-manager/common/types"
+	"github.com/eclipse-cfm/cfm/common/collection"
+	"github.com/eclipse-cfm/cfm/common/query"
+	"github.com/eclipse-cfm/cfm/common/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

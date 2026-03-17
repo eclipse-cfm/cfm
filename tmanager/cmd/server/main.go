@@ -13,7 +13,7 @@
 package main
 
 import (
-	"github.com/metaform/connector-fabric-manager/tmanager/cmd/server/launcher"
+	"github.com/eclipse-cfm/cfm/tmanager/cmd/server/launcher"
 )
 
 // The entry point for the Tenant Manager runtime.

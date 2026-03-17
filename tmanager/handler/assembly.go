@@ -15,12 +15,12 @@ package handler
 import (
 	"net/http"
 
+	"github.com/eclipse-cfm/cfm/assembly/routing"
+	"github.com/eclipse-cfm/cfm/common/store"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/metaform/connector-fabric-manager/assembly/routing"
-	"github.com/metaform/connector-fabric-manager/common/store"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/tmanager/api"
 )
 
 type response struct {

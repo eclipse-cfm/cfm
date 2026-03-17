@@ -15,9 +15,9 @@ package natsagent
 import (
 	"fmt"
 
-	"github.com/metaform/connector-fabric-manager/common/runtime"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
+	"github.com/eclipse-cfm/cfm/common/runtime"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/spf13/viper"
 )
 

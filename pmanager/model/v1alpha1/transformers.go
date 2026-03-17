@@ -13,9 +13,9 @@
 package v1alpha1
 
 import (
+	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/google/uuid"
-	"github.com/metaform/connector-fabric-manager/common/model"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
 )
 
 func ToActivityDefinitionDto(definition *api.ActivityDefinition) *ActivityDefinitionDto {

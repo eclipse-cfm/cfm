@@ -19,9 +19,9 @@ import (
 	"iter"
 	"sync"
 
-	"github.com/metaform/connector-fabric-manager/common/query"
-	"github.com/metaform/connector-fabric-manager/common/store"
-	"github.com/metaform/connector-fabric-manager/common/types"
+	"github.com/eclipse-cfm/cfm/common/query"
+	"github.com/eclipse-cfm/cfm/common/store"
+	"github.com/eclipse-cfm/cfm/common/types"
 )
 
 func NewInMemoryEntityStore[T store.EntityType]() *InMemoryEntityStore[T] {

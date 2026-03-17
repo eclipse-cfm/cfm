@@ -13,7 +13,7 @@
 package main
 
 import (
-	"github.com/metaform/connector-fabric-manager/e2e/testagent/launcher"
+	"github.com/eclipse-cfm/cfm/e2e/testagent/launcher"
 )
 
 // The entry point for the Provision Test agent runtime.

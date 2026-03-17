@@ -21,9 +21,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/common/system"
 	hvault "github.com/hashicorp/vault-client-go"
 	"github.com/hashicorp/vault-client-go/schema"
-	"github.com/metaform/connector-fabric-manager/common/system"
 )
 
 const (

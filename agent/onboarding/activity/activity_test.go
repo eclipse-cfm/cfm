@@ -17,13 +17,13 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/metaform/connector-fabric-manager/agent/common/identityhub"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
+	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestOnboardingActivityProcessor_Process_WhenNewRequest(t *testing.T) {
+func TestOnboardingActivityProcessor_ProcessDeploy_WhenNewRequest(t *testing.T) {
 	ih := MockIdentityHubClient{
 		expectedURL: "https://example.com/credentialservice/request/123",
 	}
@@ -48,8 +48,9 @@ func TestOnboardingActivityProcessor_Process_WhenNewRequest(t *testing.T) {
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -64,7 +65,7 @@ func TestOnboardingActivityProcessor_Process_WhenNewRequest(t *testing.T) {
 	assert.Contains(t, activityContext.Values(), "holderPid")
 }
 
-func TestOnboardingActivityProcessor_Process_WhenNewRequestError(t *testing.T) {
+func TestOnboardingActivityProcessor_ProcessDeploy_WhenNewRequestError(t *testing.T) {
 	ih := MockIdentityHubClient{
 		expectedError: fmt.Errorf("some error"),
 	}
@@ -89,8 +90,9 @@ func TestOnboardingActivityProcessor_Process_WhenNewRequestError(t *testing.T) {
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -102,7 +104,7 @@ func TestOnboardingActivityProcessor_Process_WhenNewRequestError(t *testing.T) {
 	assert.Empty(t, activityContext.OutputValues())
 }
 
-func TestOnboardingActivityProcessor_Process_WhenPendingRequestApiError(t *testing.T) {
+func TestOnboardingActivityProcessor_ProcessDeploy_WhenPendingRequestApiError(t *testing.T) {
 	ih := MockIdentityHubClient{
 		expectedError: fmt.Errorf("some error"),
 	}
@@ -122,8 +124,9 @@ func TestOnboardingActivityProcessor_Process_WhenPendingRequestApiError(t *testi
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -135,7 +138,7 @@ func TestOnboardingActivityProcessor_Process_WhenPendingRequestApiError(t *testi
 	assert.Empty(t, activityContext.OutputValues())
 }
 
-func TestOnboardingActivityProcessor_Process_WhenPendingRequestIssued(t *testing.T) {
+func TestOnboardingActivityProcessor_ProcessDeploy_WhenPendingRequestIssued(t *testing.T) {
 	ih := MockIdentityHubClient{
 		expectedState: identityhub.CredentialRequestStateIssued,
 	}
@@ -155,8 +158,9 @@ func TestOnboardingActivityProcessor_Process_WhenPendingRequestIssued(t *testing
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -171,7 +175,7 @@ func TestOnboardingActivityProcessor_Process_WhenPendingRequestIssued(t *testing
 	assert.Equal(t, "test-holder-pid", activityContext.OutputValues()["holderPid"])
 }
 
-func TestOnboardingActivityProcessor_Process_WhenPendingRequestCreated(t *testing.T) {
+func TestOnboardingActivityProcessor_ProcessDeploy_WhenPendingRequestCreated(t *testing.T) {
 	ih := MockIdentityHubClient{
 		expectedState: identityhub.CredentialRequestStateCreated,
 	}
@@ -191,8 +195,9 @@ func TestOnboardingActivityProcessor_Process_WhenPendingRequestCreated(t *testin
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -205,7 +210,7 @@ func TestOnboardingActivityProcessor_Process_WhenPendingRequestCreated(t *testin
 	assert.Empty(t, activityContext.OutputValues())
 }
 
-func TestOnboardingActivityProcessor_Process_WhenPendingRequestRejected(t *testing.T) {
+func TestOnboardingActivityProcessor_ProcessDeploy_WhenPendingRequestRejected(t *testing.T) {
 	ih := MockIdentityHubClient{
 		expectedState: identityhub.CredentialRequestStateRejected,
 	}
@@ -225,8 +230,9 @@ func TestOnboardingActivityProcessor_Process_WhenPendingRequestRejected(t *testi
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -239,7 +245,7 @@ func TestOnboardingActivityProcessor_Process_WhenPendingRequestRejected(t *testi
 	assert.Empty(t, activityContext.OutputValues())
 }
 
-func TestOnboardingActivityProcessor_Process_WhenPendingRequestError(t *testing.T) {
+func TestOnboardingActivityProcessor_ProcessDeploy_WhenPendingRequestError(t *testing.T) {
 	ih := MockIdentityHubClient{
 		expectedState: identityhub.CredentialRequestStateError,
 	}
@@ -259,8 +265,9 @@ func TestOnboardingActivityProcessor_Process_WhenPendingRequestError(t *testing.
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -273,7 +280,7 @@ func TestOnboardingActivityProcessor_Process_WhenPendingRequestError(t *testing.
 	assert.Empty(t, activityContext.OutputValues())
 }
 
-func TestOnboardingActivityProcessor_Process_WhenInvalidData(t *testing.T) {
+func TestOnboardingActivityProcessor_ProcessDeploy_WhenInvalidData(t *testing.T) {
 	ih := MockIdentityHubClient{}
 	processor := OnboardingActivityProcessor{
 		Monitor:           system.NoopMonitor{},
@@ -286,8 +293,9 @@ func TestOnboardingActivityProcessor_Process_WhenInvalidData(t *testing.T) {
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -298,7 +306,7 @@ func TestOnboardingActivityProcessor_Process_WhenInvalidData(t *testing.T) {
 	assert.Error(t, result.Error)
 }
 
-func TestOnboardingActivityProcessor_Process_WhenInvalidStateReceived(t *testing.T) {
+func TestOnboardingActivityProcessor_ProcessDeploy_WhenInvalidStateReceived(t *testing.T) {
 	ih := MockIdentityHubClient{
 		expectedState: "invalid state foobar",
 	}
@@ -318,8 +326,9 @@ func TestOnboardingActivityProcessor_Process_WhenInvalidStateReceived(t *testing
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -333,10 +342,158 @@ func TestOnboardingActivityProcessor_Process_WhenInvalidStateReceived(t *testing
 	assert.Contains(t, activityContext.Values(), "holderPid")
 }
 
+func TestOnboardingActivityProcessor_ProcessDispose(t *testing.T) {
+	ih := MockIdentityHubClient{
+		expectedCredentials: []identityhub.VerifiableCredentialResource{
+			{
+				ParticipantContextID: "test-participant",
+				IssuerID:             "test-issuer",
+				HolderID:             "test-participant",
+				Metadata:             nil,
+				State:                0,
+				VerifiableCredential: identityhub.CredentialContainer{},
+			},
+		},
+	}
+	processor := OnboardingActivityProcessor{
+		Monitor:                system.NoopMonitor{},
+		IdentityApiClient:      ih,
+		IssuerServiceApiClient: MockIssuerServiceApiClient{},
+	}
+
+	var processingData = map[string]any{
+		"clientID.apiAccess": "test-participant",
+		"cfm.vpa.credentials": []any{
+			map[string]string{
+				"id":     "id",
+				"format": "format",
+				"issuer": "issuer",
+				"type":   "type",
+			},
+		},
+	}
+
+	ctx := context.Background()
+	outputData := make(map[string]any)
+
+	activity := api.Activity{
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DisposeDiscriminator,
+	}
+
+	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
+
+	result := processor.Process(activityContext)
+
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
+	assert.NoError(t, result.Error)
+}
+func TestOnboardingActivityProcessor_ProcessDispose_RevocationFails(t *testing.T) {
+	ih := MockIdentityHubClient{
+		expectedCredentials: []identityhub.VerifiableCredentialResource{
+			{
+				ParticipantContextID: "test-participant",
+				IssuerID:             "test-issuer",
+				HolderID:             "test-participant",
+				Metadata:             nil,
+				State:                0,
+				VerifiableCredential: identityhub.CredentialContainer{},
+			},
+		},
+	}
+	processor := OnboardingActivityProcessor{
+		Monitor:           system.NoopMonitor{},
+		IdentityApiClient: ih,
+		IssuerServiceApiClient: MockIssuerServiceApiClient{
+			expectedError: fmt.Errorf("some error"),
+		},
+	}
+
+	var processingData = map[string]any{
+		"clientID.apiAccess": "test-participant",
+		"cfm.vpa.credentials": []any{
+			map[string]string{
+				"id":     "id",
+				"format": "format",
+				"issuer": "issuer",
+				"type":   "type",
+			},
+		},
+	}
+
+	ctx := context.Background()
+	outputData := make(map[string]any)
+
+	activity := api.Activity{
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DisposeDiscriminator,
+	}
+
+	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
+
+	result := processor.Process(activityContext)
+
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
+	assert.ErrorContains(t, result.Error, "some error")
+}
+
+func TestOnboardingActivityProcessor_ProcessDispose_NoCredentials(t *testing.T) {
+	ih := MockIdentityHubClient{
+		expectedCredentials: []identityhub.VerifiableCredentialResource{},
+	}
+	processor := OnboardingActivityProcessor{
+		Monitor:           system.NoopMonitor{},
+		IdentityApiClient: ih,
+		IssuerServiceApiClient: MockIssuerServiceApiClient{
+			expectedError: fmt.Errorf("some error"), // should never be invoked, because there are no credentials
+		},
+	}
+
+	var processingData = map[string]any{
+		"clientID.apiAccess": "test-participant",
+		"cfm.vpa.credentials": []any{
+			map[string]string{
+				"id":     "id",
+				"format": "format",
+				"issuer": "issuer",
+				"type":   "type",
+			},
+		},
+	}
+
+	ctx := context.Background()
+	outputData := make(map[string]any)
+
+	activity := api.Activity{
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DisposeDiscriminator,
+	}
+
+	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
+
+	result := processor.Process(activityContext)
+
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
+	assert.NoError(t, result.Error)
+}
+
 type MockIdentityHubClient struct {
-	expectedError error
-	expectedState string
-	expectedURL   string
+	expectedError       error
+	expectedState       string
+	expectedURL         string
+	expectedCredentials []identityhub.VerifiableCredentialResource
+}
+
+func (m MockIdentityHubClient) QueryCredentialByType(participantContextID string, credentialType string) ([]identityhub.VerifiableCredentialResource, error) {
+	return m.expectedCredentials, m.expectedError
+}
+
+func (m MockIdentityHubClient) DeleteParticipantContext(participantContextID string) error {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (m MockIdentityHubClient) CreateParticipantContext(identityhub.ParticipantManifest) (*identityhub.CreateParticipantContextResponse, error) {
@@ -349,4 +506,21 @@ func (m MockIdentityHubClient) RequestCredentials(string, identityhub.Credential
 
 func (m MockIdentityHubClient) GetCredentialRequestState(string, string) (string, error) {
 	return m.expectedState, m.expectedError
+}
+
+type MockIssuerServiceApiClient struct {
+	expectedError error
+}
+
+func (m MockIssuerServiceApiClient) DeleteHolder(holderID string) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockIssuerServiceApiClient) CreateHolder(did string, holderID string, name string) error {
+	return m.expectedError
+}
+
+func (m MockIssuerServiceApiClient) RevokeCredential(participantContextID string, credentialID string) error {
+	return m.expectedError
 }

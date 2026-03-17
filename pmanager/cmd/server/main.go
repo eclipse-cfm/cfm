@@ -13,7 +13,7 @@
 package main
 
 import (
-	"github.com/metaform/connector-fabric-manager/pmanager/cmd/server/launcher"
+	"github.com/eclipse-cfm/cfm/pmanager/cmd/server/launcher"
 )
 
 // The entry point for the Provision Manager runtime.

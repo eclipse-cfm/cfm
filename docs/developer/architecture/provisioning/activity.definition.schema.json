@@ -1,5 +1,5 @@
 {
-  "$id": "https://https://github.com/Metaform/connector-fabric-manager/orchestration.definition.schema.json",
+  "$id": "https://https://github.com/eclipse-cfm/cfm/orchestration.definition.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActivityDefinitionSchema",
   "description": "Defines an Activity Definition",

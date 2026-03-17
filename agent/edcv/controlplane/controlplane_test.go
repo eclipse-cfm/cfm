@@ -23,7 +23,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/metaform/connector-fabric-manager/common/mocks"
+	"github.com/eclipse-cfm/cfm/common/mocks"
 	"github.com/stretchr/testify/require"
 )
 
@@ -328,4 +328,72 @@ func TestCreateParticipantConfig_Conflict(t *testing.T) {
 	}
 
 	require.ErrorContains(t, client.CreateConfig("test-participant", context), "foobar")
+}
+
+func TestDeleteParticipant(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == CreateParticipantURL+"/test-participant" && r.Method == http.MethodDelete {
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken").Return("token", nil)
+	client := HttpManagementAPIClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	err := client.DeleteParticipantContext("test-participant")
+	require.NoError(t, err)
+}
+
+func TestDeleteParticipant_AuthError(t *testing.T) {
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken").Return("", fmt.Errorf("test error"))
+	client := HttpManagementAPIClient{
+		BaseURL:       "http://foo.bar",
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	require.ErrorContains(t, client.DeleteParticipantContext("test-participant"), "test error")
+}
+
+func TestDeleteParticipant_NotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte("participant not found"))
+	}))
+	defer server.Close()
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken").Return("test token", nil)
+	client := HttpManagementAPIClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	require.ErrorContains(t, client.DeleteParticipantContext("test-participant"), "not found in control plane")
+}
+
+func TestDeleteParticipant_ServerError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("internal server error"))
+	}))
+	defer server.Close()
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken").Return("test token", nil)
+	client := HttpManagementAPIClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	require.ErrorContains(t, client.DeleteParticipantContext("test-participant"), "received status code 500")
 }

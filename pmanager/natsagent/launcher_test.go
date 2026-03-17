@@ -16,11 +16,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/stretchr/testify/require"
 )
-
 
 func Test_LaunchAgent_WithAssemblyProvider(t *testing.T) {
 	// Setup environment variables

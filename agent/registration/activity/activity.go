@@ -15,9 +15,9 @@ package activity
 import (
 	"fmt"
 
-	"github.com/metaform/connector-fabric-manager/agent/registration/issuerservice"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
+	"github.com/eclipse-cfm/cfm/agent/common/issuerservice"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
 )
 
 type RegistrationActivityProcessor struct {
@@ -48,16 +48,36 @@ func (p RegistrationActivityProcessor) Process(ctx api.ActivityContext) api.Acti
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Registration activity for orchestration %s: %w", ctx.OID(), err)}
 	}
 
+	if ctx.Discriminator() == api.DeployDiscriminator {
+		return p.handleDeployAction(registrationData)
+	} else if ctx.Discriminator() == api.DisposeDiscriminator {
+		return p.handleDisposeAction(registrationData)
+	}
+	return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("the '%s' discriminator is not supported", ctx.Discriminator())}
+
+}
+
+func (p RegistrationActivityProcessor) handleDeployAction(registrationData RegistrationData) api.ActivityResult {
 	if registrationData.HolderName == "" {
 		registrationData.HolderName = registrationData.DID
 	}
 
-	if err := p.IssuerService.CreateHolder(registrationData.DID, registrationData.DID, registrationData.HolderName); err != nil {
+	holderID := registrationData.DID
+	if err := p.IssuerService.CreateHolder(registrationData.DID, holderID, registrationData.HolderName); err != nil {
 		// todo: inspect error if it is retryable
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating holder in ApiClient: %w", err)}
 	}
 
-	p.Monitor.Infof("Registration activity for participant '%s' completed successfully", registrationData.DID)
-	// create holder in ApiClient
+	return api.ActivityResult{Result: api.ActivityResultComplete}
+}
+
+func (p RegistrationActivityProcessor) handleDisposeAction(data RegistrationData) api.ActivityResult {
+
+	holderID := data.DID
+	if err := p.IssuerService.DeleteHolder(holderID); err != nil {
+		// todo: inspect error if it is retryable
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("registration rollback: error deleting holder in IssuerService: %w", err)}
+	}
+	p.Monitor.Debugf("Registration rollback: activity for participant '%s' completed successfully", data.DID)
 	return api.ActivityResult{Result: api.ActivityResultComplete}
 }

@@ -18,7 +18,7 @@ KIND_CLUSTER_NAME=edcv
 E2E_DIR=e2e
 
 # Docker settings
-DOCKER_REGISTRY=ghcr.io/metaform/connector-fabric-manager/
+DOCKER_REGISTRY=ghcr.io/eclipse-cfm/cfm/
 DOCKER_TAG=latest
 
 # TEST OUTPUT CONFIG

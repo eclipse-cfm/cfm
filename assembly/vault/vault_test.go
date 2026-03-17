@@ -13,7 +13,6 @@
 package vault
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -22,9 +21,8 @@ import (
 )
 
 func TestStoreAndResolveSecret(t *testing.T) {
-	ctx := context.Background()
-	client, cleanup := setupTestFixtures(ctx, t)
-	defer cleanup()
+	ctx := t.Context()
+	client := getTestClient(t)
 
 	newSecretPath := "new-test-secret"
 	newSecretValue := "new-secret-value"
@@ -38,11 +36,12 @@ func TestStoreAndResolveSecret(t *testing.T) {
 }
 
 func TestDeleteSecret_WithSoftDelete(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
-	client, cleanup := setupTestFixtures(ctx, t)
+	client := getTestClient(t)
+	prev := client.softDelete
 	client.softDelete = true
-	defer cleanup()
+	defer func() { client.softDelete = prev }()
 
 	secretToDelete := "secret-to-delete"
 	err := client.StoreSecret(ctx, secretToDelete, "delete-me")
@@ -57,10 +56,9 @@ func TestDeleteSecret_WithSoftDelete(t *testing.T) {
 }
 
 func TestDeleteSecret_NoSoftDelete(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
-	client, cleanup := setupTestFixtures(ctx, t)
-	defer cleanup()
+	client := getTestClient(t)
 
 	secretToDelete := "secret-to-delete"
 	err := client.StoreSecret(ctx, secretToDelete, "delete-me")
@@ -75,9 +73,7 @@ func TestDeleteSecret_NoSoftDelete(t *testing.T) {
 }
 
 func Test_TokenRenewal(t *testing.T) {
-	client, cleanup := setupTestFixtures(context.Background(), t)
-	defer cleanup()
-	defer client.Close()
+	client := getTestClient(t)
 
 	go client.renewTokenPeriodically(10 * time.Millisecond)
 

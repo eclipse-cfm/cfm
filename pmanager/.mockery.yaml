@@ -3,10 +3,20 @@ resolve-type-alias: false
 disable-version-string: true
 with-expecter: true
 packages:
-  github.com/metaform/connector-fabric-manager/pmanager/api:
+  github.com/eclipse-cfm/cfm/pmanager/api:
     interfaces:
       Orchestrator:
         config:
           filename: orchestrator_mock.go
           outpkg: mocks
-          dir: ./mocks
+          dir: ./api/mocks
+      ProvisionManager:
+        config:
+          filename: provision_mock.go
+          outpkg: mocks
+          dir: ./api/mocks
+      DefinitionManager:
+        config:
+          filename: definition_manager_mock.go
+          outpkg: mocks
+          dir: ./api/mocks

@@ -17,11 +17,12 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"time"
 
-	"github.com/metaform/connector-fabric-manager/common/dag"
-	"github.com/metaform/connector-fabric-manager/common/model"
-	"github.com/metaform/connector-fabric-manager/common/types"
+	"github.com/eclipse-cfm/cfm/common/dag"
+	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/types"
 )
 
 type OrchestrationState uint
@@ -32,6 +33,20 @@ const (
 	OrchestrationStateCompleted   OrchestrationState = 2
 	OrchestrationStateErrored     OrchestrationState = 3
 )
+
+func (s OrchestrationState) String() string {
+	switch s {
+	case OrchestrationStateErrored:
+		return "Errored"
+	case OrchestrationStateCompleted:
+		return "Completed"
+	case OrchestrationStateInitialized:
+		return "Initialized"
+	case OrchestrationStateRunning:
+		return "Running"
+	}
+	return "Unknown, code: " + strconv.Itoa(int(s))
+}
 
 // Orchestration is a collection of activities that are executed to allocate resources in the system. Activities are
 // organized into parallel execution steps based on dependencies.

@@ -13,11 +13,11 @@
 package launcher
 
 import (
-	"github.com/metaform/connector-fabric-manager/common/model"
-	"github.com/metaform/connector-fabric-manager/common/runtime"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
-	"github.com/metaform/connector-fabric-manager/pmanager/natsagent"
+	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/runtime"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
+	"github.com/eclipse-cfm/cfm/pmanager/natsagent"
 )
 
 const (
@@ -36,17 +36,37 @@ func Launch(shutdown <-chan struct{}) {
 		ConfigPrefix: configPrefix,
 		ActivityType: activityType,
 		NewProcessor: func(ctx *natsagent.AgentContext) api.ActivityProcessor {
-			return &TestActivityProcessor{ctx.Monitor}
+			return &TestActivityProcessor{monitor: ctx.Monitor}
+		},
+	}
+	natsagent.LaunchAgent(shutdown, config)
+}
+
+func LaunchWithCallback(shutdown <-chan struct{}, callback func(ctx api.ActivityContext) api.ActivityResult) {
+	config := natsagent.LauncherConfig{
+		AgentName:    agentName,
+		ConfigPrefix: configPrefix,
+		ActivityType: activityType,
+		NewProcessor: func(ctx *natsagent.AgentContext) api.ActivityProcessor {
+			return &TestActivityProcessor{ctx.Monitor, callback}
 		},
 	}
 	natsagent.LaunchAgent(shutdown, config)
 }
 
 type TestActivityProcessor struct {
-	monitor system.LogMonitor
+	monitor  system.LogMonitor
+	callback func(ctx api.ActivityContext) api.ActivityResult
 }
 
 func (t TestActivityProcessor) Process(ctx api.ActivityContext) api.ActivityResult {
+	if t.callback != nil {
+		return t.callback(ctx)
+	}
+	return processDefault(ctx, t)
+}
+
+func processDefault(ctx api.ActivityContext, t TestActivityProcessor) api.ActivityResult {
 	if ctx.Discriminator() == api.DisposeDiscriminator {
 		// a disposal request
 		t.monitor.Infof("Processed dispose")

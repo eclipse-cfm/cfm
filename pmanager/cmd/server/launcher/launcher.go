@@ -15,16 +15,17 @@ package launcher
 import (
 	"fmt"
 
-	"github.com/metaform/connector-fabric-manager/assembly/routing"
-	"github.com/metaform/connector-fabric-manager/common/runtime"
-	"github.com/metaform/connector-fabric-manager/common/store"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/core"
-	"github.com/metaform/connector-fabric-manager/pmanager/handler"
-	"github.com/metaform/connector-fabric-manager/pmanager/memorystore"
-	"github.com/metaform/connector-fabric-manager/pmanager/natsorchestration"
-	"github.com/metaform/connector-fabric-manager/pmanager/natsprovision"
-	"github.com/metaform/connector-fabric-manager/pmanager/sqlstore"
+	"github.com/eclipse-cfm/cfm/assembly/httpclient"
+	"github.com/eclipse-cfm/cfm/assembly/routing"
+	"github.com/eclipse-cfm/cfm/common/runtime"
+	"github.com/eclipse-cfm/cfm/common/store"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/core"
+	"github.com/eclipse-cfm/cfm/pmanager/handler"
+	"github.com/eclipse-cfm/cfm/pmanager/memorystore"
+	"github.com/eclipse-cfm/cfm/pmanager/natsorchestration"
+	"github.com/eclipse-cfm/cfm/pmanager/natsprovision"
+	"github.com/eclipse-cfm/cfm/pmanager/sqlstore"
 )
 
 const (
@@ -32,7 +33,7 @@ const (
 	defaultPort  = 8181
 	configPrefix = "pm"
 	httpKey      = "httpPort"
-	postgresKey = "postgres"
+	postgresKey  = "postgres"
 	uriKey       = "uri"
 	bucketKey    = "bucket"
 	streamKey    = "stream"
@@ -82,4 +83,3 @@ func Launch(shutdown <-chan struct{}) {
 
 	runtime.AssembleAndLaunch(assembler, "Provision Manager", logMonitor, shutdown)
 }
-

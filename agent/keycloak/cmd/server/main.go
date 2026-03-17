@@ -13,8 +13,8 @@
 package main
 
 import (
-	"github.com/metaform/connector-fabric-manager/agent/keycloak/launcher"
-	"github.com/metaform/connector-fabric-manager/common/runtime"
+	"github.com/eclipse-cfm/cfm/agent/keycloak/launcher"
+	"github.com/eclipse-cfm/cfm/common/runtime"
 )
 
 // The entry point for the KeyCloak agent runtime.

@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/metaform/connector-fabric-manager/common/dag"
+	"github.com/eclipse-cfm/cfm/common/dag"
 	"github.com/spf13/viper"
 )
 

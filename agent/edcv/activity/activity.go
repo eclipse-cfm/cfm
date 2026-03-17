@@ -13,19 +13,18 @@
 package activity
 
 import (
-	"encoding/base64"
 	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
-	"github.com/metaform/connector-fabric-manager/agent/common/identityhub"
-	"github.com/metaform/connector-fabric-manager/agent/edcv"
-	"github.com/metaform/connector-fabric-manager/agent/edcv/controlplane"
-	"github.com/metaform/connector-fabric-manager/assembly/serviceapi"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/common/token"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
+	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
+	"github.com/eclipse-cfm/cfm/agent/edcv"
+	"github.com/eclipse-cfm/cfm/agent/edcv/controlplane"
+	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
+	. "github.com/eclipse-cfm/cfm/common/collection"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/common/token"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
 )
 
 type EDCVActivityProcessor struct {
@@ -89,9 +88,21 @@ func (p EDCVActivityProcessor) Process(ctx api.ActivityContext) api.ActivityResu
 
 	participantContextId := data.ApiAccessClientID
 
+	if ctx.Discriminator() == api.DeployDiscriminator {
+		return p.handleDeployAction(ctx, data, participantContextId)
+	} else if ctx.Discriminator() == api.DisposeDiscriminator {
+		return p.handleDisposeAction(participantContextId)
+	}
+
+	return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("the '%s' discriminator is not supported", ctx.Discriminator())}
+
+}
+
+// handleDeployAction creates a participant context in IdentityHub and the control plane (incl. participant context config)
+func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data EDCVData, participantContextId string) api.ActivityResult {
 	// override if config is provided
 	if p.CredentialServiceURL != "" {
-		data.CredentialServiceURL = fmt.Sprintf(p.CredentialServiceURL, base64.RawURLEncoding.EncodeToString([]byte(participantContextId)))
+		data.CredentialServiceURL = fmt.Sprintf(p.CredentialServiceURL, participantContextId)
 	}
 	if p.ProtocolServiceURL != "" {
 		data.ProtocolServiceURL = fmt.Sprintf(p.ProtocolServiceURL, participantContextId)
@@ -158,6 +169,35 @@ func (p EDCVActivityProcessor) Process(ctx api.ActivityContext) api.ActivityResu
 	return api.ActivityResult{Result: api.ActivityResultComplete}
 }
 
+// handleDisposeAction deletes the participant context in IdentityHub and the control plane
+func (p EDCVActivityProcessor) handleDisposeAction(participantContextID string) api.ActivityResult {
+	var errors []error
+	// delete from IdentityHub
+	err := p.IdentityAPIClient.DeleteParticipantContext(participantContextID)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
+	// delete config from Control Plane
+	err = p.ManagementAPIClient.DeleteConfig(participantContextID)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
+	// delete participant context from Control Plane
+	err = p.ManagementAPIClient.DeleteParticipantContext(participantContextID)
+	if err != nil {
+		errors = append(errors, err)
+	}
+	if len(errors) > 0 {
+		errorStrings := Collect(Map(From(errors), func(err error) string { return err.Error() }))
+		errStr := strings.Join(errorStrings, ", ")
+		p.Monitor.Warnf("one or more errors occurred while rolling back participant context '%s': [%s]", participantContextID, errStr)
+
+	}
+	return api.ActivityResult{Result: api.ActivityResultComplete}
+}
+
 // extractWebDid extracts a WebDID from a given URL. Currently not used, as the participant profile contains an "identifier" which is the DID.
 func (p EDCVActivityProcessor) extractWebDid(url string) (string, error) {
 
@@ -168,8 +208,4 @@ func (p EDCVActivityProcessor) extractWebDid(url string) (string, error) {
 	did = "did:web:" + did
 
 	return did, nil
-}
-
-func createParticipantContextID() string {
-	return uuid.New().String()
 }

@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/metaform/connector-fabric-manager/common/model"
+	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/stretchr/testify/assert"
 )
 

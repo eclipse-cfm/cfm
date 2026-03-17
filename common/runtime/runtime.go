@@ -21,7 +21,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/metaform/connector-fabric-manager/common/system"
+	"github.com/eclipse-cfm/cfm/common/system"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )

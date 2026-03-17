@@ -13,8 +13,8 @@
 package main
 
 import (
-	"github.com/metaform/connector-fabric-manager/agent/edcv/launcher"
-	"github.com/metaform/connector-fabric-manager/common/runtime"
+	"github.com/eclipse-cfm/cfm/agent/edcv/launcher"
+	"github.com/eclipse-cfm/cfm/common/runtime"
 )
 
 // The entry point for the EDC-V agent runtime.

@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/metaform/connector-fabric-manager/tmanager/api"
+	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -54,7 +54,7 @@ func TestResolveCell(t *testing.T) {
 							State:          api.DeploymentStateActive,
 							StateTimestamp: now,
 						},
-						CellID:"cell1",
+						CellID: "cell1",
 					},
 				},
 			},
@@ -108,7 +108,7 @@ func TestResolveCell(t *testing.T) {
 							State:          api.DeploymentStateActive,
 							StateTimestamp: now,
 						},
-						CellID:"cell1",
+						CellID: "cell1",
 					},
 					{
 						DeployableEntity: api.DeployableEntity{
@@ -119,8 +119,7 @@ func TestResolveCell(t *testing.T) {
 							State:          api.DeploymentStateActive,
 							StateTimestamp: now,
 						},
-						CellID:"cell2",
-
+						CellID: "cell2",
 					},
 				},
 			},
@@ -163,7 +162,7 @@ func TestResolveCell(t *testing.T) {
 							State:          api.DeploymentStateActive,
 							StateTimestamp: now,
 						},
-						CellID:"cell1",
+						CellID: "cell1",
 					},
 				},
 			},
@@ -206,7 +205,7 @@ func TestResolveCell(t *testing.T) {
 							State:          api.DeploymentStatePending,
 							StateTimestamp: now,
 						},
-						CellID:"cell1",
+						CellID: "cell1",
 					},
 				},
 			},
@@ -238,7 +237,7 @@ func TestResolveCell(t *testing.T) {
 							State:          api.DeploymentStateActive,
 							StateTimestamp: now,
 						},
-						CellID:"cell1",
+						CellID: "cell1",
 					},
 				},
 			},
@@ -335,7 +334,7 @@ func TestResolveCell(t *testing.T) {
 							State:          api.DeploymentStatePending,
 							StateTimestamp: now,
 						},
-						CellID:"cell1",
+						CellID: "cell1",
 					},
 				},
 			},
@@ -354,7 +353,7 @@ func TestResolveCell(t *testing.T) {
 							State:          api.DeploymentStateActive,
 							StateTimestamp: now,
 						},
-						CellID:"cell1",
+						CellID: "cell1",
 					},
 				},
 			},
@@ -418,7 +417,7 @@ func TestResolveCell(t *testing.T) {
 							State:          api.DeploymentStateActive,
 							StateTimestamp: now,
 						},
-						CellID:"cell2",
+						CellID: "cell2",
 					},
 				},
 			},

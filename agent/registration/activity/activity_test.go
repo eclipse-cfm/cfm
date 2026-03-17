@@ -17,9 +17,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/metaform/connector-fabric-manager/common/model"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
+	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -34,8 +34,9 @@ func TestRegistrationActivityProcessor_MinimalValidData(t *testing.T) {
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	processingData := map[string]any{
@@ -63,8 +64,9 @@ func TestRegistrationActivityProcessor_FullValidData(t *testing.T) {
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	processingData := map[string]any{
@@ -93,8 +95,9 @@ func TestRegistrationActivityProcessor_InvalidData(t *testing.T) {
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
 	}
 
 	processingData := map[string]any{}
@@ -118,8 +121,65 @@ func TestRegistrationActivityProcessor_IssuerServiceFails(t *testing.T) {
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
+	}
+
+	processingData := map[string]any{
+		model.ParticipantIdentifier: "did:web:someparticipant",
+	}
+
+	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
+
+	result := processor.Process(activityContext)
+
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
+	assert.ErrorContains(t, result.Error, "some error")
+}
+
+func TestRegistrationActivityProcessor_Rollback(t *testing.T) {
+	issuerService := MockIssuerService{}
+	processor := NewProcessor(&Config{
+		LogMonitor:    system.NoopMonitor{},
+		IssuerService: &issuerService,
+	})
+
+	ctx := context.Background()
+	outputData := make(map[string]any)
+
+	activity := api.Activity{
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DisposeDiscriminator,
+	}
+
+	processingData := map[string]any{
+		model.ParticipantIdentifier: "did:web:someparticipant",
+	}
+
+	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
+
+	result := processor.Process(activityContext)
+
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
+	assert.NoError(t, result.Error)
+}
+
+func TestRegistrationActivityProcessor_Rollback_IssuerServiceFails(t *testing.T) {
+	issuerService := MockIssuerService{expectedError: fmt.Errorf("some error")}
+	processor := NewProcessor(&Config{
+		LogMonitor:    system.NoopMonitor{},
+		IssuerService: &issuerService,
+	})
+
+	ctx := context.Background()
+	outputData := make(map[string]any)
+
+	activity := api.Activity{
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DisposeDiscriminator,
 	}
 
 	processingData := map[string]any{
@@ -143,6 +203,15 @@ type regData struct {
 type MockIssuerService struct {
 	expectedError error
 	recorded      regData
+}
+
+func (m *MockIssuerService) DeleteHolder(holderID string) error {
+	return m.expectedError
+}
+
+func (m *MockIssuerService) RevokeCredential(participantContextID string, credentialID string) error {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (m *MockIssuerService) CreateHolder(did string, holderID string, name string) error {

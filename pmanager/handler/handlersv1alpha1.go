@@ -15,13 +15,13 @@ package handler
 import (
 	"net/http"
 
-	. "github.com/metaform/connector-fabric-manager/common/collection"
-	"github.com/metaform/connector-fabric-manager/common/handler"
-	"github.com/metaform/connector-fabric-manager/common/model"
-	"github.com/metaform/connector-fabric-manager/common/store"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
-	"github.com/metaform/connector-fabric-manager/pmanager/model/v1alpha1"
+	. "github.com/eclipse-cfm/cfm/common/collection"
+	"github.com/eclipse-cfm/cfm/common/handler"
+	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/store"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
+	"github.com/eclipse-cfm/cfm/pmanager/model/v1alpha1"
 )
 
 type PMHandler struct {
@@ -73,6 +73,16 @@ func (h *PMHandler) createOrchestrationDefinition(w http.ResponseWriter, req *ht
 	var orchestrationTemplate v1alpha1.OrchestrationTemplate
 	if !h.ReadPayload(w, req, &orchestrationTemplate) {
 		return
+	}
+
+	hasCompensation := false
+	for key, activities := range orchestrationTemplate.Activities {
+		if key == model.VPADisposeType.String() && len(activities) > 0 {
+			hasCompensation = true
+		}
+	}
+	if !hasCompensation {
+		h.Monitor.Warnf("Orchestration template does not contain a compensation activity. Compensation orchestration definitions will not be created for orchestration template [%s] and auto-rollback will not be available", orchestrationTemplate.ID)
 	}
 
 	templateRef, definitions := v1alpha1.ToOrchestrationDefinition(&orchestrationTemplate)

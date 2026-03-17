@@ -15,15 +15,15 @@ package launcher
 import (
 	"net/http"
 
-	"github.com/metaform/connector-fabric-manager/agent/registration/activity"
-	"github.com/metaform/connector-fabric-manager/agent/registration/issuerservice"
-	"github.com/metaform/connector-fabric-manager/assembly/httpclient"
-	"github.com/metaform/connector-fabric-manager/assembly/serviceapi"
-	"github.com/metaform/connector-fabric-manager/common/oauth2"
-	"github.com/metaform/connector-fabric-manager/common/runtime"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
-	"github.com/metaform/connector-fabric-manager/pmanager/natsagent"
+	"github.com/eclipse-cfm/cfm/agent/common/issuerservice"
+	"github.com/eclipse-cfm/cfm/agent/registration/activity"
+	"github.com/eclipse-cfm/cfm/assembly/httpclient"
+	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
+	"github.com/eclipse-cfm/cfm/common/oauth2"
+	"github.com/eclipse-cfm/cfm/common/runtime"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
+	"github.com/eclipse-cfm/cfm/pmanager/natsagent"
 )
 
 const (

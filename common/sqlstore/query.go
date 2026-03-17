@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/metaform/connector-fabric-manager/common/query"
+	"github.com/eclipse-cfm/cfm/common/query"
 )
 
 const (

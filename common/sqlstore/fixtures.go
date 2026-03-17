@@ -37,7 +37,7 @@ func SetupTestContainer(t *testing.T) (testcontainers.Container, string, error) 
 			"POSTGRES_PASSWORD": "test",
 			"POSTGRES_DB":       pgDb,
 		},
-		WaitingFor: wait.ForListeningPort("5432/tcp"),
+		WaitingFor: wait.ForAll(wait.ForExposedPort(), wait.ForListeningPort("5432/tcp")),
 	}
 
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -67,7 +67,7 @@ func SetupTestContainer(t *testing.T) (testcontainers.Container, string, error) 
 		panic(err)
 	}
 
-	dsn := fmt.Sprintf("postgres://test:test@%s:%s/%s?sslmode=disable", host, port.Port(),pgDb)
+	dsn := fmt.Sprintf("postgres://test:test@%s:%s/%s?sslmode=disable", host, port.Port(), pgDb)
 	return container, dsn, nil
 }
 

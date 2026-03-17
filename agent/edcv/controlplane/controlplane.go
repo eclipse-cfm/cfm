@@ -21,18 +21,17 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/metaform/connector-fabric-manager/agent/edcv"
-	"github.com/metaform/connector-fabric-manager/common/token"
+	"github.com/eclipse-cfm/cfm/agent/edcv"
+	"github.com/eclipse-cfm/cfm/common/token"
 )
 
 const (
-	CreateParticipantURL                                       = "/v4alpha/participants"
+	CreateParticipantURL                                       = "/v5alpha/participants"
 	applicationJSON                                            = "application/json"
 	ParticipantContextStateCreated     ParticipantContextState = "CREATED"
 	ParticipantContextStateActivated   ParticipantContextState = "ACTIVATED"
 	ParticipantContextStateDeactivated ParticipantContextState = "DEACTIVATED"
 	contextConnector                                           = "https://w3id.org/edc/connector/management/v2"
-	contextConnectorVirtual                                    = "https://w3id.org/edc/virtual-connector/management/v2"
 )
 
 type ParticipantContextConfig struct {
@@ -78,12 +77,48 @@ type ParticipantContext struct {
 type ManagementAPIClient interface {
 	CreateParticipantContext(manifest ParticipantContext) error
 	CreateConfig(participantContextID string, config ParticipantContextConfig) error
+	DeleteConfig(participantContextID string) error
+	DeleteParticipantContext(participantContextID string) error
 }
 
 type HttpManagementAPIClient struct {
 	BaseURL       string
 	TokenProvider token.TokenProvider
 	HttpClient    *http.Client
+}
+
+func (h HttpManagementAPIClient) DeleteConfig(participantContextID string) error {
+	// fixme: there is no dedicated delete endpoint
+	return nil
+}
+
+func (h HttpManagementAPIClient) DeleteParticipantContext(participantContextID string) error {
+	accessToken, err := h.TokenProvider.GetToken()
+	if err != nil {
+		return fmt.Errorf("failed to get API access token: %w", err)
+	}
+
+	url := fmt.Sprintf("%s%s/%s", h.BaseURL, CreateParticipantURL, participantContextID)
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	resp, err := h.HttpClient.Do(req)
+	h.closeResponse(resp)
+	if err != nil {
+		return fmt.Errorf("failed to delete participant context on control plane: %w", err)
+	}
+
+	switch resp.StatusCode {
+	case http.StatusNotFound:
+		return fmt.Errorf("participant context %s not found in control plane", participantContextID)
+	case http.StatusOK:
+		return nil
+	default:
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to delete participant context on control plane: received status code %d, body: %s", resp.StatusCode, string(body))
+	}
 }
 
 func (h HttpManagementAPIClient) CreateParticipantContext(manifest ParticipantContext) error {
@@ -93,7 +128,7 @@ func (h HttpManagementAPIClient) CreateParticipantContext(manifest ParticipantCo
 	}
 
 	jsonLdData := map[string]any{
-		"@context":   []string{contextConnector, contextConnectorVirtual},
+		"@context":   []string{contextConnector},
 		"@type":      "ParticipantContext",
 		"@id":        manifest.ParticipantContextID,
 		"identity":   manifest.Identifier,
@@ -122,7 +157,7 @@ func (h HttpManagementAPIClient) CreateParticipantContext(manifest ParticipantCo
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to create participant context on IdentityHub: received status code %d, body: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("failed to create participant context on control plane: received status code %d, body: %s", resp.StatusCode, string(body))
 	}
 
 	return nil
@@ -135,7 +170,7 @@ func (h HttpManagementAPIClient) CreateConfig(participantContextID string, confi
 	}
 
 	configData := map[string]any{
-		"@context":       []string{contextConnector, contextConnectorVirtual},
+		"@context":       []string{contextConnector},
 		"@type":          "ParticipantContextConfig",
 		"entries":        config.Entries,
 		"privateEntries": config.SecretEntries,

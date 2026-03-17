@@ -16,13 +16,12 @@ package identityhub
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 
-	"github.com/metaform/connector-fabric-manager/common/token"
+	"github.com/eclipse-cfm/cfm/common/token"
 )
 
 const (
@@ -40,12 +39,77 @@ type IdentityAPIClient interface {
 	CreateParticipantContext(manifest ParticipantManifest) (*CreateParticipantContextResponse, error)
 	RequestCredentials(participantContextID string, credentialRequest CredentialRequest) (string, error)
 	GetCredentialRequestState(participantContextID string, credentialRequestID string) (string, error)
+	QueryCredentialByType(participantContextID string, credentialType string) ([]VerifiableCredentialResource, error)
+	DeleteParticipantContext(participantContextID string) error
 }
 
 type HttpIdentityAPIClient struct {
 	BaseURL       string
 	TokenProvider token.TokenProvider
 	HttpClient    *http.Client
+}
+
+func (a HttpIdentityAPIClient) DeleteParticipantContext(participantContextID string) error {
+	accessToken, err := a.TokenProvider.GetToken()
+	if err != nil {
+		return fmt.Errorf("failed to get API access token: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/v1alpha/participants/%s", a.BaseURL, participantContextID)
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	resp, err := a.HttpClient.Do(req)
+	defer a.closeResponse(resp)
+	if err != nil {
+		return fmt.Errorf("failed to delete participant context on IdentityHub: %w", err)
+	}
+	switch resp.StatusCode {
+	case http.StatusNotFound:
+		return fmt.Errorf("participant context %s not found in Identity", participantContextID)
+	case http.StatusOK:
+		return nil
+	default:
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to delete participant context on IdentityHub: received status code %d, body: %s", resp.StatusCode, string(body))
+	}
+}
+
+func (a HttpIdentityAPIClient) QueryCredentialByType(participantContextID string, credentialType string) ([]VerifiableCredentialResource, error) {
+
+	accessToken, err := a.TokenProvider.GetToken()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get API access token: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/v1alpha/participants/%s/credentials?type=%s", a.BaseURL, participantContextID, credentialType)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := a.HttpClient.Do(req)
+	defer a.closeResponse(resp)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get credential request state for %s: %w", participantContextID, err)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get credential request state: received status code %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	var credentials []VerifiableCredentialResource
+	if err := json.Unmarshal(body, &credentials); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal verifiable credentials array: %w", err)
+	}
+
+	return credentials, nil
 }
 
 func (a HttpIdentityAPIClient) RequestCredentials(participantContextID string, credentialRequest CredentialRequest) (string, error) {
@@ -59,8 +123,7 @@ func (a HttpIdentityAPIClient) RequestCredentials(participantContextID string, c
 		return "", err
 	}
 
-	b64 := base64.RawURLEncoding.EncodeToString([]byte(participantContextID))
-	url := fmt.Sprintf("%s/v1alpha/participants/%s/credentials/request", a.BaseURL, b64)
+	url := fmt.Sprintf("%s/v1alpha/participants/%s/credentials/request", a.BaseURL, participantContextID)
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(payload))
 	if err != nil {
 		return "", err
@@ -92,8 +155,7 @@ func (a HttpIdentityAPIClient) GetCredentialRequestState(participantContextID st
 		return "", fmt.Errorf("failed to get API access token: %w", err)
 	}
 
-	b64 := base64.RawURLEncoding.EncodeToString([]byte(participantContextID))
-	url := fmt.Sprintf("%s/v1alpha/participants/%s/credentials/request/%s", a.BaseURL, b64, credentialRequestID)
+	url := fmt.Sprintf("%s/v1alpha/participants/%s/credentials/request/%s", a.BaseURL, participantContextID, credentialRequestID)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return "", err

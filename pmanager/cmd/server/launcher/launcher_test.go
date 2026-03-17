@@ -19,8 +19,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/metaform/connector-fabric-manager/common/fixtures"
-	"github.com/metaform/connector-fabric-manager/common/natsfixtures"
+	"github.com/eclipse-cfm/cfm/common/fixtures"
+	"github.com/eclipse-cfm/cfm/common/natsfixtures"
 	"github.com/stretchr/testify/require"
 )
 

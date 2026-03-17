@@ -15,23 +15,26 @@ package launcher
 import (
 	"net/http"
 
-	"github.com/metaform/connector-fabric-manager/agent/common/identityhub"
-	"github.com/metaform/connector-fabric-manager/agent/onboarding/activity"
-	"github.com/metaform/connector-fabric-manager/assembly/httpclient"
-	"github.com/metaform/connector-fabric-manager/assembly/serviceapi"
-	"github.com/metaform/connector-fabric-manager/common/oauth2"
-	"github.com/metaform/connector-fabric-manager/common/runtime"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
-	"github.com/metaform/connector-fabric-manager/pmanager/natsagent"
+	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
+	"github.com/eclipse-cfm/cfm/agent/common/issuerservice"
+	"github.com/eclipse-cfm/cfm/agent/onboarding/activity"
+	"github.com/eclipse-cfm/cfm/assembly/httpclient"
+	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
+	"github.com/eclipse-cfm/cfm/common/oauth2"
+	"github.com/eclipse-cfm/cfm/common/runtime"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
+	"github.com/eclipse-cfm/cfm/pmanager/natsagent"
 )
 
 const (
-	ActivityType      = "onboarding-activity"
-	identityHubURLKey = "identityhub.url"
-	clientIDKey       = "keycloak.clientID"
-	clientSecretKey   = "keycloak.clientSecret"
-	tokenURLKey       = "keycloak.tokenUrl"
+	ActivityType            = "onboarding-activity"
+	identityHubURLKey       = "identityhub.url"
+	clientIDKey             = "keycloak.clientID"
+	clientSecretKey         = "keycloak.clientSecret"
+	tokenURLKey             = "keycloak.tokenUrl"
+	issuerServiceBaseUrlKey = "issuerservice.url"
+	issuerIDKey             = "issuer.id"
 )
 
 func LaunchAndWaitSignal(shutdown <-chan struct{}) {
@@ -49,6 +52,9 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 			ihURL := ctx.Config.GetString(identityHubURLKey)
 			clientID := ctx.Config.GetString(clientIDKey)
 			clientSecret := ctx.Config.GetString(clientSecretKey)
+			issuerServiceBaseUrl := ctx.Config.GetString(issuerServiceBaseUrlKey)
+			issuerID := ctx.Config.GetString(issuerIDKey)
+
 			tokenURL := ctx.Config.GetString(tokenURLKey) // this may be nil or "" if the in-mem vault is used
 			if err := runtime.CheckRequiredParams(identityHubURLKey, ihURL, clientIDKey, clientID, clientSecretKey, clientSecret, tokenURLKey, tokenURL); err != nil {
 				panic(err)
@@ -67,6 +73,12 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 				IdentityApiClient: identityhub.HttpIdentityAPIClient{
 					BaseURL:       ihURL,
 					TokenProvider: provider,
+					HttpClient:    &httpClient,
+				},
+				IssuerServiceApiClient: issuerservice.HttpApiClient{
+					BaseURL:       issuerServiceBaseUrl,
+					TokenProvider: provider,
+					IssuerID:      issuerID,
 					HttpClient:    &httpClient,
 				},
 			}

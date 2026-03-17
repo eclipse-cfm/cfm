@@ -15,15 +15,15 @@ package launcher
 import (
 	"fmt"
 
-	"github.com/metaform/connector-fabric-manager/assembly/routing"
-	"github.com/metaform/connector-fabric-manager/common/runtime"
-	"github.com/metaform/connector-fabric-manager/common/store"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/tmanager/core"
-	"github.com/metaform/connector-fabric-manager/tmanager/handler"
-	"github.com/metaform/connector-fabric-manager/tmanager/memorystore"
-	"github.com/metaform/connector-fabric-manager/tmanager/natsprovision"
-	"github.com/metaform/connector-fabric-manager/tmanager/sqlstore"
+	"github.com/eclipse-cfm/cfm/assembly/routing"
+	"github.com/eclipse-cfm/cfm/common/runtime"
+	"github.com/eclipse-cfm/cfm/common/store"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/tmanager/core"
+	"github.com/eclipse-cfm/cfm/tmanager/handler"
+	"github.com/eclipse-cfm/cfm/tmanager/memorystore"
+	"github.com/eclipse-cfm/cfm/tmanager/natsprovision"
+	"github.com/eclipse-cfm/cfm/tmanager/sqlstore"
 )
 
 const (
@@ -34,7 +34,7 @@ const (
 
 	postgresKey = "postgres"
 
-	uriKey      = "uri"
+	uriKey    = "uri"
 	bucketKey = "bucket"
 	streamKey = "stream"
 )
@@ -70,14 +70,12 @@ func Launch(shutdown <-chan struct{}) {
 	assembler.Register(&handler.HandlerServiceAssembly{})
 	assembler.Register(&core.TMCoreServiceAssembly{})
 
-
 	if vConfig.IsSet(postgresKey) {
 		assembler.Register(&sqlstore.PostgresServiceAssembly{})
 	} else {
 		assembler.Register(&store.NoOpTrxAssembly{})
 		assembler.Register(&memorystore.InMemoryServiceAssembly{})
 	}
-
 
 	assembler.Register(natsprovision.NewNatsOrchestrationServiceAssembly(uri, bucketValue, streamValue))
 

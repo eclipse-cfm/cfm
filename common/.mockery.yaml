@@ -3,14 +3,14 @@ resolve-type-alias: false
 disable-version-string: true
 with-expecter: true
 packages:
-  github.com/metaform/connector-fabric-manager/common/natsclient:
+  github.com/eclipse-cfm/cfm/common/natsclient:
     interfaces:
       MsgClient:
         config:
           filename: msg_client_mock.go
           outpkg: mocks
           dir: ./mocks
-  github.com/metaform/connector-fabric-manager/common/store:
+  github.com/eclipse-cfm/cfm/common/store:
     interfaces:
       EntityStore:
         config:
@@ -18,7 +18,7 @@ packages:
           outpkg: mocks
           dir: ./mocks
 
-  github.com/metaform/connector-fabric-manager/common/token:
+  github.com/eclipse-cfm/cfm/common/token:
     interfaces:
       TokenProvider:
         config:

@@ -19,11 +19,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/metaform/connector-fabric-manager/common/model"
-	"github.com/metaform/connector-fabric-manager/common/natsclient"
-	"github.com/metaform/connector-fabric-manager/common/natsfixtures"
-	"github.com/metaform/connector-fabric-manager/common/system"
-	"github.com/metaform/connector-fabric-manager/pmanager/api"
+	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/natsclient"
+	"github.com/eclipse-cfm/cfm/common/natsfixtures"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -132,7 +132,7 @@ func TestNatsActivityExecutor_OrchestrationResponsePublished(t *testing.T) {
 	responseMutex.Unlock()
 }
 
-func TestNatsActivityExecutor_OrchestrationResponseNotPublishedOnError(t *testing.T) {
+func TestNatsActivityExecutor_OrchestrationResponsePublishedOnError(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), processTimeout)
 	defer cancel()
 
@@ -209,9 +209,10 @@ func TestNatsActivityExecutor_OrchestrationResponseNotPublishedOnError(t *testin
 	// Wait and ensure no orchestration response is published
 	select {
 	case <-responseReceived:
-		t.Fatal("Orchestration response should not be published on fatal error")
-	case <-time.After(2 * time.Second):
 		// Expected - no response should be published on error
+	case <-time.After(2 * time.Second):
+		t.Fatal("Orchestration response should not be published on fatal error")
+
 	}
 
 	// Verify orchestration is marked as errored
