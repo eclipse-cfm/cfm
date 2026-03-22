@@ -36,12 +36,26 @@ func (d definitionManager) CreateOrchestrationDefinition(ctx context.Context, de
 
 		// Verify that all referenced activities exist
 		for _, activity := range definition.Activities {
-			exists, err := d.store.ExistsActivityDefinition(ctx, activity.Type)
+			activityDefinition, err := d.store.FindActivityDefinition(ctx, activity.Type)
 			if err != nil {
+				if errors.Is(err, types.ErrNotFound) {
+					missingErrors = append(missingErrors, types.NewClientError("activity type '%s' not found", activity.Type))
+					continue
+				}
 				return nil, err
 			}
-			if !exists {
-				missingErrors = append(missingErrors, types.NewClientError("activity type '%s' not found", activity.Type))
+			if len(activity.Inputs) == 0 {
+				continue
+			}
+			properties, ok := activityDefinition.InputSchema["properties"].(map[string]any)
+			if !ok {
+				continue
+			}
+
+			for _, input := range activity.Inputs {
+				if _, exists := properties[input.Target]; !exists {
+					missingErrors = append(missingErrors, types.NewClientError("activity input target '%s' is not defined in input schema '%s'", input.Target, activity.Type))
+				}
 			}
 		}
 

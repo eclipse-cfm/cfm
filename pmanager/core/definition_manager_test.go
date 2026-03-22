@@ -881,6 +881,80 @@ func TestDeleteActivityDefinition_AfterOrchestrationDeletion(t *testing.T) {
 	assert.False(t, exists, "Activity definition should no longer exist")
 }
 
+func TestCreateOrchestrationDefinition_ActivityInputValidSchema(t *testing.T) {
+	store := memorystore.NewDefinitionStore()
+	manager := definitionManager{
+		trxContext: cstore.NoOpTransactionContext{},
+		store:      store,
+	}
+	ctx := context.Background()
+	activityDef := &api.ActivityDefinition{
+		Type: "input-schema-activity",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"field-one": map[string]any{"type": "string"},
+				"field-two": map[string]any{"type": "string"},
+			},
+		},
+	}
+	_, err := store.StoreActivityDefinition(ctx, activityDef)
+	require.NoError(t, err, "Failed to store activity definition")
+	orchestrationDef := &api.OrchestrationDefinition{
+		Type:   model.OrchestrationType("input-schema-orchestration"),
+		Active: true,
+		Activities: []api.Activity{
+			{
+				ID:   "activity-1",
+				Type: "input-schema-activity",
+				Inputs: []api.MappingEntry{
+					{Source: "field-1", Target: "field-one"},
+					{Source: "field-2", Target: "field-two"}},
+			},
+		},
+	}
+	result, err := manager.CreateOrchestrationDefinition(ctx, orchestrationDef)
+	require.NoError(t, err, "The creation of an orchestration should pass when the activity input fields map the schema")
+	assert.NotNil(t, result, "The result should not be nil")
+}
+
+func TestCreateOrchestrationDefinition_ActivityInputInvalidSchema(t *testing.T) {
+	store := memorystore.NewDefinitionStore()
+	manager := definitionManager{
+		trxContext: cstore.NoOpTransactionContext{},
+		store:      store,
+	}
+	ctx := context.Background()
+	activityDef := &api.ActivityDefinition{
+		Type: "input-schema-activity",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"field-one": map[string]any{"type": "string"},
+			},
+		},
+	}
+	_, err := store.StoreActivityDefinition(ctx, activityDef)
+	require.NoError(t, err, "Failed to store activity definition")
+	orchestrationDef := &api.OrchestrationDefinition{
+		Type:   model.OrchestrationType("input-schema-orchestration"),
+		Active: true,
+		Activities: []api.Activity{
+			{
+				ID:   "activity-1",
+				Type: "input-schema-activity",
+				Inputs: []api.MappingEntry{
+					{Source: "not-existing-field", Target: "not-existing-field"},
+				},
+			},
+		},
+	}
+	result, err := manager.CreateOrchestrationDefinition(ctx, orchestrationDef)
+	require.Error(t, err, "The creation of an orchestration should fail when the input field doesn't exists in the schema")
+	assert.Nil(t, result, "The result should be nil on error")
+	assert.Contains(t, err.Error(), "not-existing-field", "Error should mention invalid Activity Input")
+}
+
 // Helper mock store for testing error scenarios
 type mockDefinitionStore struct {
 	simulatedErrors map[string]error
