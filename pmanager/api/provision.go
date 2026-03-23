@@ -17,6 +17,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"iter"
 	"reflect"
 
@@ -70,18 +71,22 @@ type Orchestrator interface {
 	GetOrchestration(ctx context.Context, id string) (*Orchestration, error)
 }
 
-// ActivityProcessor executes activities for a given type.
-//
-// If the execution completes successfully, the processor returns ActivityResultComplete.
-//
-// If the processor returns ActivityResultWait, the activity will remain outstanding until completion is asynchronously signaled.
-//
-// If the processor returns ActivityResultSchedule, the orchestration engine will reschedule message delivery in the duration
-// defined by WaitOnReschedule.
-//
-// If the processor encounters an error, it returns an ActivityResultRetryError or an ActivityResultFatalError.
+// ActivityProcessor defines an interface for processing various activities within an orchestrated workflow.
+// Process handles a generic activity, taking an ActivityContext and returning an ActivityResult.
+// ProcessDeploy handles deployment-specific activities, taking an ActivityContext and returning an ActivityResult.
+// ProcessDispose handles disposal-specific activities, taking an ActivityContext and returning an ActivityResult.
 type ActivityProcessor interface {
 	Process(activityContext ActivityContext) ActivityResult
+	ProcessDeploy(activityContext ActivityContext) ActivityResult
+	ProcessDispose(activityContext ActivityContext) ActivityResult
+}
+
+// BaseActivityProcessor provides default implementations for processing activity lifecycle methods in an orchestration system.
+type BaseActivityProcessor struct {
+}
+
+func (p BaseActivityProcessor) Process(ctx ActivityContext) ActivityResult {
+	return ActivityResult{Result: ActivityResultFatalError, Error: fmt.Errorf("the '%s' discriminator is not supported", ctx.Discriminator())}
 }
 
 type ActivityResultType int

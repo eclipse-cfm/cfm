@@ -108,7 +108,14 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 		orchestration.OutputData)
 
 	e.Monitor.Debugf("Received activity message %s for orchestration %s", oMessage.Activity.ID, oMessage.OrchestrationID)
-	result := e.ActivityProcessor.Process(activityContext)
+	var result api.ActivityResult
+	if activityContext.Discriminator() == api.DeployDiscriminator {
+		result = e.ActivityProcessor.ProcessDeploy(activityContext)
+	} else if activityContext.Discriminator() == api.DisposeDiscriminator {
+		result = e.ActivityProcessor.ProcessDispose(activityContext)
+	} else {
+		result = e.ActivityProcessor.Process(activityContext)
+	}
 
 	switch result.Result {
 	case api.ActivityResultRetryError:

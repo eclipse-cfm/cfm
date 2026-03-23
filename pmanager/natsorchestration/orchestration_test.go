@@ -342,6 +342,7 @@ func TestActivityProcessor_ScheduleThenContinue(t *testing.T) {
 // ScheduleThenContinueProcessor implements ActivityProcessor
 // Returns ActivityResultSchedule on first call, ActivityResultComplete on subsequent calls
 type ScheduleThenContinueProcessor struct {
+	DefaultTestProcessor
 	callCount int
 	wg        *sync.WaitGroup
 }
@@ -369,6 +370,7 @@ func (p *ScheduleThenContinueProcessor) Process(_ api.ActivityContext) api.Activ
 
 // TestActivityProcessor with timing information
 type TestActivityProcessor struct {
+	DefaultTestProcessor
 	onProcess func(id string)
 }
 

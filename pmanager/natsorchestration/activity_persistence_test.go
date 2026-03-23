@@ -154,6 +154,7 @@ func TestNatsActivityExecutor_ProcessingDataPersistedAcrossReschedules(t *testin
 // TestPersistenceActivityProcessor reschedules multiple times using a counter,
 // testing that the counter value persists across reschedule boundaries
 type TestPersistenceActivityProcessor struct {
+	DefaultTestProcessor
 	CallCount       int
 	RescheduleCount int
 	CompleteCount   int

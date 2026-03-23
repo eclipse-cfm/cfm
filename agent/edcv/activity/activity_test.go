@@ -82,7 +82,7 @@ func TestEDCVActivityProcessor_Process_WithValidData(t *testing.T) {
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	assert.NoError(t, result.Error)
@@ -104,7 +104,7 @@ func TestEDCVActivityProcessor_Process_MissingParticipantID(t *testing.T) {
 
 	activityContext := api.NewActivityContext(ctx, "orchestration-1", activity, pd, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	require.NotNil(t, result)
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
@@ -127,7 +127,7 @@ func TestEDCVActivityProcessor_Process_MissingClientID(t *testing.T) {
 
 	activityContext := api.NewActivityContext(ctx, "orchestration-2", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	require.NotNil(t, result)
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
@@ -150,7 +150,7 @@ func TestEDCVActivityProcessor_Process_MissingCredentialServiceUrl(t *testing.T)
 
 	activityContext := api.NewActivityContext(ctx, "orchestration-2", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	require.NotNil(t, result)
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
@@ -173,7 +173,7 @@ func TestEDCVActivityProcessor_Process_MissingProtocolServiceUrl(t *testing.T) {
 
 	activityContext := api.NewActivityContext(ctx, "orchestration-2", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	require.NotNil(t, result)
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
@@ -194,7 +194,7 @@ func TestEDCVActivityProcessor_Process_EmptyProcessingData(t *testing.T) {
 
 	activityContext := api.NewActivityContext(ctx, "orchestration-3", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	require.NotNil(t, result)
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
@@ -216,7 +216,7 @@ func TestEDCVActivityProcessor_Process_InvalidDataTypes(t *testing.T) {
 
 	activityContext := api.NewActivityContext(ctx, "orchestration-4", activity, pd, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	require.NotNil(t, result)
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
@@ -244,7 +244,7 @@ func TestEDCVActivityProcessor_Process_OrchestrationIDInError(t *testing.T) {
 	orchestrationID := "test-orch-12345"
 	activityContext := api.NewActivityContext(ctx, orchestrationID, activity, pd, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	require.NotNil(t, result)
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
@@ -272,7 +272,7 @@ func TestEDCVActivityProcessor_Process_MultipleUnknownFields(t *testing.T) {
 
 	activityContext := api.NewActivityContext(ctx, "orch-multi", activity, pd, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	require.NotNil(t, result)
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
@@ -298,7 +298,7 @@ func TestEDCVActivityProcessor_Process_MissingVaultEntry(t *testing.T) {
 
 	activityContext := api.NewActivityContext(ctx, "orch-multi", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	assert.NotNil(t, result.Error)
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
@@ -318,7 +318,7 @@ func TestEDCVActivityProcessor_Process_IdentityHubFailure(t *testing.T) {
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	assert.Error(t, result.Error, "some error")
@@ -338,7 +338,7 @@ func TestEDCVActivityProcessor_Process_ManagementAPIFailure(t *testing.T) {
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	assert.ErrorContains(t, result.Error, "some error")
@@ -358,7 +358,7 @@ func TestEDCVActivityProcessor_Process_ManagementAPIFailureConfig(t *testing.T) 
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	assert.ErrorContains(t, result.Error, "some error")
@@ -379,7 +379,7 @@ func TestEDCVActivityProcessor_ProcessDispose(t *testing.T) {
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDispose(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	assert.NoError(t, result.Error)
@@ -402,7 +402,7 @@ func TestEDCVActivityProcessor_ProcessDispose_CtrlPlaneParticipantError(t *testi
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDispose(activityContext)
 
 	// expect to complete successfully, to unblock subsequent agents
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
@@ -425,7 +425,7 @@ func TestEDCVActivityProcessor_ProcessDispose_CtrlPlaneConfigError(t *testing.T)
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDispose(activityContext)
 
 	// expect to complete successfully, to unblock subsequent agents
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
@@ -448,7 +448,7 @@ func TestEDCVActivityProcessor_ProcessDispose_IdentityHubError(t *testing.T) {
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDispose(activityContext)
 
 	// expect to complete successfully, to unblock subsequent agents
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)

@@ -21,6 +21,7 @@ import (
 )
 
 type RegistrationActivityProcessor struct {
+	api.BaseActivityProcessor
 	Monitor       system.LogMonitor
 	IssuerService issuerservice.ApiClient
 }
@@ -42,22 +43,11 @@ type Config struct {
 	IssuerService issuerservice.ApiClient
 }
 
-func (p RegistrationActivityProcessor) Process(ctx api.ActivityContext) api.ActivityResult {
+func (p RegistrationActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
 	var registrationData RegistrationData
 	if err := ctx.ReadValues(&registrationData); err != nil {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Registration activity for orchestration %s: %w", ctx.OID(), err)}
 	}
-
-	if ctx.Discriminator() == api.DeployDiscriminator {
-		return p.handleDeployAction(registrationData)
-	} else if ctx.Discriminator() == api.DisposeDiscriminator {
-		return p.handleDisposeAction(registrationData)
-	}
-	return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("the '%s' discriminator is not supported", ctx.Discriminator())}
-
-}
-
-func (p RegistrationActivityProcessor) handleDeployAction(registrationData RegistrationData) api.ActivityResult {
 	if registrationData.HolderName == "" {
 		registrationData.HolderName = registrationData.DID
 	}
@@ -71,13 +61,16 @@ func (p RegistrationActivityProcessor) handleDeployAction(registrationData Regis
 	return api.ActivityResult{Result: api.ActivityResultComplete}
 }
 
-func (p RegistrationActivityProcessor) handleDisposeAction(data RegistrationData) api.ActivityResult {
-
-	holderID := data.DID
+func (p RegistrationActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.ActivityResult {
+	var registrationData RegistrationData
+	if err := ctx.ReadValues(&registrationData); err != nil {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Registration activity for orchestration %s: %w", ctx.OID(), err)}
+	}
+	holderID := registrationData.DID
 	if err := p.IssuerService.DeleteHolder(holderID); err != nil {
 		// todo: inspect error if it is retryable
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("registration rollback: error deleting holder in IssuerService: %w", err)}
 	}
-	p.Monitor.Debugf("Registration rollback: activity for participant '%s' completed successfully", data.DID)
+	p.Monitor.Debugf("Registration rollback: activity for participant '%s' completed successfully", registrationData.DID)
 	return api.ActivityResult{Result: api.ActivityResultComplete}
 }

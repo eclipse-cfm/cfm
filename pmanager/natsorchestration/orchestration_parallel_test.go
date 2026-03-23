@@ -143,6 +143,7 @@ outerLoop:
 
 // FailingActivityProcessor wraps a TestActivityProcessor and always returns an error
 type FailingActivityProcessor struct {
+	DefaultTestProcessor
 	testProcessor TestActivityProcessor
 }
 

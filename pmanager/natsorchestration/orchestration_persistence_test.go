@@ -596,6 +596,7 @@ func Test_ValuePersistenceOnWait(t *testing.T) {
 // Generic test processors
 
 type GenericValueProcessor struct {
+	DefaultTestProcessor
 	onProcess func(api.ActivityContext)
 }
 
@@ -607,6 +608,7 @@ func (p *GenericValueProcessor) Process(ctx api.ActivityContext) api.ActivityRes
 }
 
 type GenericRetryProcessor struct {
+	DefaultTestProcessor
 	onProcess func(api.ActivityContext) api.ActivityResult
 }
 
@@ -618,6 +620,7 @@ func (p *GenericRetryProcessor) Process(ctx api.ActivityContext) api.ActivityRes
 }
 
 type GenericWaitProcessor struct {
+	DefaultTestProcessor
 	onProcess func(api.ActivityContext)
 }
 
@@ -631,6 +634,7 @@ func (p *GenericWaitProcessor) Process(ctx api.ActivityContext) api.ActivityResu
 // Test processors
 
 type ValueSettingProcessor struct {
+	DefaultTestProcessor
 	onProcess func(api.ActivityContext)
 }
 
@@ -642,6 +646,7 @@ func (p *ValueSettingProcessor) Process(ctx api.ActivityContext) api.ActivityRes
 }
 
 type RetryWithValueProcessor struct {
+	DefaultTestProcessor
 	onProcess func(api.ActivityContext) api.ActivityResult
 }
 
@@ -653,6 +658,7 @@ func (p *RetryWithValueProcessor) Process(ctx api.ActivityContext) api.ActivityR
 }
 
 type MultiActivityValueProcessor struct {
+	DefaultTestProcessor
 	onProcess func(api.ActivityContext)
 }
 
@@ -664,6 +670,7 @@ func (p *MultiActivityValueProcessor) Process(ctx api.ActivityContext) api.Activ
 }
 
 type WaitWithValueProcessor struct {
+	DefaultTestProcessor
 	onProcess func(api.ActivityContext)
 }
 

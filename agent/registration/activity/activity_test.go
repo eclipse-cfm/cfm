@@ -45,7 +45,7 @@ func TestRegistrationActivityProcessor_MinimalValidData(t *testing.T) {
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	assert.NoError(t, result.Error)
@@ -76,7 +76,7 @@ func TestRegistrationActivityProcessor_FullValidData(t *testing.T) {
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	assert.NoError(t, result.Error)
@@ -104,7 +104,7 @@ func TestRegistrationActivityProcessor_InvalidData(t *testing.T) {
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	assert.Error(t, result.Error)
@@ -132,13 +132,13 @@ func TestRegistrationActivityProcessor_IssuerServiceFails(t *testing.T) {
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	assert.ErrorContains(t, result.Error, "some error")
 }
 
-func TestRegistrationActivityProcessor_Rollback(t *testing.T) {
+func TestRegistrationActivityProcessor_ProcessDispose(t *testing.T) {
 	issuerService := MockIssuerService{}
 	processor := NewProcessor(&Config{
 		LogMonitor:    system.NoopMonitor{},
@@ -160,13 +160,13 @@ func TestRegistrationActivityProcessor_Rollback(t *testing.T) {
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDispose(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	assert.NoError(t, result.Error)
 }
 
-func TestRegistrationActivityProcessor_Rollback_IssuerServiceFails(t *testing.T) {
+func TestRegistrationActivityProcessor_ProcessDispose_IssuerServiceFails(t *testing.T) {
 	issuerService := MockIssuerService{expectedError: fmt.Errorf("some error")}
 	processor := NewProcessor(&Config{
 		LogMonitor:    system.NoopMonitor{},
@@ -188,7 +188,7 @@ func TestRegistrationActivityProcessor_Rollback_IssuerServiceFails(t *testing.T)
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDispose(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	assert.ErrorContains(t, result.Error, "some error")

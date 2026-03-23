@@ -180,7 +180,16 @@ func (m *MockServiceAssembly) Shutdown() error {
 }
 
 // MockActivityProcessor implements api.ActivityProcessor for testing
-type MockActivityProcessor struct{}
+type MockActivityProcessor struct {
+}
+
+func (m *MockActivityProcessor) ProcessDispose(activityContext api.ActivityContext) api.ActivityResult {
+	return api.ActivityResult{Result: api.ActivityResultComplete}
+}
+
+func (m *MockActivityProcessor) ProcessDeploy(activityContext api.ActivityContext) api.ActivityResult {
+	return api.ActivityResult{Result: api.ActivityResultComplete}
+}
 
 func (m *MockActivityProcessor) Process(activityContext api.ActivityContext) api.ActivityResult {
 	return api.ActivityResult{Result: api.ActivityResultComplete}

@@ -55,7 +55,7 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenNewRequest(t *testing.T) 
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultSchedule), result.Result)
 	assert.NoError(t, result.Error)
@@ -97,7 +97,7 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenNewRequestError(t *testin
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	assert.ErrorContains(t, result.Error, "some error")
@@ -131,7 +131,7 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenPendingRequestApiError(t 
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	assert.ErrorContains(t, result.Error, "some error")
@@ -165,7 +165,7 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenPendingRequestIssued(t *t
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	assert.NoError(t, result.Error)
@@ -202,7 +202,7 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenPendingRequestCreated(t *
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultSchedule), result.Result)
 	assert.NoError(t, result.Error)
@@ -237,7 +237,7 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenPendingRequestRejected(t 
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	assert.ErrorContains(t, result.Error, "credential request for participant 'test-participant' was rejected")
@@ -272,7 +272,7 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenPendingRequestError(t *te
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	assert.ErrorContains(t, result.Error, "credential request for participant 'test-participant' failed")
@@ -300,7 +300,7 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenInvalidData(t *testing.T)
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	assert.Error(t, result.Error)
@@ -333,7 +333,7 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenInvalidStateReceived(t *t
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDeploy(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultRetryError), result.Result)
 	assert.ErrorContains(t, result.Error, "unexpected credential request state ")
@@ -384,11 +384,12 @@ func TestOnboardingActivityProcessor_ProcessDispose(t *testing.T) {
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDispose(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	assert.NoError(t, result.Error)
 }
+
 func TestOnboardingActivityProcessor_ProcessDispose_RevocationFails(t *testing.T) {
 	ih := MockIdentityHubClient{
 		expectedCredentials: []identityhub.VerifiableCredentialResource{
@@ -433,7 +434,7 @@ func TestOnboardingActivityProcessor_ProcessDispose_RevocationFails(t *testing.T
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDispose(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	assert.ErrorContains(t, result.Error, "some error")
@@ -474,7 +475,7 @@ func TestOnboardingActivityProcessor_ProcessDispose_NoCredentials(t *testing.T) 
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
 
-	result := processor.Process(activityContext)
+	result := processor.ProcessDispose(activityContext)
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	assert.NoError(t, result.Error)

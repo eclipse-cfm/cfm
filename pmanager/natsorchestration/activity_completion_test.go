@@ -338,7 +338,9 @@ func TestNatsActivityExecutor_RescheduleWithCounter(t *testing.T) {
 }
 
 // TestCompleteActivityProcessor always returns complete
-type TestCompleteActivityProcessor struct{}
+type TestCompleteActivityProcessor struct {
+	DefaultTestProcessor
+}
 
 func (p *TestCompleteActivityProcessor) Process(ctx api.ActivityContext) api.ActivityResult {
 	return api.ActivityResult{
@@ -347,7 +349,9 @@ func (p *TestCompleteActivityProcessor) Process(ctx api.ActivityContext) api.Act
 }
 
 // TestFatalErrorActivityProcessor always returns fatal error
-type TestFatalErrorActivityProcessor struct{}
+type TestFatalErrorActivityProcessor struct {
+	DefaultTestProcessor
+}
 
 func (p *TestFatalErrorActivityProcessor) Process(ctx api.ActivityContext) api.ActivityResult {
 	return api.ActivityResult{
@@ -358,6 +362,7 @@ func (p *TestFatalErrorActivityProcessor) Process(ctx api.ActivityContext) api.A
 
 // TestRescheduleCounterActivityProcessor reschedules once using a counter, then completes
 type TestRescheduleCounterActivityProcessor struct {
+	DefaultTestProcessor
 	CallCount int
 }
 

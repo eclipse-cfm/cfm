@@ -52,6 +52,7 @@ type Config struct {
 // KeyCloakActivityProcessor creates a confidential client in Keycloak and stores the client secret in Vault for use by
 // other processors. The client ID is returned as a value in the context.
 type KeyCloakActivityProcessor struct {
+	api.BaseActivityProcessor
 	keycloakURL string
 	clientId    string
 	username    string
@@ -198,19 +199,7 @@ func NewProcessor(config *Config) *KeyCloakActivityProcessor {
 	}
 }
 
-func (p KeyCloakActivityProcessor) Process(ctx api.ActivityContext) api.ActivityResult {
-	if ctx.Discriminator() == api.DeployDiscriminator {
-		return p.handleDeployAction(ctx)
-	}
-
-	if ctx.Discriminator() == api.DisposeDiscriminator {
-		return p.handleDisposeAction(ctx)
-	}
-	return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("the '%s' discriminator is not supported", ctx.Discriminator())}
-}
-
-// handleDeployAction handles the deployment process, creating required Keycloak clients for API and Vault access.
-func (p KeyCloakActivityProcessor) handleDeployAction(ctx api.ActivityContext) api.ActivityResult {
+func (p KeyCloakActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
 	clientIDSlug := generateClientID()
 
 	// create Keycloak client for API access
@@ -245,8 +234,7 @@ func (p KeyCloakActivityProcessor) handleDeployAction(ctx api.ActivityContext) a
 	return vaultClientResult
 }
 
-// handleDisposeAction handles the disposal of Keycloak clients, removing API and Vault access clients if they exist.
-func (p KeyCloakActivityProcessor) handleDisposeAction(ctx api.ActivityContext) api.ActivityResult {
+func (p KeyCloakActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.ActivityResult {
 	apiAccessID := ctx.Values()[apiAccessClientIDKey].(string)
 	vaultAccessID := ctx.Values()[vaultAccessClientIDKey].(string)
 	if vaultAccessID != "" && apiAccessID != "" {

@@ -28,6 +28,7 @@ import (
 )
 
 type EDCVActivityProcessor struct {
+	api.BaseActivityProcessor
 	VaultClient          serviceapi.VaultClient
 	HTTPClient           *http.Client
 	Monitor              system.LogMonitor
@@ -79,7 +80,7 @@ type Config struct {
 	ProtocolServiceURL   string
 }
 
-func (p EDCVActivityProcessor) Process(ctx api.ActivityContext) api.ActivityResult {
+func (p EDCVActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
 	var data EDCVData
 	err := ctx.ReadValues(&data)
 	if err != nil {
@@ -87,15 +88,16 @@ func (p EDCVActivityProcessor) Process(ctx api.ActivityContext) api.ActivityResu
 	}
 
 	participantContextId := data.ApiAccessClientID
+	return p.handleDeployAction(ctx, data, participantContextId)
+}
 
-	if ctx.Discriminator() == api.DeployDiscriminator {
-		return p.handleDeployAction(ctx, data, participantContextId)
-	} else if ctx.Discriminator() == api.DisposeDiscriminator {
-		return p.handleDisposeAction(participantContextId)
+func (p EDCVActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.ActivityResult {
+	var data EDCVData
+	err := ctx.ReadValues(&data)
+	if err != nil {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing EDC-V activity for orchestration %s: %w", ctx.OID(), err)}
 	}
-
-	return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("the '%s' discriminator is not supported", ctx.Discriminator())}
-
+	return p.handleDisposeAction(data.ApiAccessClientID)
 }
 
 // handleDeployAction creates a participant context in IdentityHub and the control plane (incl. participant context config)

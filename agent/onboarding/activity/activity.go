@@ -25,6 +25,7 @@ import (
 )
 
 type OnboardingActivityProcessor struct {
+	api.BaseActivityProcessor
 	Monitor                system.LogMonitor
 	IdentityApiClient      identityhub.IdentityAPIClient
 	IssuerServiceApiClient issuerservice.ApiClient
@@ -37,16 +38,71 @@ type credentialRequestData struct {
 	CredentialRequestURL string `json:"credentialRequest"`
 }
 
-func (p OnboardingActivityProcessor) Process(ctx api.ActivityContext) api.ActivityResult {
-
-	if ctx.Discriminator() == api.DeployDiscriminator {
-		return p.handleDeployAction(ctx)
+// handleDeployAction processes the deploy action for an onboarding activity by requesting the issuance of verifiable credentials.
+// if a credential request is in progress, the deploy action simply checks its status and reschedules itself.
+func (p OnboardingActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
+	var credentialRequest credentialRequestData
+	if err := ctx.ReadValues(&credentialRequest); err != nil {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Onboarding activity for orchestration %s: %w", ctx.OID(), err)}
 	}
-	if ctx.Discriminator() == api.DisposeDiscriminator {
-		return p.handleDisposeAction(ctx)
+
+	// no credential request was made yet -> make one
+	if "" == credentialRequest.HolderPID {
+		var data onboardingData
+		if err := ctx.ReadValues(&data); err != nil {
+			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Onboarding activity for orchestration %s: %w", ctx.OID(), err)}
+		}
+		return p.processNewRequest(ctx, &data, credentialRequest)
+	}
+	// holderPID exists, check the status of the issuance
+	return p.processExistingRequest(ctx, credentialRequest)
+}
+
+// handleDisposeAction revokes a credential using the IssuerService's Admin API. The credential is NOT deleted from the
+// holder wallet (IdentityHub).
+func (p OnboardingActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.ActivityResult {
+
+	var credentialRequest credentialRequestData
+	if err := ctx.ReadValues(&credentialRequest); err != nil {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Onboarding activity for orchestration %s: %w", ctx.OID(), err)}
 	}
 
-	return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("the '%s' discriminator is not supported", ctx.Discriminator())}
+	var data onboardingData
+	if err := ctx.ReadValues(&data); err != nil {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Onboarding activity for orchestration %s: %w", ctx.OID(), err)}
+	}
+
+	participantContextID := credentialRequest.ParticipantContextID
+	// query credentials by type, using the IdentityAPI
+	var revocationErrors []error
+
+	for _, spec := range data.CredentialSpecs {
+		credentialType := spec.Type
+
+		credentials, err := p.IdentityApiClient.QueryCredentialByType(participantContextID, credentialType)
+		if err != nil {
+			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error querying credentials by type %s for participant context %s: %w", credentialType, participantContextID, err)}
+		}
+
+		if len(credentials) == 0 {
+			p.Monitor.Infof("Rollback: could not revoke credentials of type '%s': 0 found for participant context '%s'", credentialType, participantContextID)
+			return api.ActivityResult{Result: api.ActivityResultComplete}
+		}
+
+		// for each credential, send a revocation request
+		for _, credential := range credentials {
+			err := p.IssuerServiceApiClient.RevokeCredential(participantContextID, credential.VerifiableCredential.Credential.ID)
+			if err != nil {
+				revocationErrors = append(revocationErrors, err)
+			}
+		}
+	}
+
+	if len(revocationErrors) > 0 {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error revoking one or more credentials: %v", revocationErrors)}
+	}
+
+	return api.ActivityResult{Result: api.ActivityResultComplete}
 }
 
 func (p OnboardingActivityProcessor) processExistingRequest(ctx api.ActivityContext, credentialRequest credentialRequestData) api.ActivityResult {
@@ -121,73 +177,6 @@ func (p OnboardingActivityProcessor) processNewRequest(ctx api.ActivityContext, 
 		WaitOnReschedule: time.Duration(5) * time.Second,
 		Error:            nil,
 	}
-}
-
-// handleDeployAction processes the deploy action for an onboarding activity by requesting the issuance of verifiable credentials.
-// if a credential request is in progress, the deploy action simply checks its status and reschedules itself.
-func (p OnboardingActivityProcessor) handleDeployAction(ctx api.ActivityContext) api.ActivityResult {
-	var credentialRequest credentialRequestData
-	if err := ctx.ReadValues(&credentialRequest); err != nil {
-		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Onboarding activity for orchestration %s: %w", ctx.OID(), err)}
-	}
-
-	// no credential request was made yet -> make one
-	if "" == credentialRequest.HolderPID {
-		var data onboardingData
-		if err := ctx.ReadValues(&data); err != nil {
-			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Onboarding activity for orchestration %s: %w", ctx.OID(), err)}
-		}
-		return p.processNewRequest(ctx, &data, credentialRequest)
-	}
-	// holderPID exists, check the status of the issuance
-	return p.processExistingRequest(ctx, credentialRequest)
-}
-
-// handleDisposeAction revokes a credential using the IssuerService's Admin API. The credential is NOT deleted from the
-// holder wallet (IdentityHub).
-func (p OnboardingActivityProcessor) handleDisposeAction(ctx api.ActivityContext) api.ActivityResult {
-
-	var credentialRequest credentialRequestData
-	if err := ctx.ReadValues(&credentialRequest); err != nil {
-		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Onboarding activity for orchestration %s: %w", ctx.OID(), err)}
-	}
-
-	var data onboardingData
-	if err := ctx.ReadValues(&data); err != nil {
-		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Onboarding activity for orchestration %s: %w", ctx.OID(), err)}
-	}
-
-	participantContextID := credentialRequest.ParticipantContextID
-	// query credentials by type, using the IdentityAPI
-	var revocationErrors []error
-
-	for _, spec := range data.CredentialSpecs {
-		credentialType := spec.Type
-
-		credentials, err := p.IdentityApiClient.QueryCredentialByType(participantContextID, credentialType)
-		if err != nil {
-			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error querying credentials by type %s for participant context %s: %w", credentialType, participantContextID, err)}
-		}
-
-		if len(credentials) == 0 {
-			p.Monitor.Infof("Rollback: could not revoke credentials of type '%s': 0 found for participant context '%s'", credentialType, participantContextID)
-			return api.ActivityResult{Result: api.ActivityResultComplete}
-		}
-
-		// for each credential, send a revocation request
-		for _, credential := range credentials {
-			err := p.IssuerServiceApiClient.RevokeCredential(participantContextID, credential.VerifiableCredential.Credential.ID)
-			if err != nil {
-				revocationErrors = append(revocationErrors, err)
-			}
-		}
-	}
-
-	if len(revocationErrors) > 0 {
-		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error revoking one or more credentials: %v", revocationErrors)}
-	}
-
-	return api.ActivityResult{Result: api.ActivityResultComplete}
 }
 
 type onboardingData struct {

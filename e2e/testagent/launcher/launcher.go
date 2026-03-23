@@ -59,6 +59,14 @@ type TestActivityProcessor struct {
 	callback func(ctx api.ActivityContext) api.ActivityResult
 }
 
+func (t TestActivityProcessor) ProcessDeploy(activityContext api.ActivityContext) api.ActivityResult {
+	return t.Process(activityContext)
+}
+
+func (t TestActivityProcessor) ProcessDispose(activityContext api.ActivityContext) api.ActivityResult {
+	return t.Process(activityContext)
+}
+
 func (t TestActivityProcessor) Process(ctx api.ActivityContext) api.ActivityResult {
 	if t.callback != nil {
 		return t.callback(ctx)
