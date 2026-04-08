@@ -18,9 +18,11 @@ import (
 	"github.com/eclipse-cfm/cfm/assembly/routing"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/common/telemetry"
 	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 type response struct {
@@ -44,6 +46,7 @@ func (h *HandlerServiceAssembly) Requires() []system.ServiceType {
 		api.ParticipantProfileServiceKey,
 		api.CellServiceKey,
 		api.DataspaceProfileServiceKey,
+		telemetry.TracerProviderKey,
 		routing.RouterKey}
 }
 
@@ -57,7 +60,10 @@ func (h *HandlerServiceAssembly) Init(context *system.InitContext) error {
 	dataspaceService := context.Registry.Resolve(api.DataspaceProfileServiceKey).(api.DataspaceProfileService)
 	txContext := context.Registry.Resolve(store.TransactionContextKey).(store.TransactionContext)
 
-	handler := NewHandler(tenantService, participantService, cellService, dataspaceService, txContext, context.LogMonitor)
+	traceProvider := context.Registry.Resolve(telemetry.TracerProviderKey).(*sdktrace.TracerProvider)
+	tracer := traceProvider.Tracer("tmanager/handler")
+
+	handler := NewHandler(tenantService, participantService, cellService, dataspaceService, txContext, context.LogMonitor, tracer)
 
 	router.Route("/api/v1alpha1", func(r chi.Router) {
 		h.registerV1Alpha1(r, handler)

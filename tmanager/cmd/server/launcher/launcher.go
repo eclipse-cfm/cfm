@@ -19,6 +19,7 @@ import (
 	"github.com/eclipse-cfm/cfm/common/runtime"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/common/telemetry"
 	"github.com/eclipse-cfm/cfm/tmanager/core"
 	"github.com/eclipse-cfm/cfm/tmanager/handler"
 	"github.com/eclipse-cfm/cfm/tmanager/memorystore"
@@ -69,6 +70,7 @@ func Launch(shutdown <-chan struct{}) {
 	assembler.Register(&routing.RouterServiceAssembly{})
 	assembler.Register(&handler.HandlerServiceAssembly{})
 	assembler.Register(&core.TMCoreServiceAssembly{})
+	assembler.Register(telemetry.NewTelemetryServiceAssembly(logPrefix))
 
 	if vConfig.IsSet(postgresKey) {
 		assembler.Register(&sqlstore.PostgresServiceAssembly{})

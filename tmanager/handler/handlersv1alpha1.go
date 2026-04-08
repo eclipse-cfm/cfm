@@ -21,6 +21,8 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/eclipse-cfm/cfm/tmanager/model/v1alpha1"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type TMHandler struct {
@@ -30,15 +32,10 @@ type TMHandler struct {
 	cellService        api.CellService
 	dataspaceService   api.DataspaceProfileService
 	txContext          store.TransactionContext
+	tracer             trace.Tracer
 }
 
-func NewHandler(
-	tenantService api.TenantService,
-	participantService api.ParticipantProfileService,
-	cellService api.CellService,
-	dataspaceService api.DataspaceProfileService,
-	txContext store.TransactionContext,
-	monitor system.LogMonitor) *TMHandler {
+func NewHandler(tenantService api.TenantService, participantService api.ParticipantProfileService, cellService api.CellService, dataspaceService api.DataspaceProfileService, txContext store.TransactionContext, monitor system.LogMonitor, tracer trace.Tracer) *TMHandler {
 	return &TMHandler{
 		HttpHandler: handler.HttpHandler{
 			Monitor: monitor,
@@ -48,6 +45,7 @@ func NewHandler(
 		cellService:        cellService,
 		dataspaceService:   dataspaceService,
 		txContext:          txContext,
+		tracer:             tracer,
 	}
 }
 
@@ -92,6 +90,9 @@ func (h *TMHandler) deployParticipantProfile(
 	req *http.Request,
 	tenantID string) {
 
+	_, span := h.tracer.Start(req.Context(), "deployParticipantProfile")
+	defer span.End()
+
 	if h.InvalidMethod(w, req, http.MethodPost) {
 		return
 	}
@@ -101,8 +102,11 @@ func (h *TMHandler) deployParticipantProfile(
 		return
 	}
 
+	span.SetAttributes(attribute.String("tenant.id", tenantID),
+		attribute.String("profile.did", newDeployment.Identifier),
+		attribute.String("cell.id", newDeployment.CellID))
 	converted := v1alpha1.ToAPINewParticipantProfileDeployment(&newDeployment)
-
+	span.AddEvent("Converted participant deployment")
 	// TODO support specific cell selection
 	profile, err := h.participantService.DeployProfile(
 		req.Context(),
@@ -110,10 +114,12 @@ func (h *TMHandler) deployParticipantProfile(
 		converted)
 
 	if err != nil {
+		span.RecordError(err)
 		h.HandleError(w, err)
 		return
 	}
 
+	span.AddEvent("Profile deployed successfully", trace.WithAttributes(attribute.String("profile.id", profile.ID)))
 	response := v1alpha1.ToParticipantProfile(profile)
 	h.ResponseAccepted(w, response)
 }

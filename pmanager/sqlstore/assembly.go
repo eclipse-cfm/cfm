@@ -20,8 +20,8 @@ import (
 	"github.com/eclipse-cfm/cfm/common/sqlstore"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/common/telemetry"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
-	"github.com/eclipse-cfm/cfm/pmanager/telemetry"
 	_ "github.com/lib/pq" // Register PostgreSQL driver
 )
 

@@ -19,13 +19,13 @@ import (
 	"github.com/eclipse-cfm/cfm/common/runtime"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/common/telemetry"
 	"github.com/eclipse-cfm/cfm/pmanager/core"
 	"github.com/eclipse-cfm/cfm/pmanager/handler"
 	"github.com/eclipse-cfm/cfm/pmanager/memorystore"
 	"github.com/eclipse-cfm/cfm/pmanager/natsorchestration"
 	"github.com/eclipse-cfm/cfm/pmanager/natsprovision"
 	"github.com/eclipse-cfm/cfm/pmanager/sqlstore"
-	"github.com/eclipse-cfm/cfm/pmanager/telemetry"
 )
 
 const (

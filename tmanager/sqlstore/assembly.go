@@ -16,6 +16,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/XSAM/otelsql"
 	"github.com/eclipse-cfm/cfm/common/sqlstore"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
@@ -48,7 +49,7 @@ func (a *PostgresServiceAssembly) Init(ictx *system.InitContext) error {
 	}
 	dsn := ictx.Config.GetString(dsnKey)
 
-	db, err := sql.Open(driverName, dsn)
+	db, err := otelsql.Open(driverName, dsn)
 	if err != nil {
 		return fmt.Errorf("error connecting to DB at %s: %w", dsn, err)
 	}
