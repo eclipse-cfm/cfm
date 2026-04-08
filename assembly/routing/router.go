@@ -22,6 +22,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/spf13/viper"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 const (
@@ -86,6 +87,7 @@ func (r *RouterServiceAssembly) Shutdown() error {
 func (r *RouterServiceAssembly) setupRouter(monitor system.LogMonitor, mode system.RuntimeMode) *chi.Mux {
 	router := chi.NewRouter()
 
+	router.Use(otelhttp.NewMiddleware("http"))
 	if mode == system.DebugMode {
 		router.Use(createLoggerHandler(monitor))
 	}

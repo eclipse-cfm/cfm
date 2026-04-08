@@ -53,7 +53,7 @@ func TestPostgresDefinitionStore_FindOrchestrationDefinition(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 	ctx := context.Background()
 
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -80,7 +80,7 @@ func TestFindOrchestrationDefinition_NotFound(t *testing.T) {
 	setupActivityDefinitionTable(t, testDB)
 	defer cleanupActivityDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 	ctx := context.Background()
 
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -101,7 +101,7 @@ func TestPostgresDefinitionStore_FindOrchestrationDefinitionsByPredicate_Type(t 
 	setupOrchestrationDefinitionTable(t, testDB)
 	defer cleanupOrchestrationDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -157,7 +157,7 @@ func TestPostgresDefinitionStore_FindOrchestrationDefinitionsByPredicate_Active(
 	setupOrchestrationDefinitionTable(t, testDB)
 	defer cleanupOrchestrationDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -213,7 +213,7 @@ func TestPostgresDefinitionStore_FindOrchestrationDefinitionsByPredicate_ActiveF
 	setupOrchestrationDefinitionTable(t, testDB)
 	defer cleanupOrchestrationDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -269,7 +269,7 @@ func TestPostgresDefinitionStore_FindOrchestrationDefinitionsByPredicate_Activit
 	setupOrchestrationDefinitionTable(t, testDB)
 	defer cleanupOrchestrationDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -337,7 +337,7 @@ func TestPostgresDefinitionStore_FindOrchestrationDefinitionsByPredicate_Activit
 	setupOrchestrationDefinitionTable(t, testDB)
 	defer cleanupOrchestrationDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -405,7 +405,7 @@ func TestPostgresDefinitionStore_FindOrchestrationDefinitionsByPredicate_Compoun
 	setupOrchestrationDefinitionTable(t, testDB)
 	defer cleanupOrchestrationDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -468,7 +468,7 @@ func TestPostgresDefinitionStore_FindOrchestrationDefinitionsByPredicate_NoMatch
 	setupOrchestrationDefinitionTable(t, testDB)
 	defer cleanupOrchestrationDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -506,7 +506,7 @@ func TestPostgresDefinitionStore_FindOrchestrationDefinitionsByPredicate_Activit
 	setupOrchestrationDefinitionTable(t, testDB)
 	defer cleanupOrchestrationDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -572,7 +572,7 @@ func TestPostgresDefinitionStore_FindActivityDefinition(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 	ctx := context.Background()
 
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -601,7 +601,7 @@ func TestFindActivityDefinition_NotFound(t *testing.T) {
 	setupActivityDefinitionTable(t, testDB)
 	defer cleanupActivityDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 	ctx := context.Background()
 
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -622,7 +622,7 @@ func TestPostgresDefinitionStore_FindActivityDefinitionsByPredicate_Type(t *test
 	setupActivityDefinitionTable(t, testDB)
 	defer cleanupActivityDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -672,7 +672,7 @@ func TestPostgresDefinitionStore_FindActivityDefinitionsByPredicate_Version(t *t
 	setupActivityDefinitionTable(t, testDB)
 	defer cleanupActivityDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -722,7 +722,7 @@ func TestPostgresDefinitionStore_FindActivityDefinitionsByPredicate_Description(
 	setupActivityDefinitionTable(t, testDB)
 	defer cleanupActivityDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -772,7 +772,7 @@ func TestPostgresDefinitionStore_FindActivityDefinitionsByPredicate_CompoundPred
 	setupActivityDefinitionTable(t, testDB)
 	defer cleanupActivityDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -825,7 +825,7 @@ func TestPostgresDefinitionStore_FindActivityDefinitionsByPredicate_NoMatches(t 
 	setupActivityDefinitionTable(t, testDB)
 	defer cleanupActivityDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -861,7 +861,7 @@ func TestPostgresDefinitionStore_FindActivityDefinitionsByPredicate_MultipleMatc
 	setupActivityDefinitionTable(t, testDB)
 	defer cleanupActivityDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -911,7 +911,7 @@ func TestPostgresDefinitionStore_DeleteOrchestrationDefinition(t *testing.T) {
 	setupOrchestrationDefinitionTable(t, testDB)
 	defer cleanupOrchestrationDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -959,7 +959,7 @@ func TestPostgresDefinitionStore_DeleteOrchestrationDefinition_NotFound(t *testi
 	setupOrchestrationDefinitionTable(t, testDB)
 	defer cleanupOrchestrationDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -979,7 +979,7 @@ func TestPostgresDefinitionStore_DeleteOrchestrationDefinition_Multiple(t *testi
 	setupOrchestrationDefinitionTable(t, testDB)
 	defer cleanupOrchestrationDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -1044,7 +1044,7 @@ func TestPostgresDefinitionStore_DeleteActivityDefinition(t *testing.T) {
 	setupActivityDefinitionTable(t, testDB)
 	defer cleanupActivityDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -1090,7 +1090,7 @@ func TestPostgresDefinitionStore_DeleteActivityDefinition_NotFound(t *testing.T)
 	setupActivityDefinitionTable(t, testDB)
 	defer cleanupActivityDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -1110,7 +1110,7 @@ func TestPostgresDefinitionStore_DeleteActivityDefinition_Multiple(t *testing.T)
 	setupActivityDefinitionTable(t, testDB)
 	defer cleanupActivityDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -1174,7 +1174,7 @@ func TestPostgresDefinitionStore_ListOrchestrationDefinitions(t *testing.T) {
 	setupOrchestrationDefinitionTable(t, testDB)
 	defer cleanupOrchestrationDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -1255,7 +1255,7 @@ func TestPostgresDefinitionStore_ListOrchestrationDefinitions_Empty(t *testing.T
 	setupOrchestrationDefinitionTable(t, testDB)
 	defer cleanupOrchestrationDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -1275,7 +1275,7 @@ func TestPostgresDefinitionStore_ListActivityDefinitions(t *testing.T) {
 	setupActivityDefinitionTable(t, testDB)
 	defer cleanupActivityDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -1348,7 +1348,7 @@ func TestPostgresDefinitionStore_ListActivityDefinitions_Empty(t *testing.T) {
 	setupActivityDefinitionTable(t, testDB)
 	defer cleanupActivityDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -1368,7 +1368,7 @@ func TestPostgresDefinitionStore_ActivityDefinitionReferences(t *testing.T) {
 	setupOrchestrationDefinitionTable(t, testDB)
 	defer cleanupOrchestrationDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -1432,7 +1432,7 @@ func TestPostgresDefinitionStore_ActivityDefinitionReferences_SingleReference(t 
 	setupOrchestrationDefinitionTable(t, testDB)
 	defer cleanupOrchestrationDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -1477,7 +1477,7 @@ func TestPostgresDefinitionStore_ActivityDefinitionReferences_NoReferences(t *te
 	setupOrchestrationDefinitionTable(t, testDB)
 	defer cleanupOrchestrationDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -1521,7 +1521,7 @@ func TestPostgresDefinitionStore_ActivityDefinitionReferences_EmptyOrchestration
 	setupOrchestrationDefinitionTable(t, testDB)
 	defer cleanupOrchestrationDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -1541,7 +1541,7 @@ func TestPostgresDefinitionStore_ActivityDefinitionReferences_MultipleActivities
 	setupOrchestrationDefinitionTable(t, testDB)
 	defer cleanupOrchestrationDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)
@@ -1580,7 +1580,7 @@ func TestPostgresDefinitionStore_ActivityDefinitionReferences_ActiveAndInactive(
 	setupOrchestrationDefinitionTable(t, testDB)
 	defer cleanupOrchestrationDefinitionTestData(t, testDB)
 
-	store := newPostgresDefinitionStore()
+	store := newPostgresDefinitionStore(nil)
 
 	ctx := context.Background()
 	tx, err := testDB.BeginTx(ctx, nil)

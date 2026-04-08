@@ -25,6 +25,7 @@ import (
 	"github.com/eclipse-cfm/cfm/pmanager/natsorchestration"
 	"github.com/eclipse-cfm/cfm/pmanager/natsprovision"
 	"github.com/eclipse-cfm/cfm/pmanager/sqlstore"
+	"github.com/eclipse-cfm/cfm/pmanager/telemetry"
 )
 
 const (
@@ -66,6 +67,7 @@ func Launch(shutdown <-chan struct{}) {
 
 	assembler := system.NewServiceAssembler(logMonitor, vConfig, mode)
 
+	assembler.Register(telemetry.NewTelemetryServiceAssembly(logPrefix))
 	assembler.Register(&routing.RouterServiceAssembly{})
 	assembler.Register(&handler.HandlerServiceAssembly{})
 

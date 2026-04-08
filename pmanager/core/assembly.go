@@ -16,6 +16,8 @@ import (
 	store "github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
+	"github.com/eclipse-cfm/cfm/pmanager/telemetry"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 type PMCoreServiceAssembly struct {
@@ -31,13 +33,14 @@ func (m PMCoreServiceAssembly) Provides() []system.ServiceType {
 }
 
 func (m PMCoreServiceAssembly) Requires() []system.ServiceType {
-	return []system.ServiceType{api.DefinitionStoreKey, api.OrchestratorKey, store.TransactionContextKey}
+	return []system.ServiceType{api.DefinitionStoreKey, api.OrchestratorKey, store.TransactionContextKey, telemetry.TracerProviderKey, api.OrchestrationIndexKey}
 }
 
 func (m PMCoreServiceAssembly) Init(context *system.InitContext) error {
 	definitionStore := context.Registry.Resolve(api.DefinitionStoreKey).(api.DefinitionStore)
 	transactionContext := context.Registry.Resolve(store.TransactionContextKey).(store.TransactionContext)
 	orchestrationIndex := context.Registry.Resolve(api.OrchestrationIndexKey).(store.EntityStore[*api.OrchestrationEntry])
+	traceProvider := context.Registry.Resolve(telemetry.TracerProviderKey).(*sdktrace.TracerProvider)
 
 	context.Registry.Register(api.ProvisionManagerKey, provisionManager{
 		orchestrator: context.Registry.Resolve(api.OrchestratorKey).(api.Orchestrator),
@@ -51,6 +54,7 @@ func (m PMCoreServiceAssembly) Init(context *system.InitContext) error {
 		trxContext:         transactionContext,
 		store:              definitionStore,
 		orchestrationStore: orchestrationIndex,
+		tp:                 traceProvider,
 	})
 	return nil
 }

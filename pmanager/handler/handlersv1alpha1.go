@@ -13,6 +13,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 
 	. "github.com/eclipse-cfm/cfm/common/collection"
@@ -22,6 +23,8 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/eclipse-cfm/cfm/pmanager/model/v1alpha1"
+	"go.opentelemetry.io/otel/attribute"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 type PMHandler struct {
@@ -29,13 +32,10 @@ type PMHandler struct {
 	provisionManager  api.ProvisionManager
 	definitionManager api.DefinitionManager
 	txContext         store.TransactionContext
+	tp                *sdktrace.TracerProvider
 }
 
-func NewHandler(
-	provisionManager api.ProvisionManager,
-	definitionManager api.DefinitionManager,
-	txContext store.TransactionContext,
-	monitor system.LogMonitor) *PMHandler {
+func NewHandler(provisionManager api.ProvisionManager, definitionManager api.DefinitionManager, txContext store.TransactionContext, monitor system.LogMonitor, tp *sdktrace.TracerProvider) *PMHandler {
 	return &PMHandler{
 		HttpHandler: handler.HttpHandler{
 			Monitor: monitor,
@@ -43,6 +43,7 @@ func NewHandler(
 		provisionManager:  provisionManager,
 		definitionManager: definitionManager,
 		txContext:         txContext,
+		tp:                tp,
 	}
 }
 
@@ -66,6 +67,8 @@ func (h *PMHandler) createActivityDefinition(w http.ResponseWriter, req *http.Re
 }
 
 func (h *PMHandler) createOrchestrationDefinition(w http.ResponseWriter, req *http.Request) {
+	_, span := h.tp.Tracer("pmanager").Start(req.Context(), "createOrchestrationDefinition")
+	defer span.End()
 	if h.InvalidMethod(w, req, http.MethodPost) {
 		return
 	}
@@ -75,6 +78,8 @@ func (h *PMHandler) createOrchestrationDefinition(w http.ResponseWriter, req *ht
 		return
 	}
 
+	span.SetAttributes(attribute.String("orchestration.template_id", orchestrationTemplate.ID))
+	span.AddEvent("Payload read successfully")
 	hasCompensation := false
 	for key, activities := range orchestrationTemplate.Activities {
 		if key == model.VPADisposeType.String() && len(activities) > 0 {
@@ -82,14 +87,17 @@ func (h *PMHandler) createOrchestrationDefinition(w http.ResponseWriter, req *ht
 		}
 	}
 	if !hasCompensation {
+		span.RecordError(fmt.Errorf("no compensation activity found"))
 		h.Monitor.Warnf("Orchestration template does not contain a compensation activity. Compensation orchestration definitions will not be created for orchestration template [%s] and auto-rollback will not be available", orchestrationTemplate.ID)
 	}
 
 	templateRef, definitions := v1alpha1.ToOrchestrationDefinition(&orchestrationTemplate)
+	span.AddEvent("Orchestration template converted to orchestration definition")
 	for _, def := range definitions {
 		_, err := h.definitionManager.CreateOrchestrationDefinition(req.Context(), def)
 		if err != nil {
 			h.HandleError(w, err)
+			span.RecordError(err)
 			return
 		}
 	}
