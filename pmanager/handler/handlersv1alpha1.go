@@ -25,6 +25,7 @@ import (
 	"github.com/eclipse-cfm/cfm/pmanager/model/v1alpha1"
 	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type PMHandler struct {
@@ -67,7 +68,7 @@ func (h *PMHandler) createActivityDefinition(w http.ResponseWriter, req *http.Re
 }
 
 func (h *PMHandler) createOrchestrationDefinition(w http.ResponseWriter, req *http.Request) {
-	_, span := h.tp.Tracer("pmanager").Start(req.Context(), "createOrchestrationDefinition")
+	_, span := h.tp.Tracer("handler").Start(req.Context(), "createOrchestrationDefinition")
 	defer span.End()
 	if h.InvalidMethod(w, req, http.MethodPost) {
 		return
@@ -92,7 +93,6 @@ func (h *PMHandler) createOrchestrationDefinition(w http.ResponseWriter, req *ht
 	}
 
 	templateRef, definitions := v1alpha1.ToOrchestrationDefinition(&orchestrationTemplate)
-	span.AddEvent("Orchestration template converted to orchestration definition")
 	for _, def := range definitions {
 		_, err := h.definitionManager.CreateOrchestrationDefinition(req.Context(), def)
 		if err != nil {
@@ -100,6 +100,7 @@ func (h *PMHandler) createOrchestrationDefinition(w http.ResponseWriter, req *ht
 			span.RecordError(err)
 			return
 		}
+		span.AddEvent("Orchestration definition created", trace.WithAttributes(attribute.String("orchestration.definition_id", def.GetID())))
 	}
 
 	h.ResponseCreated(w, v1alpha1.IDResponse{ID: templateRef, Description: "ID of the Orchestration Template"})

@@ -22,26 +22,18 @@ import (
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/types"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/sdk/trace"
 )
 
 type definitionManager struct {
 	trxContext         store.TransactionContext
 	store              api.DefinitionStore
 	orchestrationStore store.EntityStore[*api.OrchestrationEntry]
-	tp                 *trace.TracerProvider
 }
 
 func (d definitionManager) CreateOrchestrationDefinition(ctx context.Context, definition *api.OrchestrationDefinition) (*api.OrchestrationDefinition, error) {
 	return store.Trx[api.OrchestrationDefinition](d.trxContext).AndReturn(ctx, func(ctx context.Context) (*api.OrchestrationDefinition, error) {
 		var missingErrors []error
 
-		_, span := d.tp.Tracer("definitionManager").Start(ctx, "CreateOrchestrationDefinition")
-		defer span.End()
-
-		span.SetAttributes(attribute.String("definition.id", definition.GetID()),
-			attribute.Int("definition.activities", len(definition.Activities)))
 		// Verify that all referenced activities exist
 		for _, activity := range definition.Activities {
 			exists, err := d.store.ExistsActivityDefinition(ctx, activity.Type)
@@ -54,14 +46,11 @@ func (d definitionManager) CreateOrchestrationDefinition(ctx context.Context, de
 		}
 
 		if len(missingErrors) > 0 {
-			err := errors.Join(missingErrors...)
-			span.RecordError(err)
-			return nil, err
+			return nil, errors.Join(missingErrors...)
 		}
 
 		persisted, err := d.store.StoreOrchestrationDefinition(ctx, definition)
 		if err != nil {
-			span.RecordError(err)
 			return nil, err
 		}
 		return persisted, nil
