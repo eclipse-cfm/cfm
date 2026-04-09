@@ -22,6 +22,9 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type OnboardingActivityProcessor struct {
@@ -29,6 +32,7 @@ type OnboardingActivityProcessor struct {
 	Monitor                system.LogMonitor
 	IdentityApiClient      identityhub.IdentityAPIClient
 	IssuerServiceApiClient issuerservice.ApiClient
+	tracer                 trace.Tracer
 }
 
 type credentialRequestData struct {
@@ -38,7 +42,7 @@ type credentialRequestData struct {
 	CredentialRequestURL string `json:"credentialRequest"`
 }
 
-// handleDeployAction processes the deploy action for an onboarding activity by requesting the issuance of verifiable credentials.
+// ProcessDeploy processes the deploy action for an onboarding activity by requesting the issuance of verifiable credentials.
 // if a credential request is in progress, the deploy action simply checks its status and reschedules itself.
 func (p OnboardingActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
 	var credentialRequest credentialRequestData
@@ -58,7 +62,7 @@ func (p OnboardingActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.
 	return p.processExistingRequest(ctx, credentialRequest)
 }
 
-// handleDisposeAction revokes a credential using the IssuerService's Admin API. The credential is NOT deleted from the
+// ProcessDispose revokes a credential using the IssuerService's Admin API. The credential is NOT deleted from the
 // holder wallet (IdentityHub).
 func (p OnboardingActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.ActivityResult {
 
@@ -106,11 +110,17 @@ func (p OnboardingActivityProcessor) ProcessDispose(ctx api.ActivityContext) api
 }
 
 func (p OnboardingActivityProcessor) processExistingRequest(ctx api.ActivityContext, credentialRequest credentialRequestData) api.ActivityResult {
+	tracer := otel.GetTracerProvider().Tracer("cfm.agent.onboarding")
+	_, span := tracer.Start(ctx.Context(), "cfm.agent.onboarding.deploy.check-credentials", trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
+
 	state, err := p.IdentityApiClient.GetCredentialRequestState(credentialRequest.ParticipantContextID, credentialRequest.HolderPID)
 	if err != nil {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error getting credential request state: %w", err)}
 	}
 	p.Monitor.Infof("Credential request for participant '%s' is in state '%s'", credentialRequest.ParticipantContextID, state)
+
+	span.SetAttributes(attribute.String("state", state))
 
 	switch state {
 
@@ -131,7 +141,9 @@ func (p OnboardingActivityProcessor) processExistingRequest(ctx api.ActivityCont
 }
 
 func (p OnboardingActivityProcessor) processNewRequest(ctx api.ActivityContext, data *onboardingData, credentialRequest credentialRequestData) api.ActivityResult {
-
+	tracer := otel.GetTracerProvider().Tracer("cfm.agent.onboarding")
+	_, span := tracer.Start(ctx.Context(), "cfm.agent.onboarding.request-credentials", trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
 	if len(data.CredentialSpecs) == 0 {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("no credential specs provided")}
 	}
@@ -153,7 +165,7 @@ func (p OnboardingActivityProcessor) processNewRequest(ctx api.ActivityContext, 
 	}
 
 	if len(issuers) > 1 {
-		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("Multiple issuers not supported yet")}
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("multiple issuers not supported yet")}
 	}
 
 	holderPid := uuid.New().String()
@@ -171,6 +183,8 @@ func (p OnboardingActivityProcessor) processNewRequest(ctx api.ActivityContext, 
 	ctx.SetValue("participantContextId", credentialRequest.ParticipantContextID)
 	ctx.SetValue("holderPid", holderPid)
 	ctx.SetValue("credentialRequest", location)
+
+	span.SetAttributes(attribute.String("holderPid", holderPid), attribute.String("credentialRequest", location))
 
 	return api.ActivityResult{
 		Result:           api.ActivityResultSchedule,

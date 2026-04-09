@@ -89,14 +89,6 @@ func (e *NatsActivityExecutor) processLoop(ctx context.Context, consumer jetstre
 //
 // Returns an error if message processing fails.
 func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetstream.Msg) error {
-	// Extract trace context from message headers
-	propagator := propagation.TraceContext{}
-	carrier := &natsHeaderCarrier{headers: message.Headers()}
-	ctx = propagator.Extract(ctx, carrier)
-
-	// Start span with extracted context
-	ctx, span := otel.GetTracerProvider().Tracer("cfm.pmanager.orchestrator").Start(ctx, "activity.process_message")
-	defer span.End()
 
 	var oMessage api.ActivityMessage
 	if err := json.Unmarshal(message.Data(), &oMessage); err != nil {
@@ -111,6 +103,24 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 	if err != nil {
 		return fmt.Errorf("failed to read orchestration data: %w", err)
 	}
+
+	// attempt to restore trace ID from stored orchestration
+	if orchestration.ProcessingData["trace_context"] != nil {
+		traceParent := orchestration.ProcessingData["trace_context"].(string)
+		e.Monitor.Infof("Telemetry: continue trace from Orchestration's traceparent: %s", traceParent)
+		carrier := propagation.MapCarrier{"traceparent": traceParent}
+		ctx = propagation.TraceContext{}.Extract(ctx, carrier)
+		delete(orchestration.ProcessingData, "trace_context") // Clean up trace context from processing data after restoring it
+	} else {
+		e.Monitor.Debugf("Telemetry: continue trace from NATS message")
+		// Extract trace context from message headers
+		carrier := &natsHeaderCarrier{headers: message.Headers()}
+		ctx = propagation.TraceContext{}.Extract(ctx, carrier)
+	}
+
+	// Start span with extracted context
+	ctx, span := otel.GetTracerProvider().Tracer("cfm.pmanager.orchestrator").Start(ctx, "activity.process_message")
+	defer span.End()
 
 	activityContext := api.NewActivityContext(
 		ctx,
@@ -143,6 +153,12 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 	case api.ActivityResultSchedule:
 		// IMPORTANT: Must persist state BEFORE rescheduling
 		// This ensures processing data is saved for the next invocation
+
+		// Inject trace context into processing data so that subsequent executions are under the same trace-id
+		m := propagation.MapCarrier{}
+		propagation.TraceContext{}.Inject(ctx, m)
+		orchestration.ProcessingData["trace_context"] = m["traceparent"]
+
 		e.persistState(activityContext, orchestration, revision)
 		if err := message.NakWithDelay(result.WaitOnReschedule); err != nil {
 			return fmt.Errorf("failed to reschedule schedule activity %s: %w", oMessage.OrchestrationID, err)

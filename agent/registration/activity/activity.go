@@ -18,6 +18,8 @@ import (
 	"github.com/eclipse-cfm/cfm/agent/common/issuerservice"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type RegistrationActivityProcessor struct {
@@ -44,8 +46,12 @@ type Config struct {
 }
 
 func (p RegistrationActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
+	tracer := otel.GetTracerProvider().Tracer("cfm.agent.registration")
+	_, span := tracer.Start(ctx.Context(), "cfm.agent.registration.create-holder", trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
 	var registrationData RegistrationData
 	if err := ctx.ReadValues(&registrationData); err != nil {
+		span.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Registration activity for orchestration %s: %w", ctx.OID(), err)}
 	}
 	if registrationData.HolderName == "" {
@@ -54,6 +60,7 @@ func (p RegistrationActivityProcessor) ProcessDeploy(ctx api.ActivityContext) ap
 
 	holderID := registrationData.DID
 	if err := p.IssuerService.CreateHolder(registrationData.DID, holderID, registrationData.HolderName); err != nil {
+		span.RecordError(err)
 		// todo: inspect error if it is retryable
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating holder in ApiClient: %w", err)}
 	}

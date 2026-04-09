@@ -20,6 +20,7 @@ import (
 	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/hashicorp/go-retryablehttp"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 const (
@@ -56,6 +57,10 @@ func (h HttpClientServiceAssembly) Init(context *system.InitContext) error {
 	retryClient.CheckRetry = customCheckRetry
 	retryClient.Logger = &routingLogger{monitor: context.LogMonitor}
 	standardClient := retryClient.StandardClient()
+
+	// Wrap the client with OpenTelemetry instrumentation
+	standardClient.Transport = otelhttp.NewTransport(standardClient.Transport)
+
 	context.Registry.Register(serviceapi.HttpClientKey, *standardClient)
 
 	return nil
