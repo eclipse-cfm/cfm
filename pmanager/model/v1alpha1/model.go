@@ -30,15 +30,9 @@ type ActivityDefinitionDto struct {
 }
 
 type ActivityDto struct {
-	ID        string         `json:"id" validate:"required"`
-	Type      string         `json:"type" validate:"required,modeltype"`
-	Inputs    []MappingEntry `json:"inputs,omitempty"`
-	DependsOn []string       `json:"dependsOn,omitempty"`
-}
-
-type MappingEntry struct {
-	Source string `json:"source" validate:"required"`
-	Target string `json:"target" validate:"required"`
+	ID        string   `json:"id" validate:"required"`
+	Type      string   `json:"type" validate:"required,modeltype"`
+	DependsOn []string `json:"dependsOn,omitempty"`
 }
 
 type OrchestrationDefinitionDto struct {

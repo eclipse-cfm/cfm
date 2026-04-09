@@ -194,7 +194,6 @@ func publishActivityMessage(ctx context.Context, id string, d api.Discriminator,
 			ID:            "test-activity",
 			Type:          launcher.ActivityType,
 			Discriminator: d,
-			Inputs:        make([]api.MappingEntry, 0),
 			DependsOn:     make([]string, 0),
 		},
 	}
