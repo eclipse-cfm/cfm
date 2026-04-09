@@ -13,6 +13,8 @@
 package launcher
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/eclipse-cfm/cfm/agent/keycloak/activity"
@@ -23,6 +25,11 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/eclipse-cfm/cfm/pmanager/natsagent"
+	"go.opentelemetry.io/contrib/exporters/autoexport"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 )
 
 const (
@@ -70,5 +77,32 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 			})
 		},
 	}
+	_, err := initTracer()
+	if err != nil {
+		panic(err)
+	}
 	natsagent.LaunchAgent(shutdown, config)
+}
+
+func initTracer() (*trace.TracerProvider, error) {
+	ctx := context.Background()
+	spanExporter, err := autoexport.NewSpanExporter(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := resource.New(ctx,
+		resource.WithFromEnv(),
+		resource.WithAttributes(semconv.ServiceNameKey.String(AgentPrefix)),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create telemetry resource: %w", err)
+	}
+
+	tp := trace.NewTracerProvider(
+		trace.WithBatcher(spanExporter),
+		trace.WithResource(res),
+	)
+	otel.SetTracerProvider(tp)
+	return tp, nil
 }

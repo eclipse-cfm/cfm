@@ -24,7 +24,10 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/google/uuid"
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 type NatsActivityExecutor struct {
@@ -86,6 +89,15 @@ func (e *NatsActivityExecutor) processLoop(ctx context.Context, consumer jetstre
 //
 // Returns an error if message processing fails.
 func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetstream.Msg) error {
+	// Extract trace context from message headers
+	propagator := propagation.TraceContext{}
+	carrier := &natsHeaderCarrier{headers: message.Headers()}
+	ctx = propagator.Extract(ctx, carrier)
+
+	// Start span with extracted context
+	ctx, span := otel.GetTracerProvider().Tracer("activity.processor").Start(ctx, "activity.process_message")
+	defer span.End()
+
 	var oMessage api.ActivityMessage
 	if err := json.Unmarshal(message.Data(), &oMessage); err != nil {
 		ackErr := natsclient.AckMessage(message)
@@ -304,4 +316,25 @@ func (e *NatsActivityExecutor) handleFatalError(
 			orchestration.ID, resultErr, err)
 	}
 	return fmt.Errorf("fatal failure while executing activity %s: %w", orchestration.ID, resultErr)
+}
+
+// natsHeaderCarrier implements propagation.TextMapCarrier for NATS message headers
+type natsHeaderCarrier struct {
+	headers nats.Header
+}
+
+func (c *natsHeaderCarrier) Get(key string) string {
+	return c.headers.Get(key)
+}
+
+func (c *natsHeaderCarrier) Set(key string, value string) {
+	c.headers.Set(key, value)
+}
+
+func (c *natsHeaderCarrier) Keys() []string {
+	keys := make([]string, 0, len(c.headers))
+	for key := range c.headers {
+		keys = append(keys, key)
+	}
+	return keys
 }

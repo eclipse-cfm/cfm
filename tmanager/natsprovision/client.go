@@ -22,6 +22,7 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/common/types"
 	"github.com/nats-io/nats.go/jetstream"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type natsOrchestrationClient struct {
@@ -31,12 +32,14 @@ type natsOrchestrationClient struct {
 func newNatsOrchestrationClient(
 	client natsclient.MsgClient,
 	dispatcher provisionCallbackDispatcher,
-	monitor system.LogMonitor) *natsOrchestrationClient {
+	monitor system.LogMonitor,
+	tracer trace.Tracer) *natsOrchestrationClient {
 	return &natsOrchestrationClient{
 		RetriableMessageProcessor: natsclient.RetriableMessageProcessor[model.OrchestrationResponse]{
 			Client:     client,
 			Monitor:    monitor,
 			Processing: atomic.Bool{},
+			Tracer:     tracer,
 			Dispatcher: func(ctx context.Context, payload model.OrchestrationResponse) error {
 				err := model.Validator.Struct(payload)
 				if err != nil {

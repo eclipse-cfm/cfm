@@ -19,32 +19,32 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"go.opentelemetry.io/contrib/exporters/autoexport"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 )
 
 const TracerProviderKey system.ServiceType = "telemetry:TracerProvider"
 
-type telemetryServiceAssembly struct {
+type TelemetryServiceAssembly struct {
 	system.DefaultServiceAssembly
-	serviceName string
+	ServiceName string
 	tp          *sdktrace.TracerProvider
 }
 
 func NewTelemetryServiceAssembly(serviceName string) system.ServiceAssembly {
-	return &telemetryServiceAssembly{serviceName: serviceName}
+	return &TelemetryServiceAssembly{ServiceName: serviceName}
 }
 
-func (t *telemetryServiceAssembly) Name() string {
-	return "Telemetry"
+func (t *TelemetryServiceAssembly) Name() string {
+	return "OpenTelemetry"
 }
 
-func (t *telemetryServiceAssembly) Provides() []system.ServiceType {
+func (t *TelemetryServiceAssembly) Provides() []system.ServiceType {
 	return []system.ServiceType{TracerProviderKey}
 }
 
-func (t *telemetryServiceAssembly) Init(ctx *system.InitContext) error {
+func (t *TelemetryServiceAssembly) Init(ctx *system.InitContext) error {
 
 	spanCtx := context.Background()
 	spanExporter, err := autoexport.NewSpanExporter(spanCtx)
@@ -54,14 +54,14 @@ func (t *telemetryServiceAssembly) Init(ctx *system.InitContext) error {
 
 	res, err := resource.New(spanCtx,
 		resource.WithFromEnv(),
-		resource.WithAttributes(attribute.String("service.name", t.serviceName)),
+		resource.WithAttributes(semconv.ServiceNameKey.String(t.ServiceName)),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create telemetry resource: %w", err)
 	}
 
 	t.tp = sdktrace.NewTracerProvider(
-		sdktrace.WithSyncer(spanExporter),
+		sdktrace.WithBatcher(spanExporter),
 		sdktrace.WithResource(res),
 	)
 	otel.SetTracerProvider(t.tp)
@@ -69,7 +69,7 @@ func (t *telemetryServiceAssembly) Init(ctx *system.InitContext) error {
 	return nil
 }
 
-func (t *telemetryServiceAssembly) Shutdown() error {
+func (t *TelemetryServiceAssembly) Shutdown() error {
 	if t.tp != nil {
 		return t.tp.Shutdown(context.Background())
 	}

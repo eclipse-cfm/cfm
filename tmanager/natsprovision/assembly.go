@@ -18,7 +18,9 @@ import (
 
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/common/telemetry"
 	"github.com/eclipse-cfm/cfm/tmanager/api"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 type natsOrchestrationServiceAssembly struct {
@@ -49,7 +51,7 @@ func (a *natsOrchestrationServiceAssembly) Provides() []system.ServiceType {
 }
 
 func (d *natsOrchestrationServiceAssembly) Requires() []system.ServiceType {
-	return []system.ServiceType{}
+	return []system.ServiceType{telemetry.TracerProviderKey}
 }
 
 func (a *natsOrchestrationServiceAssembly) Init(ctx *system.InitContext) error {
@@ -64,7 +66,8 @@ func (a *natsOrchestrationServiceAssembly) Init(ctx *system.InitContext) error {
 	ctx.Registry.Register(api.ProvisionHandlerRegistryKey, dispatcher)
 
 	client := natsclient.NewMsgClient(natsClient)
-	a.orchestrationClient = newNatsOrchestrationClient(client, dispatcher, ctx.LogMonitor)
+	tracer := ctx.Registry.Resolve(telemetry.TracerProviderKey).(*sdktrace.TracerProvider).Tracer("tmanager")
+	a.orchestrationClient = newNatsOrchestrationClient(client, dispatcher, ctx.LogMonitor, tracer)
 	ctx.Registry.Register(api.ProvisionClientKey, a.orchestrationClient)
 
 	return nil

@@ -26,6 +26,9 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -200,6 +203,10 @@ func NewProcessor(config *Config) *KeyCloakActivityProcessor {
 }
 
 func (p KeyCloakActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
+
+	_, span := otel.GetTracerProvider().Tracer("keycloak.activity").Start(ctx.Context(), "agent.kcagent.deploy")
+	defer span.End()
+
 	clientIDSlug := generateClientID()
 
 	// create Keycloak client for API access
@@ -210,9 +217,12 @@ func (p KeyCloakActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.Ac
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}
 	}
 	apiClientResult := p.provisionConfidentialClient(apiClient, ctx)
+	span.AddEvent("API client created")
 	p.monitor.Debugf("created API Access client: %s", apiClient.ClientId)
 	ctx.SetValue(apiAccessClientIDKey, apiClient.ClientId)
 	ctx.SetOutputValue(participantContextIDKey, participantContextID)
+	span.SetAttributes(attribute.String("api.client.id", apiClient.ClientId), attribute.String(participantContextIDKey, participantContextID))
+
 	if apiClientResult.Result != api.ActivityResultComplete {
 		p.monitor.Warnw("Provisioning API Access client not complete. Result was %s, error: %s", apiClientResult.Result, apiClientResult.Error)
 		return apiClientResult
@@ -225,8 +235,12 @@ func (p KeyCloakActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.Ac
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}
 	}
 	vaultClientResult := p.provisionConfidentialClient(vaultAccessClient, ctx)
+	span.AddEvent("Vault client created")
+
 	p.monitor.Debugf("created Vault Access client: %s", vaultAccessClient.ClientId)
 	ctx.SetValue(vaultAccessClientIDKey, vaultAccessClient.ClientId)
+
+	span.SetAttributes(attribute.String("vault.client.id", vaultAccessClient.ClientId))
 
 	if vaultClientResult.Result != api.ActivityResultComplete {
 		p.monitor.Warnw("Provisioning Vault Access client not complete. Result was %s, error: %s", vaultClientResult.Result, vaultClientResult.Error)
@@ -268,6 +282,10 @@ func (p KeyCloakActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.A
 // other processors. The client ID is returned as a value in the context.
 // TODO support idempotent provisioning
 func (p KeyCloakActivityProcessor) provisionConfidentialClient(client *KeycloakClientData, ctx api.ActivityContext) api.ActivityResult {
+	_, span := otel.GetTracerProvider().Tracer("keycloak.activity").
+		Start(ctx.Context(), "agent.kcagent.deploy.provisionConfidentialClient", trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
+
 	err := p.createClient(client)
 	if err != nil {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}
