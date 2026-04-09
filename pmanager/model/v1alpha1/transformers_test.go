@@ -95,19 +95,14 @@ func TestToOrchestrationDefinition(t *testing.T) {
 				Activities: map[string][]ActivityDto{
 					"foo.bar.kubernetes": {
 						{
-							ID:   "activity-1",
-							Type: "http-request",
-							Inputs: []MappingEntry{
-								{Source: "input.url", Target: "request.url"},
-								{Source: "input.method", Target: "request.method"},
-							},
+							ID:        "activity-1",
+							Type:      "http-request",
 							DependsOn: []string{"activity-0"},
 						},
 					},
 					DefaultActivityDiscriminator: {{
 						ID:        "activity-2",
 						Type:      "data-transform",
-						Inputs:    []MappingEntry{},
 						DependsOn: []string{"activity-1"},
 					}},
 				},
@@ -124,11 +119,7 @@ func TestToOrchestrationDefinition(t *testing.T) {
 							ID:            "activity-1",
 							Type:          api.ActivityType("http-request"),
 							Discriminator: "foo.bar.kubernetes",
-							Inputs: []api.MappingEntry{
-								{Source: "input.url", Target: "request.url"},
-								{Source: "input.method", Target: "request.method"},
-							},
-							DependsOn: []string{"activity-0"},
+							DependsOn:     []string{"activity-0"},
 						},
 					},
 				},
@@ -143,7 +134,6 @@ func TestToOrchestrationDefinition(t *testing.T) {
 							ID:            "activity-2",
 							Discriminator: DefaultActivityDiscriminator,
 							Type:          api.ActivityType("data-transform"),
-							Inputs:        []api.MappingEntry{},
 							DependsOn:     []string{"activity-1"},
 						},
 					},
@@ -177,9 +167,6 @@ func TestToOrchestrationDefinition(t *testing.T) {
 					"local": {{
 						ID:   "standalone-activity",
 						Type: "file-processor",
-						Inputs: []MappingEntry{
-							{Source: "file.path", Target: "processor.input"},
-						},
 					}},
 				},
 			},
@@ -192,9 +179,6 @@ func TestToOrchestrationDefinition(t *testing.T) {
 						ID:            "standalone-activity",
 						Type:          api.ActivityType("file-processor"),
 						Discriminator: "local",
-						Inputs: []api.MappingEntry{
-							{Source: "file.path", Target: "processor.input"},
-						},
 					},
 				},
 			},
@@ -219,89 +203,6 @@ func TestToAPIOrchestrationDefinition_NilInput(t *testing.T) {
 	})
 }
 
-func TestToAPIMappingEntries(t *testing.T) {
-	tests := []struct {
-		name     string
-		entries  []MappingEntry
-		expected []api.MappingEntry
-	}{
-		{
-			name: "multiple mapping entries",
-			entries: []MappingEntry{
-				{Source: "input.name", Target: "output.fullName"},
-				{Source: "input.age", Target: "output.yearsOld"},
-				{Source: "input.email", Target: "output.contactEmail"},
-			},
-			expected: []api.MappingEntry{
-				{Source: "input.name", Target: "output.fullName"},
-				{Source: "input.age", Target: "output.yearsOld"},
-				{Source: "input.email", Target: "output.contactEmail"},
-			},
-		},
-		{
-			name: "single mapping entry",
-			entries: []MappingEntry{
-				{Source: "data.value", Target: "result.processed"},
-			},
-			expected: []api.MappingEntry{
-				{Source: "data.value", Target: "result.processed"},
-			},
-		},
-		{
-			name:     "empty mapping entries",
-			entries:  []MappingEntry{},
-			expected: []api.MappingEntry{},
-		},
-		{
-			name: "mapping entries with empty strings",
-			entries: []MappingEntry{
-				{Source: "", Target: ""},
-				{Source: "valid.source", Target: ""},
-				{Source: "", Target: "valid.target"},
-			},
-			expected: []api.MappingEntry{
-				{Source: "", Target: ""},
-				{Source: "valid.source", Target: ""},
-				{Source: "", Target: "valid.target"},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := ToAPIMappingEntries(tt.entries)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-func TestToAPIMappingEntries_NilInput(t *testing.T) {
-	result := ToAPIMappingEntries(nil)
-	assert.NotNil(t, result)
-	assert.Len(t, result, 0)
-}
-
-func TestToOrchestrationEntry_VerifiesInputs(t *testing.T) {
-	testTime := time.Now()
-	input := api.OrchestrationEntry{
-		ID:                "test-id-123",
-		CorrelationID:     "corr-id-456",
-		State:             5,
-		StateTimestamp:    testTime,
-		CreatedTimestamp:  testTime.Add(-time.Hour),
-		OrchestrationType: model.OrchestrationType("TestType"),
-	}
-
-	result := ToOrchestrationEntry(&input)
-
-	assert.Equal(t, input.ID, result.ID)
-	assert.Equal(t, input.CorrelationID, result.CorrelationID)
-	assert.Equal(t, int(input.State), result.State)
-	assert.Equal(t, input.StateTimestamp, result.StateTimestamp)
-	assert.Equal(t, input.CreatedTimestamp, result.CreatedTimestamp)
-	assert.Equal(t, input.OrchestrationType, result.OrchestrationType)
-}
-
 func TestToOrchestration(t *testing.T) {
 	now := time.Now()
 	apiOrchestration := &api.Orchestration{
@@ -321,10 +222,7 @@ func TestToOrchestration(t *testing.T) {
 						ID:            "activity-1",
 						Type:          "test.activity",
 						Discriminator: "test-disc",
-						Inputs: []api.MappingEntry{
-							{Source: "src1", Target: "tgt1"},
-						},
-						DependsOn: []string{"activity-0"},
+						DependsOn:     []string{"activity-0"},
 					},
 				},
 			},
@@ -345,8 +243,6 @@ func TestToOrchestration(t *testing.T) {
 	assert.Equal(t, 1, len(result.Steps[0].Activities))
 	assert.Equal(t, "activity-1", result.Steps[0].Activities[0].ID)
 	assert.Equal(t, "test.activity", result.Steps[0].Activities[0].Type)
-	assert.Equal(t, 1, len(result.Steps[0].Activities[0].Inputs))
-	assert.Equal(t, "src1", result.Steps[0].Activities[0].Inputs[0].Source)
 }
 
 func TestToActivityDefinition_WithValidDefinition(t *testing.T) {

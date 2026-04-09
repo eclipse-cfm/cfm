@@ -27,13 +27,11 @@ func TestInstantiateOrchestration(t *testing.T) {
 			{
 				ID:        "activity1",
 				Type:      "test-type",
-				Inputs:    []MappingEntry{{Source: "input1", Target: "target1"}},
 				DependsOn: []string{},
 			},
 			{
 				ID:        "activity2",
 				Type:      "test-type-2",
-				Inputs:    []MappingEntry{{Source: "input2", Target: "target2"}},
 				DependsOn: []string{},
 			},
 		}
@@ -71,19 +69,16 @@ func TestInstantiateOrchestration(t *testing.T) {
 			{
 				ID:        "activity1",
 				Type:      "first",
-				Inputs:    []MappingEntry{{Source: "input1", Target: "target1"}},
 				DependsOn: []string{},
 			},
 			{
 				ID:        "activity2",
 				Type:      "second",
-				Inputs:    []MappingEntry{{Source: "input2", Target: "target2"}},
 				DependsOn: []string{"activity1"},
 			},
 			{
 				ID:        "activity3",
 				Type:      "third",
-				Inputs:    []MappingEntry{{Source: "input3", Target: "target3"}},
 				DependsOn: []string{"activity2"},
 			},
 		}
@@ -120,25 +115,21 @@ func TestInstantiateOrchestration(t *testing.T) {
 			{
 				ID:        "activity1",
 				Type:      "root",
-				Inputs:    []MappingEntry{{Source: "input1", Target: "target1"}},
 				DependsOn: []string{},
 			},
 			{
 				ID:        "activity2",
 				Type:      "parallel1",
-				Inputs:    []MappingEntry{{Source: "input2", Target: "target2"}},
 				DependsOn: []string{"activity1"},
 			},
 			{
 				ID:        "activity3",
 				Type:      "parallel2",
-				Inputs:    []MappingEntry{{Source: "input3", Target: "target3"}},
 				DependsOn: []string{"activity1"},
 			},
 			{
 				ID:        "activity4",
 				Type:      "final",
-				Inputs:    []MappingEntry{{Source: "input4", Target: "target4"}},
 				DependsOn: []string{"activity2", "activity3"},
 			},
 		}
@@ -179,13 +170,11 @@ func TestInstantiateOrchestration(t *testing.T) {
 			{
 				ID:        "activity1",
 				Type:      "first",
-				Inputs:    []MappingEntry{{Source: "input1", Target: "target1"}},
 				DependsOn: []string{"activity2"},
 			},
 			{
 				ID:        "activity2",
 				Type:      "second",
-				Inputs:    []MappingEntry{{Source: "input2", Target: "target2"}},
 				DependsOn: []string{"activity1"},
 			},
 		}
@@ -218,7 +207,6 @@ func TestInstantiateOrchestration(t *testing.T) {
 			{
 				ID:        "activity1",
 				Type:      "test",
-				Inputs:    []MappingEntry{{Source: "input1", Target: "target1"}},
 				DependsOn: []string{},
 			},
 		}
@@ -243,31 +231,26 @@ func TestInstantiateOrchestration(t *testing.T) {
 			{
 				ID:        "activity1",
 				Type:      "init",
-				Inputs:    []MappingEntry{{Source: "input1", Target: "target1"}},
 				DependsOn: []string{},
 			},
 			{
 				ID:        "activity2",
 				Type:      "setup",
-				Inputs:    []MappingEntry{{Source: "input2", Target: "target2"}},
 				DependsOn: []string{},
 			},
 			{
 				ID:        "activity3",
 				Type:      "process",
-				Inputs:    []MappingEntry{{Source: "input3", Target: "target3"}},
 				DependsOn: []string{"activity1", "activity2"},
 			},
 			{
 				ID:        "activity4",
 				Type:      "validate",
-				Inputs:    []MappingEntry{{Source: "input4", Target: "target4"}},
 				DependsOn: []string{"activity3"},
 			},
 			{
 				ID:        "activity5",
 				Type:      "cleanup",
-				Inputs:    []MappingEntry{{Source: "input5", Target: "target5"}},
 				DependsOn: []string{"activity4"},
 			},
 		}
@@ -329,7 +312,6 @@ func TestInstantiateOrchestration(t *testing.T) {
 			{
 				ID:        "activity1",
 				Type:      "test",
-				Inputs:    []MappingEntry{{Source: "input1", Target: "target1"}},
 				DependsOn: []string{},
 			},
 		}
@@ -348,7 +330,6 @@ func TestInstantiateOrchestration(t *testing.T) {
 			{
 				ID:        "activity1",
 				Type:      "test",
-				Inputs:    []MappingEntry{{Source: "input1", Target: "target1"}},
 				DependsOn: []string{"non-existent-activity"},
 			},
 		}
