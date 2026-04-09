@@ -18,11 +18,9 @@ import (
 	"github.com/eclipse-cfm/cfm/assembly/routing"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
-	"github.com/eclipse-cfm/cfm/common/telemetry"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 type response struct {
@@ -38,7 +36,7 @@ func (h *HandlerServiceAssembly) Name() string {
 }
 
 func (h *HandlerServiceAssembly) Requires() []system.ServiceType {
-	return []system.ServiceType{routing.RouterKey, api.ProvisionManagerKey, api.DefinitionStoreKey, telemetry.TracerProviderKey}
+	return []system.ServiceType{routing.RouterKey, api.ProvisionManagerKey, api.DefinitionStoreKey}
 }
 
 func (h *HandlerServiceAssembly) Init(context *system.InitContext) error {
@@ -48,8 +46,7 @@ func (h *HandlerServiceAssembly) Init(context *system.InitContext) error {
 	provisionManager := context.Registry.Resolve(api.ProvisionManagerKey).(api.ProvisionManager)
 	definitionManager := context.Registry.Resolve(api.DefinitionManagerKey).(api.DefinitionManager)
 	txContext := context.Registry.Resolve(store.TransactionContextKey).(store.TransactionContext)
-	tp := context.Registry.Resolve(telemetry.TracerProviderKey).(*sdktrace.TracerProvider)
-	handler := NewHandler(provisionManager, definitionManager, txContext, context.LogMonitor, tp)
+	handler := NewHandler(provisionManager, definitionManager, txContext, context.LogMonitor)
 
 	router.Route("/api/v1alpha1", func(r chi.Router) {
 		h.registerV1Alpha1(r, handler)

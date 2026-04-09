@@ -19,7 +19,6 @@ import (
 	"github.com/eclipse-cfm/cfm/common/runtime"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
-	"github.com/eclipse-cfm/cfm/common/telemetry"
 	"github.com/eclipse-cfm/cfm/pmanager/core"
 	"github.com/eclipse-cfm/cfm/pmanager/handler"
 	"github.com/eclipse-cfm/cfm/pmanager/memorystore"
@@ -67,7 +66,6 @@ func Launch(shutdown <-chan struct{}) {
 
 	assembler := system.NewServiceAssembler(logMonitor, vConfig, mode)
 
-	assembler.Register(telemetry.NewTelemetryServiceAssembly(logPrefix))
 	assembler.Register(&routing.RouterServiceAssembly{})
 	assembler.Register(&handler.HandlerServiceAssembly{})
 
@@ -82,5 +80,8 @@ func Launch(shutdown <-chan struct{}) {
 	assembler.Register(natsprovision.NewProvisionServiceAssembly(streamValue))
 	assembler.Register(&core.PMCoreServiceAssembly{})
 
+	if err := runtime.SetupTelemetry("cfm.pmanager", shutdown); err != nil {
+		logMonitor.Warnf("Error setting up telemetry: %s. Traces and metrics will not be available.", err.Error())
+	}
 	runtime.AssembleAndLaunch(assembler, "Provision Manager", logMonitor, shutdown)
 }

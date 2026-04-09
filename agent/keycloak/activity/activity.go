@@ -39,6 +39,7 @@ const (
 	vaultAccessClientIDKey  = "clientID.vaultAccess"
 	apiAccessClientIDKey    = "clientID.apiAccess"
 	participantContextIDKey = "participantContextId"
+	tracerName              = "cfm.agent.keycloak"
 )
 
 type Config struct {
@@ -204,7 +205,7 @@ func NewProcessor(config *Config) *KeyCloakActivityProcessor {
 
 func (p KeyCloakActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
 
-	_, span := otel.GetTracerProvider().Tracer("keycloak.activity").Start(ctx.Context(), "agent.kcagent.deploy")
+	_, span := otel.GetTracerProvider().Tracer(tracerName).Start(ctx.Context(), "agent.kcagent.deploy")
 	defer span.End()
 
 	clientIDSlug := generateClientID()
@@ -282,7 +283,7 @@ func (p KeyCloakActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.A
 // other processors. The client ID is returned as a value in the context.
 // TODO support idempotent provisioning
 func (p KeyCloakActivityProcessor) provisionConfidentialClient(client *KeycloakClientData, ctx api.ActivityContext) api.ActivityResult {
-	_, span := otel.GetTracerProvider().Tracer("keycloak.activity").
+	_, span := otel.GetTracerProvider().Tracer(tracerName).
 		Start(ctx.Context(), "agent.kcagent.deploy.provisionConfidentialClient", trace.WithSpanKind(trace.SpanKindClient))
 	defer span.End()
 

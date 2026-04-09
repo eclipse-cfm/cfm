@@ -45,6 +45,7 @@ const (
 func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 	config := natsagent.LauncherConfig{
 		AgentName:    "KeyCloak Agent",
+		ServiceName:  "cfm.agent.keycloak",
 		ConfigPrefix: AgentPrefix,
 		ActivityType: ActivityType,
 		AssemblyProvider: func() []system.ServiceAssembly {

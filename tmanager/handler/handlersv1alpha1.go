@@ -21,6 +21,7 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/eclipse-cfm/cfm/tmanager/model/v1alpha1"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -32,10 +33,9 @@ type TMHandler struct {
 	cellService        api.CellService
 	dataspaceService   api.DataspaceProfileService
 	txContext          store.TransactionContext
-	tracer             trace.Tracer
 }
 
-func NewHandler(tenantService api.TenantService, participantService api.ParticipantProfileService, cellService api.CellService, dataspaceService api.DataspaceProfileService, txContext store.TransactionContext, monitor system.LogMonitor, tracer trace.Tracer) *TMHandler {
+func NewHandler(tenantService api.TenantService, participantService api.ParticipantProfileService, cellService api.CellService, dataspaceService api.DataspaceProfileService, txContext store.TransactionContext, monitor system.LogMonitor) *TMHandler {
 	return &TMHandler{
 		HttpHandler: handler.HttpHandler{
 			Monitor: monitor,
@@ -45,7 +45,6 @@ func NewHandler(tenantService api.TenantService, participantService api.Particip
 		cellService:        cellService,
 		dataspaceService:   dataspaceService,
 		txContext:          txContext,
-		tracer:             tracer,
 	}
 }
 
@@ -90,7 +89,7 @@ func (h *TMHandler) deployParticipantProfile(
 	req *http.Request,
 	tenantID string) {
 
-	_, span := h.tracer.Start(req.Context(), "deployParticipantProfile")
+	_, span := otel.GetTracerProvider().Tracer("cfm.tmanager.handler").Start(req.Context(), "deployParticipantProfile")
 	defer span.End()
 
 	if h.InvalidMethod(w, req, http.MethodPost) {

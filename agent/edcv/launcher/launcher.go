@@ -44,6 +44,7 @@ const (
 func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 	config := natsagent.LauncherConfig{
 		AgentName:    "EDC-V Agent",
+		ServiceName:  "cfm.agent.edcv",
 		ConfigPrefix: "edcvagent",
 		ActivityType: ActivityType,
 		AssemblyProvider: func() []system.ServiceAssembly {

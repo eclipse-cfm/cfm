@@ -65,7 +65,7 @@ func (o *NatsOrchestrator) GetOrchestration(ctx context.Context, id string) (*ap
 func (o *NatsOrchestrator) Execute(ctx context.Context, orchestration *api.Orchestration) error {
 	// TODO validate orchestration - this should include a check to see if there are no steps or steps with no activities
 
-	_, span := otel.GetTracerProvider().Tracer("nats.orchestrator").Start(ctx, "nats.execute_orchestration")
+	_, span := otel.GetTracerProvider().Tracer("cfm.pmanager.orchestrator").Start(ctx, "nats.execute_orchestration")
 	defer span.End()
 
 	serializedOrchestration, err := json.Marshal(orchestration)

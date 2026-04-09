@@ -24,7 +24,7 @@ import (
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go/jetstream"
-	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel"
 )
 
 type natsProvisionHandler struct {
@@ -34,15 +34,14 @@ type natsProvisionHandler struct {
 func newNatsProvisionHandler(
 	client natsclient.MsgClient,
 	provisionManager api.ProvisionManager,
-	monitor system.LogMonitor,
-	tracer trace.Tracer) *natsProvisionHandler {
+	monitor system.LogMonitor) *natsProvisionHandler {
 	return &natsProvisionHandler{
 		RetriableMessageProcessor: natsclient.RetriableMessageProcessor[model.OrchestrationManifest]{
 			Client:     client,
 			Monitor:    monitor,
 			Processing: atomic.Bool{},
-			Tracer:     tracer,
 			Dispatcher: func(ctx context.Context, manifest model.OrchestrationManifest) error {
+				tracer := otel.GetTracerProvider().Tracer("cfm.pmanager.provision")
 				_, span := tracer.Start(ctx, "Provision orchestration")
 				defer span.End()
 

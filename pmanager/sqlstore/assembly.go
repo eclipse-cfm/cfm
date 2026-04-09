@@ -20,7 +20,6 @@ import (
 	"github.com/eclipse-cfm/cfm/common/sqlstore"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
-	"github.com/eclipse-cfm/cfm/common/telemetry"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	_ "github.com/lib/pq" // Register PostgreSQL driver
 )
@@ -44,7 +43,7 @@ func (a *PostgresServiceAssembly) Provides() []system.ServiceType {
 }
 
 func (a *PostgresServiceAssembly) Requires() []system.ServiceType {
-	return []system.ServiceType{telemetry.TracerProviderKey}
+	return []system.ServiceType{}
 }
 
 func (a *PostgresServiceAssembly) Init(context *system.InitContext) error {

@@ -38,6 +38,7 @@ const (
 func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 	config := natsagent.LauncherConfig{
 		AgentName:    "Registration Agent",
+		ServiceName:  "cfm.agent.registration",
 		ConfigPrefix: "regagent",
 		ActivityType: ActivityType,
 		AssemblyProvider: func() []system.ServiceAssembly {

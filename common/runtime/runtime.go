@@ -13,6 +13,7 @@
 package runtime
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -22,6 +23,11 @@ import (
 	"syscall"
 
 	"github.com/eclipse-cfm/cfm/common/system"
+	"go.opentelemetry.io/contrib/exporters/autoexport"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -197,6 +203,38 @@ func CheckRequiredParams(params ...any) error {
 	if len(errors) > 0 {
 		return fmt.Errorf("missing parameters: %s", strings.Join(errors, ", "))
 	}
+
+	return nil
+}
+
+func SetupTelemetry(serviceName string, shutdown <-chan struct{}) error {
+	spanCtx := context.Background()
+	spanExporter, err := autoexport.NewSpanExporter(spanCtx)
+	if err != nil {
+		return err
+	}
+
+	res, err := resource.New(spanCtx,
+		resource.WithFromEnv(),
+		resource.WithAttributes(semconv.ServiceNameKey.String(serviceName)),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to set up telemetry for service '%w':  %w", serviceName, err)
+	}
+
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(spanExporter),
+		sdktrace.WithResource(res),
+	)
+	otel.SetTracerProvider(tp) // with this, just use otel.GetTracerProvider() to obtain it
+
+	go func() {
+		<-shutdown
+		if err := tp.Shutdown(spanCtx); err != nil {
+			// Log error but continue shutdown
+			_ = err
+		}
+	}()
 
 	return nil
 }

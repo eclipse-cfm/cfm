@@ -24,8 +24,8 @@ import (
 	"github.com/eclipse-cfm/cfm/common/types"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/trace"
 )
 
 // RetriableMessageProcessor delegates to a dispatcher to process messages from a JetStream consumer and retries on failure.
@@ -34,7 +34,6 @@ type RetriableMessageProcessor[T any] struct {
 	Dispatcher func(ctx context.Context, payload T) error
 	Monitor    system.LogMonitor
 	Processing atomic.Bool
-	Tracer     trace.Tracer
 }
 
 // ProcessLoop handles the main loop for consuming and processing messages from a JetStream consumer.
@@ -69,7 +68,7 @@ func (n *RetriableMessageProcessor[T]) ProcessMessage(ctx context.Context, messa
 	ctx = propagator.Extract(ctx, carrier)
 
 	// Start span with extracted context
-	ctx, span := n.Tracer.Start(ctx, "nats.process_message")
+	ctx, span := otel.GetTracerProvider().Tracer("cfm.natsclient").Start(ctx, "nats.process_message")
 	defer span.End()
 
 	var payload T

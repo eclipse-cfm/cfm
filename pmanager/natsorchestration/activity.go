@@ -95,7 +95,7 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 	ctx = propagator.Extract(ctx, carrier)
 
 	// Start span with extracted context
-	ctx, span := otel.GetTracerProvider().Tracer("activity.processor").Start(ctx, "activity.process_message")
+	ctx, span := otel.GetTracerProvider().Tracer("cfm.pmanager.orchestrator").Start(ctx, "activity.process_message")
 	defer span.End()
 
 	var oMessage api.ActivityMessage

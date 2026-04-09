@@ -23,8 +23,8 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/eclipse-cfm/cfm/pmanager/model/v1alpha1"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -33,10 +33,9 @@ type PMHandler struct {
 	provisionManager  api.ProvisionManager
 	definitionManager api.DefinitionManager
 	txContext         store.TransactionContext
-	tp                *sdktrace.TracerProvider
 }
 
-func NewHandler(provisionManager api.ProvisionManager, definitionManager api.DefinitionManager, txContext store.TransactionContext, monitor system.LogMonitor, tp *sdktrace.TracerProvider) *PMHandler {
+func NewHandler(provisionManager api.ProvisionManager, definitionManager api.DefinitionManager, txContext store.TransactionContext, monitor system.LogMonitor) *PMHandler {
 	return &PMHandler{
 		HttpHandler: handler.HttpHandler{
 			Monitor: monitor,
@@ -44,7 +43,6 @@ func NewHandler(provisionManager api.ProvisionManager, definitionManager api.Def
 		provisionManager:  provisionManager,
 		definitionManager: definitionManager,
 		txContext:         txContext,
-		tp:                tp,
 	}
 }
 
@@ -68,7 +66,7 @@ func (h *PMHandler) createActivityDefinition(w http.ResponseWriter, req *http.Re
 }
 
 func (h *PMHandler) createOrchestrationDefinition(w http.ResponseWriter, req *http.Request) {
-	_, span := h.tp.Tracer("handler").Start(req.Context(), "createOrchestrationDefinition")
+	_, span := otel.GetTracerProvider().Tracer("cfm.pmanager.handler").Start(req.Context(), "createOrchestrationDefinition")
 	defer span.End()
 	if h.InvalidMethod(w, req, http.MethodPost) {
 		return
