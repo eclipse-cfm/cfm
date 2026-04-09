@@ -59,7 +59,7 @@ func (p RegistrationActivityProcessor) ProcessDeploy(ctx api.ActivityContext) ap
 	}
 
 	holderID := registrationData.DID
-	if err := p.IssuerService.CreateHolder(registrationData.DID, holderID, registrationData.HolderName); err != nil {
+	if err := p.IssuerService.CreateHolder(ctx.Context(), registrationData.DID, holderID, registrationData.HolderName); err != nil {
 		span.RecordError(err)
 		// todo: inspect error if it is retryable
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating holder in ApiClient: %w", err)}
@@ -74,7 +74,7 @@ func (p RegistrationActivityProcessor) ProcessDispose(ctx api.ActivityContext) a
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Registration activity for orchestration %s: %w", ctx.OID(), err)}
 	}
 	holderID := registrationData.DID
-	if err := p.IssuerService.DeleteHolder(holderID); err != nil {
+	if err := p.IssuerService.DeleteHolder(ctx.Context(), holderID); err != nil {
 		// todo: inspect error if it is retryable
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("registration rollback: error deleting holder in IssuerService: %w", err)}
 	}

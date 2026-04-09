@@ -348,7 +348,7 @@ func TestDeleteParticipant(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.DeleteParticipantContext("test-participant")
+	err := client.DeleteParticipantContext(nil, "test-participant")
 	require.NoError(t, err)
 }
 
@@ -361,7 +361,7 @@ func TestDeleteParticipant_AuthError(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	require.ErrorContains(t, client.DeleteParticipantContext("test-participant"), "test error")
+	require.ErrorContains(t, client.DeleteParticipantContext(nil, "test-participant"), "test error")
 }
 
 func TestDeleteParticipant_NotFound(t *testing.T) {
@@ -378,7 +378,7 @@ func TestDeleteParticipant_NotFound(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	require.ErrorContains(t, client.DeleteParticipantContext("test-participant"), "not found in control plane")
+	require.ErrorContains(t, client.DeleteParticipantContext(nil, "test-participant"), "not found in control plane")
 }
 
 func TestDeleteParticipant_ServerError(t *testing.T) {
@@ -395,5 +395,5 @@ func TestDeleteParticipant_ServerError(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	require.ErrorContains(t, client.DeleteParticipantContext("test-participant"), "received status code 500")
+	require.ErrorContains(t, client.DeleteParticipantContext(nil, "test-participant"), "received status code 500")
 }

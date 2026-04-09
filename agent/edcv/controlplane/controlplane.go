@@ -16,6 +16,7 @@ package controlplane
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -75,10 +76,10 @@ type ParticipantContext struct {
 }
 
 type ManagementAPIClient interface {
-	CreateParticipantContext(manifest ParticipantContext) error
-	CreateConfig(participantContextID string, config ParticipantContextConfig) error
-	DeleteConfig(participantContextID string) error
-	DeleteParticipantContext(participantContextID string) error
+	CreateParticipantContext(ctx context.Context, manifest ParticipantContext) error
+	CreateConfig(ctx context.Context, participantContextID string, config ParticipantContextConfig) error
+	DeleteConfig(ctx context.Context, participantContextID string) error
+	DeleteParticipantContext(ctx context.Context, participantContextID string) error
 }
 
 type HttpManagementAPIClient struct {
@@ -87,19 +88,19 @@ type HttpManagementAPIClient struct {
 	HttpClient    *http.Client
 }
 
-func (h HttpManagementAPIClient) DeleteConfig(participantContextID string) error {
+func (h HttpManagementAPIClient) DeleteConfig(ctx context.Context, participantContextID string) error {
 	// fixme: there is no dedicated delete endpoint
 	return nil
 }
 
-func (h HttpManagementAPIClient) DeleteParticipantContext(participantContextID string) error {
-	accessToken, err := h.TokenProvider.GetToken()
+func (h HttpManagementAPIClient) DeleteParticipantContext(ctx context.Context, participantContextID string) error {
+	accessToken, err := h.TokenProvider.GetToken(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
 
 	url := fmt.Sprintf("%s%s/%s", h.BaseURL, CreateParticipantURL, participantContextID)
-	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return err
 	}
@@ -121,8 +122,8 @@ func (h HttpManagementAPIClient) DeleteParticipantContext(participantContextID s
 	}
 }
 
-func (h HttpManagementAPIClient) CreateParticipantContext(manifest ParticipantContext) error {
-	accessToken, err := h.TokenProvider.GetToken()
+func (h HttpManagementAPIClient) CreateParticipantContext(ctx context.Context, manifest ParticipantContext) error {
+	accessToken, err := h.TokenProvider.GetToken(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -142,7 +143,7 @@ func (h HttpManagementAPIClient) CreateParticipantContext(manifest ParticipantCo
 	}
 
 	url := h.BaseURL + CreateParticipantURL
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(payload))
 	if err != nil {
 		return err
 	}
@@ -163,8 +164,8 @@ func (h HttpManagementAPIClient) CreateParticipantContext(manifest ParticipantCo
 	return nil
 }
 
-func (h HttpManagementAPIClient) CreateConfig(participantContextID string, config ParticipantContextConfig) error {
-	accessToken, err := h.TokenProvider.GetToken()
+func (h HttpManagementAPIClient) CreateConfig(ctx context.Context, participantContextID string, config ParticipantContextConfig) error {
+	accessToken, err := h.TokenProvider.GetToken(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -183,7 +184,7 @@ func (h HttpManagementAPIClient) CreateConfig(participantContextID string, confi
 	}
 
 	url := fmt.Sprintf("%s%s/%s/config", h.BaseURL, CreateParticipantURL, participantContextID)
-	req, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewBuffer(payload))
 	if err != nil {
 		return err
 	}

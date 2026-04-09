@@ -15,6 +15,7 @@
 package oauth2
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -57,18 +58,18 @@ func NewTokenProvider(params Oauth2Params, client *http.Client) *TokenProvider {
 }
 
 // GetToken gets an OAuth2 token using the grant type specified in the Oauth2Params
-func (t *TokenProvider) GetToken() (string, error) {
+func (t *TokenProvider) GetToken(ctx context.Context) (string, error) {
 	switch t.tokenParams.GrantType {
 	case "client_credentials":
-		return t.getClientCredentialsToken()
+		return t.getClientCredentialsToken(ctx)
 	case "password":
-		return t.getPasswordCredentialsToken()
+		return t.getPasswordCredentialsToken(ctx)
 	default:
 		return "", fmt.Errorf("grant Type '%s' not supported", t.tokenParams.GrantType)
 	}
 }
 
-func (t *TokenProvider) getClientCredentialsToken() (string, error) {
+func (t *TokenProvider) getClientCredentialsToken(ctx context.Context) (string, error) {
 	tokenURL := t.tokenParams.TokenURL
 	clientID := t.tokenParams.ClientID
 	clientSecret := t.tokenParams.ClientSecret
@@ -80,7 +81,7 @@ func (t *TokenProvider) getClientCredentialsToken() (string, error) {
 
 	formData := fmt.Sprintf("client_id=%s&client_secret=%s&grant_type=%s", clientID, clientSecret, ClientCredentials)
 
-	req, err := http.NewRequest(http.MethodPost, tokenURL, strings.NewReader(formData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, strings.NewReader(formData))
 	if err != nil {
 		return "", fmt.Errorf("error creating token request: %w", err)
 	}
@@ -88,7 +89,7 @@ func (t *TokenProvider) getClientCredentialsToken() (string, error) {
 	return t.executeTokenRequest(req)
 }
 
-func (t *TokenProvider) getPasswordCredentialsToken() (string, error) {
+func (t *TokenProvider) getPasswordCredentialsToken(ctx context.Context) (string, error) {
 	username := t.tokenParams.UserName
 	password := t.tokenParams.Password
 	clientId := t.tokenParams.ClientID
@@ -102,7 +103,7 @@ func (t *TokenProvider) getPasswordCredentialsToken() (string, error) {
 	formData := fmt.Sprintf("username=%s&password=%s&client_id=%s&grant_type=password",
 		username, password, clientId)
 
-	req, err := http.NewRequest(http.MethodPost, tokenURL, strings.NewReader(formData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, strings.NewReader(formData))
 	if err != nil {
 		return "", fmt.Errorf("error creating token request: %w", err)
 	}

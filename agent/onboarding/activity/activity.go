@@ -83,7 +83,7 @@ func (p OnboardingActivityProcessor) ProcessDispose(ctx api.ActivityContext) api
 	for _, spec := range data.CredentialSpecs {
 		credentialType := spec.Type
 
-		credentials, err := p.IdentityApiClient.QueryCredentialByType(participantContextID, credentialType)
+		credentials, err := p.IdentityApiClient.QueryCredentialByType(ctx.Context(), participantContextID, credentialType)
 		if err != nil {
 			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error querying credentials by type %s for participant context %s: %w", credentialType, participantContextID, err)}
 		}
@@ -95,7 +95,7 @@ func (p OnboardingActivityProcessor) ProcessDispose(ctx api.ActivityContext) api
 
 		// for each credential, send a revocation request
 		for _, credential := range credentials {
-			err := p.IssuerServiceApiClient.RevokeCredential(participantContextID, credential.VerifiableCredential.Credential.ID)
+			err := p.IssuerServiceApiClient.RevokeCredential(ctx.Context(), participantContextID, credential.VerifiableCredential.Credential.ID)
 			if err != nil {
 				revocationErrors = append(revocationErrors, err)
 			}
@@ -114,7 +114,7 @@ func (p OnboardingActivityProcessor) processExistingRequest(ctx api.ActivityCont
 	_, span := tracer.Start(ctx.Context(), "cfm.agent.onboarding.deploy.check-credentials", trace.WithSpanKind(trace.SpanKindClient))
 	defer span.End()
 
-	state, err := p.IdentityApiClient.GetCredentialRequestState(credentialRequest.ParticipantContextID, credentialRequest.HolderPID)
+	state, err := p.IdentityApiClient.GetCredentialRequestState(ctx.Context(), credentialRequest.ParticipantContextID, credentialRequest.HolderPID)
 	if err != nil {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error getting credential request state: %w", err)}
 	}
@@ -175,7 +175,7 @@ func (p OnboardingActivityProcessor) processNewRequest(ctx api.ActivityContext, 
 		Credentials: credentials,
 	}
 	// make credential request
-	location, err := p.IdentityApiClient.RequestCredentials(credentialRequest.ParticipantContextID, cr)
+	location, err := p.IdentityApiClient.RequestCredentials(ctx.Context(), credentialRequest.ParticipantContextID, cr)
 	if err != nil {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error requesting credentials: %w", err)}
 	}

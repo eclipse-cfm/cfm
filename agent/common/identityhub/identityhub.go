@@ -16,6 +16,7 @@ package identityhub
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -36,11 +37,11 @@ const (
 )
 
 type IdentityAPIClient interface {
-	CreateParticipantContext(manifest ParticipantManifest) (*CreateParticipantContextResponse, error)
-	RequestCredentials(participantContextID string, credentialRequest CredentialRequest) (string, error)
-	GetCredentialRequestState(participantContextID string, credentialRequestID string) (string, error)
-	QueryCredentialByType(participantContextID string, credentialType string) ([]VerifiableCredentialResource, error)
-	DeleteParticipantContext(participantContextID string) error
+	CreateParticipantContext(ctx context.Context, manifest ParticipantManifest) (*CreateParticipantContextResponse, error)
+	RequestCredentials(ctx context.Context, participantContextID string, credentialRequest CredentialRequest) (string, error)
+	GetCredentialRequestState(ctx context.Context, participantContextID string, credentialRequestID string) (string, error)
+	QueryCredentialByType(ctx context.Context, participantContextID string, credentialType string) ([]VerifiableCredentialResource, error)
+	DeleteParticipantContext(ctx context.Context, participantContextID string) error
 }
 
 type HttpIdentityAPIClient struct {
@@ -49,14 +50,14 @@ type HttpIdentityAPIClient struct {
 	HttpClient    *http.Client
 }
 
-func (a HttpIdentityAPIClient) DeleteParticipantContext(participantContextID string) error {
-	accessToken, err := a.TokenProvider.GetToken()
+func (a HttpIdentityAPIClient) DeleteParticipantContext(ctx context.Context, participantContextID string) error {
+	accessToken, err := a.TokenProvider.GetToken(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
 
 	url := fmt.Sprintf("%s/v1alpha/participants/%s", a.BaseURL, participantContextID)
-	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return err
 	}
@@ -77,15 +78,15 @@ func (a HttpIdentityAPIClient) DeleteParticipantContext(participantContextID str
 	}
 }
 
-func (a HttpIdentityAPIClient) QueryCredentialByType(participantContextID string, credentialType string) ([]VerifiableCredentialResource, error) {
+func (a HttpIdentityAPIClient) QueryCredentialByType(ctx context.Context, participantContextID string, credentialType string) ([]VerifiableCredentialResource, error) {
 
-	accessToken, err := a.TokenProvider.GetToken()
+	accessToken, err := a.TokenProvider.GetToken(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get API access token: %w", err)
 	}
 
 	url := fmt.Sprintf("%s/v1alpha/participants/%s/credentials?type=%s", a.BaseURL, participantContextID, credentialType)
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -112,8 +113,8 @@ func (a HttpIdentityAPIClient) QueryCredentialByType(participantContextID string
 	return credentials, nil
 }
 
-func (a HttpIdentityAPIClient) RequestCredentials(participantContextID string, credentialRequest CredentialRequest) (string, error) {
-	accessToken, err := a.TokenProvider.GetToken() // this should be the participant context's access token!
+func (a HttpIdentityAPIClient) RequestCredentials(ctx context.Context, participantContextID string, credentialRequest CredentialRequest) (string, error) {
+	accessToken, err := a.TokenProvider.GetToken(ctx) // this should be the participant context's access token!
 	if err != nil {
 		return "", fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -124,7 +125,7 @@ func (a HttpIdentityAPIClient) RequestCredentials(participantContextID string, c
 	}
 
 	url := fmt.Sprintf("%s/v1alpha/participants/%s/credentials/request", a.BaseURL, participantContextID)
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(payload))
 	if err != nil {
 		return "", err
 	}
@@ -149,14 +150,14 @@ func (a HttpIdentityAPIClient) RequestCredentials(participantContextID string, c
 	return location, nil
 }
 
-func (a HttpIdentityAPIClient) GetCredentialRequestState(participantContextID string, credentialRequestID string) (string, error) {
-	accessToken, err := a.TokenProvider.GetToken()
+func (a HttpIdentityAPIClient) GetCredentialRequestState(ctx context.Context, participantContextID string, credentialRequestID string) (string, error) {
+	accessToken, err := a.TokenProvider.GetToken(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get API access token: %w", err)
 	}
 
 	url := fmt.Sprintf("%s/v1alpha/participants/%s/credentials/request/%s", a.BaseURL, participantContextID, credentialRequestID)
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return "", err
 	}
@@ -188,8 +189,8 @@ func (a HttpIdentityAPIClient) GetCredentialRequestState(participantContextID st
 	return stateStr, nil
 }
 
-func (a HttpIdentityAPIClient) CreateParticipantContext(manifest ParticipantManifest) (*CreateParticipantContextResponse, error) {
-	accessToken, err := a.TokenProvider.GetToken()
+func (a HttpIdentityAPIClient) CreateParticipantContext(ctx context.Context, manifest ParticipantManifest) (*CreateParticipantContextResponse, error) {
+	accessToken, err := a.TokenProvider.GetToken(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -241,7 +242,7 @@ func (a HttpIdentityAPIClient) CreateParticipantContext(manifest ParticipantMani
 	}
 
 	url := a.BaseURL + CreateParticipantURL
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(payload))
 	if err != nil {
 		return nil, err
 	}

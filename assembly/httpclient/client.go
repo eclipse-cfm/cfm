@@ -59,7 +59,10 @@ func (h HttpClientServiceAssembly) Init(context *system.InitContext) error {
 	standardClient := retryClient.StandardClient()
 
 	// Wrap the client with OpenTelemetry instrumentation
-	standardClient.Transport = otelhttp.NewTransport(standardClient.Transport)
+	standardClient.Transport = otelhttp.NewTransport(standardClient.Transport,
+		otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
+			return r.Method + " " + r.URL.Path
+		}))
 
 	context.Registry.Register(serviceapi.HttpClientKey, *standardClient)
 

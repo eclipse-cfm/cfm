@@ -14,8 +14,10 @@
 
 package token
 
+import "context"
+
 // TokenProvider gets tokens, most likely access tokens, API Keys, OAuth2 tokens, etc.
 type TokenProvider interface {
-	GetToken() (string, error)
+	GetToken(ctx context.Context) (string, error)
 	// todo: implement refresh
 }

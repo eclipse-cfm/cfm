@@ -16,6 +16,7 @@ package issuerservice
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -25,9 +26,9 @@ import (
 )
 
 type ApiClient interface {
-	CreateHolder(did string, holderID string, name string) error
-	DeleteHolder(holderID string) error
-	RevokeCredential(participantContextID string, credentialID string) error
+	CreateHolder(ctx context.Context, did string, holderID string, name string) error
+	DeleteHolder(ctx context.Context, holderID string) error
+	RevokeCredential(ctx context.Context, participantContextID string, credentialID string) error
 }
 
 type HttpApiClient struct {
@@ -37,14 +38,14 @@ type HttpApiClient struct {
 	HttpClient    *http.Client
 }
 
-func (i HttpApiClient) DeleteHolder(holderID string) error {
-	accessToken, err := i.TokenProvider.GetToken()
+func (i HttpApiClient) DeleteHolder(ctx context.Context, holderID string) error {
+	accessToken, err := i.TokenProvider.GetToken(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
 
 	url := fmt.Sprintf("%s/v1alpha/participants/%s/holders/%s", i.BaseURL, i.IssuerID, holderID)
-	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return err
 	}
@@ -66,8 +67,8 @@ func (i HttpApiClient) DeleteHolder(holderID string) error {
 	return nil
 }
 
-func (i HttpApiClient) CreateHolder(did string, holderID string, name string) error {
-	accessToken, err := i.TokenProvider.GetToken()
+func (i HttpApiClient) CreateHolder(ctx context.Context, did string, holderID string, name string) error {
+	accessToken, err := i.TokenProvider.GetToken(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -84,7 +85,7 @@ func (i HttpApiClient) CreateHolder(did string, holderID string, name string) er
 	}
 
 	url := fmt.Sprintf("%s/v1alpha/participants/%s/holders", i.BaseURL, i.IssuerID)
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(payload))
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}
@@ -108,13 +109,13 @@ func (i HttpApiClient) CreateHolder(did string, holderID string, name string) er
 	return nil
 }
 
-func (i HttpApiClient) RevokeCredential(participantContextID string, credentialID string) error {
-	accessToken, err := i.TokenProvider.GetToken()
+func (i HttpApiClient) RevokeCredential(ctx context.Context, participantContextID string, credentialID string) error {
+	accessToken, err := i.TokenProvider.GetToken(ctx)
 	if err != nil {
 		return err
 	}
 	url := fmt.Sprintf("%s/v1alpha/participants/%s/credentials/%s/revoke", i.BaseURL, participantContextID, credentialID)
-	req, err := http.NewRequest(http.MethodPost, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
 	if err != nil {
 		return err
 	}
