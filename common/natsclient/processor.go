@@ -25,7 +25,6 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/propagation"
 )
 
 // RetriableMessageProcessor delegates to a dispatcher to process messages from a JetStream consumer and retries on failure.
@@ -63,7 +62,7 @@ func (n *RetriableMessageProcessor[T]) ProcessLoop(ctx context.Context, consumer
 
 func (n *RetriableMessageProcessor[T]) ProcessMessage(ctx context.Context, message jetstream.Msg) error {
 	// Extract trace context from message headers
-	propagator := propagation.TraceContext{}
+	propagator := otel.GetTextMapPropagator()
 	carrier := &natsHeaderCarrier{headers: message.Headers()}
 	ctx = propagator.Extract(ctx, carrier)
 

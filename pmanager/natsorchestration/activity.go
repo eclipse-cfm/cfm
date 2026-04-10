@@ -109,13 +109,13 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 		traceParent := orchestration.ProcessingData["trace_context"].(string)
 		e.Monitor.Infof("Telemetry: continue trace from Orchestration's traceparent: %s", traceParent)
 		carrier := propagation.MapCarrier{"traceparent": traceParent}
-		ctx = propagation.TraceContext{}.Extract(ctx, carrier)
+		ctx = otel.GetTextMapPropagator().Extract(ctx, carrier)
 		delete(orchestration.ProcessingData, "trace_context") // Clean up trace context from processing data after restoring it
 	} else {
 		e.Monitor.Debugf("Telemetry: continue trace from NATS message")
 		// Extract trace context from message headers
 		carrier := &natsHeaderCarrier{headers: message.Headers()}
-		ctx = propagation.TraceContext{}.Extract(ctx, carrier)
+		ctx = otel.GetTextMapPropagator().Extract(ctx, carrier)
 	}
 
 	// Start span with extracted context
@@ -156,7 +156,7 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 
 		// Inject trace context into processing data so that subsequent executions are under the same trace-id
 		m := propagation.MapCarrier{}
-		propagation.TraceContext{}.Inject(ctx, m)
+		otel.GetTextMapPropagator().Inject(ctx, m)
 		if m["traceparent"] != "" {
 			orchestration.ProcessingData["trace_context"] = m["traceparent"]
 		}

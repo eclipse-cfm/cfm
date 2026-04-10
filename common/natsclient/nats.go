@@ -22,6 +22,7 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 )
 
@@ -114,7 +115,7 @@ func (a natsClientAdapter) Get(ctx context.Context, key string) (jetstream.KeyVa
 
 func (a natsClientAdapter) Publish(ctx context.Context, subject string, payload []byte, opts ...jetstream.PublishOpt) (*jetstream.PubAck, error) {
 	headers := nats.Header{}
-	propagation.TraceContext{}.Inject(ctx, propagation.HeaderCarrier(headers))
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(headers))
 	natsMsg := &nats.Msg{
 		Header:  headers,
 		Data:    payload,

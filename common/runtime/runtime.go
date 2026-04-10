@@ -25,6 +25,7 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"go.opentelemetry.io/contrib/exporters/autoexport"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
@@ -227,6 +228,10 @@ func SetupTelemetry(serviceName string, shutdown <-chan struct{}) error {
 		sdktrace.WithResource(res),
 	)
 	otel.SetTracerProvider(tp) // with this, just use otel.GetTracerProvider() to obtain it
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	))
 
 	go func() {
 		<-shutdown

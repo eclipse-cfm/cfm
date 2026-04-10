@@ -21,6 +21,7 @@ import (
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/nats-io/nats.go"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 )
 
@@ -42,7 +43,7 @@ func EnqueueActivityMessages(ctx context.Context, orchestrationID string, activi
 		// Strip out periods since they denote a subject hierarchy for NATS
 		subject := natsclient.CFMSubjectPrefix + "." + strings.ReplaceAll(activity.Type.String(), ".", "-")
 		headers := nats.Header{}
-		propagation.TraceContext{}.Inject(ctx, propagation.HeaderCarrier(headers))
+		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(headers))
 
 		msg := &nats.Msg{
 			Subject: subject,
