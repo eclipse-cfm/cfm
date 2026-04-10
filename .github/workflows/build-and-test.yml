@@ -28,3 +28,5 @@ jobs:
 
       - name: "Run tests"
         run: make test TEST_FORMAT=github-actions
+        env:
+          OTEL_SDK_DISABLED: "true"
