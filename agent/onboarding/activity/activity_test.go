@@ -488,24 +488,24 @@ type MockIdentityHubClient struct {
 	expectedCredentials []identityhub.VerifiableCredentialResource
 }
 
-func (m MockIdentityHubClient) QueryCredentialByType(participantContextID string, credentialType string) ([]identityhub.VerifiableCredentialResource, error) {
+func (m MockIdentityHubClient) QueryCredentialByType(ctx context.Context, participantContextID string, credentialType string) ([]identityhub.VerifiableCredentialResource, error) {
 	return m.expectedCredentials, m.expectedError
 }
 
-func (m MockIdentityHubClient) DeleteParticipantContext(participantContextID string) error {
+func (m MockIdentityHubClient) DeleteParticipantContext(ctx context.Context, participantContextID string) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (m MockIdentityHubClient) CreateParticipantContext(identityhub.ParticipantManifest) (*identityhub.CreateParticipantContextResponse, error) {
+func (m MockIdentityHubClient) CreateParticipantContext(context.Context, identityhub.ParticipantManifest) (*identityhub.CreateParticipantContextResponse, error) {
 	panic("not used here")
 }
 
-func (m MockIdentityHubClient) RequestCredentials(string, identityhub.CredentialRequest) (string, error) {
+func (m MockIdentityHubClient) RequestCredentials(context.Context, string, identityhub.CredentialRequest) (string, error) {
 	return m.expectedURL, m.expectedError
 }
 
-func (m MockIdentityHubClient) GetCredentialRequestState(string, string) (string, error) {
+func (m MockIdentityHubClient) GetCredentialRequestState(context.Context, string, string) (string, error) {
 	return m.expectedState, m.expectedError
 }
 
@@ -513,15 +513,15 @@ type MockIssuerServiceApiClient struct {
 	expectedError error
 }
 
-func (m MockIssuerServiceApiClient) DeleteHolder(holderID string) error {
+func (m MockIssuerServiceApiClient) DeleteHolder(ctx context.Context, holderID string) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (m MockIssuerServiceApiClient) CreateHolder(did string, holderID string, name string) error {
+func (m MockIssuerServiceApiClient) CreateHolder(ctx context.Context, did string, holderID string, name string) error {
 	return m.expectedError
 }
 
-func (m MockIssuerServiceApiClient) RevokeCredential(participantContextID string, credentialID string) error {
+func (m MockIssuerServiceApiClient) RevokeCredential(ctx context.Context, participantContextID string, credentialID string) error {
 	return m.expectedError
 }

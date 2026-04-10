@@ -21,6 +21,7 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/hashicorp/go-retryablehttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
 )
 
 const (
@@ -60,6 +61,7 @@ func (h HttpClientServiceAssembly) Init(context *system.InitContext) error {
 
 	// Wrap the client with OpenTelemetry instrumentation
 	standardClient.Transport = otelhttp.NewTransport(standardClient.Transport,
+		otelhttp.WithTracerProvider(otel.GetTracerProvider()),
 		otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
 			return r.Method + " " + r.URL.Path
 		}))

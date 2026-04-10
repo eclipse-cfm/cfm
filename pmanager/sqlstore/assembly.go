@@ -64,7 +64,11 @@ func (a *PostgresServiceAssembly) Init(context *system.InitContext) error {
 	txContext := sqlstore.NewDBTransactionContext(db)
 	context.Registry.Register(store.TransactionContextKey, txContext)
 
-	return createTables(db)
+	err = createTables(db)
+	if err != nil {
+		context.LogMonitor.Warnw("Failed to create tables", "error", err)
+	}
+	return nil
 }
 
 func (a *PostgresServiceAssembly) Finalize() error {

@@ -157,7 +157,9 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 		// Inject trace context into processing data so that subsequent executions are under the same trace-id
 		m := propagation.MapCarrier{}
 		propagation.TraceContext{}.Inject(ctx, m)
-		orchestration.ProcessingData["trace_context"] = m["traceparent"]
+		if m["traceparent"] != "" {
+			orchestration.ProcessingData["trace_context"] = m["traceparent"]
+		}
 
 		e.persistState(activityContext, orchestration, revision)
 		if err := message.NakWithDelay(result.WaitOnReschedule); err != nil {

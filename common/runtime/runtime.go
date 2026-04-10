@@ -219,7 +219,7 @@ func SetupTelemetry(serviceName string, shutdown <-chan struct{}) error {
 		resource.WithAttributes(semconv.ServiceNameKey.String(serviceName)),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to set up telemetry for service '%w':  %w", serviceName, err)
+		return fmt.Errorf("failed to set up telemetry for service '%s':  %w", serviceName, err)
 	}
 
 	tp := sdktrace.NewTracerProvider(

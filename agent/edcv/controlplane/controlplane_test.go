@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/eclipse-cfm/cfm/common/mocks"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -144,7 +145,7 @@ func TestCreateParticipant(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("token", nil)
+	tp.On("GetToken", mock.Anything).Return("token", nil)
 	client := HttpManagementAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -158,13 +159,13 @@ func TestCreateParticipant(t *testing.T) {
 		State:                ParticipantContextStateActivated,
 	}
 
-	err := client.CreateParticipantContext(context)
+	err := client.CreateParticipantContext(t.Context(), context)
 	require.NoError(t, err)
 }
 
 func TestCreateParticipant_AuthError(t *testing.T) {
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("", fmt.Errorf("test error"))
+	tp.On("GetToken", mock.Anything).Return("", fmt.Errorf("test error"))
 	client := HttpManagementAPIClient{
 		BaseURL:       "http://foo.bar",
 		TokenProvider: tp,
@@ -178,7 +179,7 @@ func TestCreateParticipant_AuthError(t *testing.T) {
 		State:                ParticipantContextStateActivated,
 	}
 
-	require.ErrorContains(t, client.CreateParticipantContext(context), "test error")
+	require.ErrorContains(t, client.CreateParticipantContext(t.Context(), context), "test error")
 }
 
 func TestCreateParticipant_BadRequest(t *testing.T) {
@@ -188,7 +189,7 @@ func TestCreateParticipant_BadRequest(t *testing.T) {
 	}))
 	defer server.Close()
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("test token", nil)
+	tp.On("GetToken", mock.Anything).Return("test token", nil)
 	client := HttpManagementAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -202,7 +203,7 @@ func TestCreateParticipant_BadRequest(t *testing.T) {
 		State:                ParticipantContextStateActivated,
 	}
 
-	require.ErrorContains(t, client.CreateParticipantContext(context), "received status code 400")
+	require.ErrorContains(t, client.CreateParticipantContext(t.Context(), context), "received status code 400")
 }
 
 func TestCreateParticipant_Conflict(t *testing.T) {
@@ -212,7 +213,7 @@ func TestCreateParticipant_Conflict(t *testing.T) {
 	}))
 	defer server.Close()
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("test token", nil)
+	tp.On("GetToken", mock.Anything).Return("test token", nil)
 	client := HttpManagementAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -226,7 +227,7 @@ func TestCreateParticipant_Conflict(t *testing.T) {
 		State:                ParticipantContextStateActivated,
 	}
 
-	require.ErrorContains(t, client.CreateParticipantContext(context), "received status code 409")
+	require.ErrorContains(t, client.CreateParticipantContext(t.Context(), context), "received status code 409")
 }
 
 func TestCreateParticipantConfig(t *testing.T) {
@@ -249,7 +250,7 @@ func TestCreateParticipantConfig(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("token", nil)
+	tp.On("GetToken", mock.Anything).Return("token", nil)
 	client := HttpManagementAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -262,13 +263,13 @@ func TestCreateParticipantConfig(t *testing.T) {
 		SecretEntries:        map[string]string{"secret-foo": "secret-bar"},
 	}
 
-	err := client.CreateConfig("test-participant", context)
+	err := client.CreateConfig(t.Context(), "test-participant", context)
 	require.NoError(t, err)
 }
 
 func TestCreateParticipantConfig_AuthError(t *testing.T) {
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("", fmt.Errorf("test error"))
+	tp.On("GetToken", mock.Anything).Return("", fmt.Errorf("test error"))
 	client := HttpManagementAPIClient{
 		BaseURL:       "http://foo.bar",
 		TokenProvider: tp,
@@ -281,7 +282,7 @@ func TestCreateParticipantConfig_AuthError(t *testing.T) {
 		SecretEntries:        map[string]string{"secret-foo": "secret-bar"},
 	}
 
-	require.ErrorContains(t, client.CreateConfig("test-participant", context), "test error")
+	require.ErrorContains(t, client.CreateConfig(t.Context(), "test-participant", context), "test error")
 }
 
 func TestCreateParticipantConfig_BadRequest(t *testing.T) {
@@ -291,7 +292,7 @@ func TestCreateParticipantConfig_BadRequest(t *testing.T) {
 	}))
 	defer server.Close()
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("test token", nil)
+	tp.On("GetToken", mock.Anything).Return("test token", nil)
 	client := HttpManagementAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -304,7 +305,7 @@ func TestCreateParticipantConfig_BadRequest(t *testing.T) {
 		SecretEntries:        map[string]string{"secret-foo": "secret-bar"},
 	}
 
-	require.ErrorContains(t, client.CreateConfig("test-participant", context), "foobar")
+	require.ErrorContains(t, client.CreateConfig(t.Context(), "test-participant", context), "foobar")
 }
 
 func TestCreateParticipantConfig_Conflict(t *testing.T) {
@@ -314,7 +315,7 @@ func TestCreateParticipantConfig_Conflict(t *testing.T) {
 	}))
 	defer server.Close()
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("test token", nil)
+	tp.On("GetToken", mock.Anything).Return("test token", nil)
 	client := HttpManagementAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -327,7 +328,7 @@ func TestCreateParticipantConfig_Conflict(t *testing.T) {
 		SecretEntries:        map[string]string{"secret-foo": "secret-bar"},
 	}
 
-	require.ErrorContains(t, client.CreateConfig("test-participant", context), "foobar")
+	require.ErrorContains(t, client.CreateConfig(t.Context(), "test-participant", context), "foobar")
 }
 
 func TestDeleteParticipant(t *testing.T) {
@@ -341,27 +342,27 @@ func TestDeleteParticipant(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("token", nil)
+	tp.On("GetToken", mock.Anything).Return("token", nil)
 	client := HttpManagementAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.DeleteParticipantContext(nil, "test-participant")
+	err := client.DeleteParticipantContext(t.Context(), "test-participant")
 	require.NoError(t, err)
 }
 
 func TestDeleteParticipant_AuthError(t *testing.T) {
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("", fmt.Errorf("test error"))
+	tp.On("GetToken", mock.Anything).Return("", fmt.Errorf("test error"))
 	client := HttpManagementAPIClient{
 		BaseURL:       "http://foo.bar",
 		TokenProvider: tp,
 		HttpClient:    &http.Client{},
 	}
 
-	require.ErrorContains(t, client.DeleteParticipantContext(nil, "test-participant"), "test error")
+	require.ErrorContains(t, client.DeleteParticipantContext(t.Context(), "test-participant"), "test error")
 }
 
 func TestDeleteParticipant_NotFound(t *testing.T) {
@@ -371,14 +372,14 @@ func TestDeleteParticipant_NotFound(t *testing.T) {
 	}))
 	defer server.Close()
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("test token", nil)
+	tp.On("GetToken", mock.Anything).Return("test token", nil)
 	client := HttpManagementAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
 		HttpClient:    &http.Client{},
 	}
 
-	require.ErrorContains(t, client.DeleteParticipantContext(nil, "test-participant"), "not found in control plane")
+	require.ErrorContains(t, client.DeleteParticipantContext(t.Context(), "test-participant"), "not found in control plane")
 }
 
 func TestDeleteParticipant_ServerError(t *testing.T) {
@@ -388,12 +389,12 @@ func TestDeleteParticipant_ServerError(t *testing.T) {
 	}))
 	defer server.Close()
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("test token", nil)
+	tp.On("GetToken", mock.Anything).Return("test token", nil)
 	client := HttpManagementAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
 		HttpClient:    &http.Client{},
 	}
 
-	require.ErrorContains(t, client.DeleteParticipantContext(nil, "test-participant"), "received status code 500")
+	require.ErrorContains(t, client.DeleteParticipantContext(t.Context(), "test-participant"), "received status code 500")
 }
