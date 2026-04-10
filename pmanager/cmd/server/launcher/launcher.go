@@ -80,5 +80,8 @@ func Launch(shutdown <-chan struct{}) {
 	assembler.Register(natsprovision.NewProvisionServiceAssembly(streamValue))
 	assembler.Register(&core.PMCoreServiceAssembly{})
 
+	if err := runtime.SetupTelemetry("cfm.pmanager", shutdown); err != nil {
+		logMonitor.Warnf("Error setting up telemetry: %s. Traces and metrics will not be available.", err.Error())
+	}
 	runtime.AssembleAndLaunch(assembler, "Provision Manager", logMonitor, shutdown)
 }

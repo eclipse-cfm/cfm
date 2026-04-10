@@ -13,6 +13,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 
 	. "github.com/eclipse-cfm/cfm/common/collection"
@@ -22,6 +23,9 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/eclipse-cfm/cfm/pmanager/model/v1alpha1"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type PMHandler struct {
@@ -31,11 +35,7 @@ type PMHandler struct {
 	txContext         store.TransactionContext
 }
 
-func NewHandler(
-	provisionManager api.ProvisionManager,
-	definitionManager api.DefinitionManager,
-	txContext store.TransactionContext,
-	monitor system.LogMonitor) *PMHandler {
+func NewHandler(provisionManager api.ProvisionManager, definitionManager api.DefinitionManager, txContext store.TransactionContext, monitor system.LogMonitor) *PMHandler {
 	return &PMHandler{
 		HttpHandler: handler.HttpHandler{
 			Monitor: monitor,
@@ -66,6 +66,8 @@ func (h *PMHandler) createActivityDefinition(w http.ResponseWriter, req *http.Re
 }
 
 func (h *PMHandler) createOrchestrationDefinition(w http.ResponseWriter, req *http.Request) {
+	_, span := otel.GetTracerProvider().Tracer("cfm.pmanager.handler").Start(req.Context(), "createOrchestrationDefinition")
+	defer span.End()
 	if h.InvalidMethod(w, req, http.MethodPost) {
 		return
 	}
@@ -75,6 +77,8 @@ func (h *PMHandler) createOrchestrationDefinition(w http.ResponseWriter, req *ht
 		return
 	}
 
+	span.SetAttributes(attribute.String("orchestration.template_id", orchestrationTemplate.ID))
+	span.AddEvent("Payload read successfully")
 	hasCompensation := false
 	for key, activities := range orchestrationTemplate.Activities {
 		if key == model.VPADisposeType.String() && len(activities) > 0 {
@@ -82,6 +86,7 @@ func (h *PMHandler) createOrchestrationDefinition(w http.ResponseWriter, req *ht
 		}
 	}
 	if !hasCompensation {
+		span.RecordError(fmt.Errorf("no compensation activity found"))
 		h.Monitor.Warnf("Orchestration template does not contain a compensation activity. Compensation orchestration definitions will not be created for orchestration template [%s] and auto-rollback will not be available", orchestrationTemplate.ID)
 	}
 
@@ -90,8 +95,10 @@ func (h *PMHandler) createOrchestrationDefinition(w http.ResponseWriter, req *ht
 		_, err := h.definitionManager.CreateOrchestrationDefinition(req.Context(), def)
 		if err != nil {
 			h.HandleError(w, err)
+			span.RecordError(err)
 			return
 		}
+		span.AddEvent("Orchestration definition created", trace.WithAttributes(attribute.String("orchestration.definition_id", def.GetID())))
 	}
 
 	h.ResponseCreated(w, v1alpha1.IDResponse{ID: templateRef, Description: "ID of the Orchestration Template"})

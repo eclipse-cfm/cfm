@@ -153,7 +153,7 @@ func (v *vaultClient) init(ctx context.Context) error {
 }
 
 func (v *vaultClient) createToken(ctx context.Context) (*hvault.Response[map[string]any], error) {
-	jwt, err := getVaultAccessToken(v.clientID, v.clientSecret, v.tokenUrl)
+	jwt, err := getVaultAccessToken(ctx, v.clientID, v.clientSecret, v.tokenUrl)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get Vault access token: %w", err)
 	}
@@ -174,12 +174,12 @@ func (v *vaultClient) createToken(ctx context.Context) (*hvault.Response[map[str
 	return loginResult, err
 }
 
-func getVaultAccessToken(clientId string, secret string, tokenUrl string) (string, error) {
+func getVaultAccessToken(ctx context.Context, clientId string, secret string, tokenUrl string) (string, error) {
 
 	formData := strings.NewReader(fmt.Sprintf("client_id=%s&client_secret=%s&grant_type=client_credentials",
 		clientId, secret))
 
-	req, err := http.NewRequest("POST", tokenUrl, formData)
+	req, err := http.NewRequestWithContext(ctx, "POST", tokenUrl, formData)
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}

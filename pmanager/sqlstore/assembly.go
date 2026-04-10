@@ -16,6 +16,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/XSAM/otelsql"
 	"github.com/eclipse-cfm/cfm/common/sqlstore"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
@@ -41,6 +42,10 @@ func (a *PostgresServiceAssembly) Provides() []system.ServiceType {
 	return []system.ServiceType{api.DefinitionStoreKey, api.OrchestrationIndexKey, store.TransactionContextKey}
 }
 
+func (a *PostgresServiceAssembly) Requires() []system.ServiceType {
+	return []system.ServiceType{}
+}
+
 func (a *PostgresServiceAssembly) Init(context *system.InitContext) error {
 	context.Registry.Register(api.DefinitionStoreKey, newPostgresDefinitionStore())
 	context.Registry.Register(api.OrchestrationIndexKey, newOrchestrationEntryStore())
@@ -50,7 +55,7 @@ func (a *PostgresServiceAssembly) Init(context *system.InitContext) error {
 	}
 	dsn := context.Config.GetString(dsnKey)
 
-	db, err := sql.Open(driverName, dsn)
+	db, err := otelsql.Open(driverName, dsn)
 	if err != nil {
 		return fmt.Errorf("error connecting to DB at %s: %w", dsn, err)
 	}
@@ -59,8 +64,10 @@ func (a *PostgresServiceAssembly) Init(context *system.InitContext) error {
 	txContext := sqlstore.NewDBTransactionContext(db)
 	context.Registry.Register(store.TransactionContextKey, txContext)
 
-	createTables(db)
-
+	err = createTables(db)
+	if err != nil {
+		context.LogMonitor.Warnw("Failed to create tables", "error", err)
+	}
 	return nil
 }
 

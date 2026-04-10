@@ -33,6 +33,7 @@ type LauncherConfig struct {
 	ActivityType     string
 	AssemblyProvider func() []system.ServiceAssembly
 	NewProcessor     func(ctx *AgentContext) api.ActivityProcessor
+	ServiceName      string
 }
 
 type AgentContext struct {
@@ -87,6 +88,10 @@ func LaunchAgent(shutdown <-chan struct{}, config LauncherConfig) {
 	}
 
 	assembler.Register(agentAssembly)
+
+	if err := runtime.SetupTelemetry(config.ServiceName, shutdown); err != nil {
+		monitor.Warnf("Error setting up telemetry: %s. Traces and metrics will not be available.", err.Error())
+	}
 
 	runtime.AssembleAndLaunch(assembler, cfg.Name, monitor, shutdown)
 }

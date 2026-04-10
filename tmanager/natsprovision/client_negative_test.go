@@ -226,7 +226,7 @@ type mockJetStreamMsg struct {
 }
 
 func (m *mockJetStreamMsg) Headers() nats.Header {
-	panic("not implemented")
+	return nats.Header{}
 }
 
 func (m *mockJetStreamMsg) Metadata() (*jetstream.MsgMetadata, error) {

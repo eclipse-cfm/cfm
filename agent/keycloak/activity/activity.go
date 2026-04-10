@@ -14,6 +14,7 @@ package activity
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -26,6 +27,9 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -36,6 +40,7 @@ const (
 	vaultAccessClientIDKey  = "clientID.vaultAccess"
 	apiAccessClientIDKey    = "clientID.apiAccess"
 	participantContextIDKey = "participantContextId"
+	tracerName              = "cfm.agent.keycloak"
 )
 
 type Config struct {
@@ -200,6 +205,10 @@ func NewProcessor(config *Config) *KeyCloakActivityProcessor {
 }
 
 func (p KeyCloakActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
+
+	_, span := otel.GetTracerProvider().Tracer(tracerName).Start(ctx.Context(), "agent.kcagent.deploy")
+	defer span.End()
+
 	clientIDSlug := generateClientID()
 
 	// create Keycloak client for API access
@@ -210,9 +219,12 @@ func (p KeyCloakActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.Ac
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}
 	}
 	apiClientResult := p.provisionConfidentialClient(apiClient, ctx)
+	span.AddEvent("API client created")
 	p.monitor.Debugf("created API Access client: %s", apiClient.ClientId)
 	ctx.SetValue(apiAccessClientIDKey, apiClient.ClientId)
 	ctx.SetOutputValue(participantContextIDKey, participantContextID)
+	span.SetAttributes(attribute.String("api.client.id", apiClient.ClientId), attribute.String(participantContextIDKey, participantContextID))
+
 	if apiClientResult.Result != api.ActivityResultComplete {
 		p.monitor.Warnw("Provisioning API Access client not complete. Result was %s, error: %s", apiClientResult.Result, apiClientResult.Error)
 		return apiClientResult
@@ -225,8 +237,12 @@ func (p KeyCloakActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.Ac
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}
 	}
 	vaultClientResult := p.provisionConfidentialClient(vaultAccessClient, ctx)
+	span.AddEvent("Vault client created")
+
 	p.monitor.Debugf("created Vault Access client: %s", vaultAccessClient.ClientId)
 	ctx.SetValue(vaultAccessClientIDKey, vaultAccessClient.ClientId)
+
+	span.SetAttributes(attribute.String("vault.client.id", vaultAccessClient.ClientId))
 
 	if vaultClientResult.Result != api.ActivityResultComplete {
 		p.monitor.Warnw("Provisioning Vault Access client not complete. Result was %s, error: %s", vaultClientResult.Result, vaultClientResult.Error)
@@ -238,9 +254,9 @@ func (p KeyCloakActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.A
 	apiAccessID := ctx.Values()[apiAccessClientIDKey].(string)
 	vaultAccessID := ctx.Values()[vaultAccessClientIDKey].(string)
 	if vaultAccessID != "" && apiAccessID != "" {
-		vaultErr := p.deleteClient(vaultAccessID)
+		vaultErr := p.deleteClient(ctx.Context(), vaultAccessID)
 		p.monitor.Debugf("deleted Vault Access client: %s", vaultAccessID)
-		apiErr := p.deleteClient(apiAccessID)
+		apiErr := p.deleteClient(ctx.Context(), apiAccessID)
 		p.monitor.Debugf("deleted API Access client: %s", apiAccessID)
 
 		var errors []error
@@ -268,7 +284,11 @@ func (p KeyCloakActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.A
 // other processors. The client ID is returned as a value in the context.
 // TODO support idempotent provisioning
 func (p KeyCloakActivityProcessor) provisionConfidentialClient(client *KeycloakClientData, ctx api.ActivityContext) api.ActivityResult {
-	err := p.createClient(client)
+	_, span := otel.GetTracerProvider().Tracer(tracerName).
+		Start(ctx.Context(), "agent.kcagent.deploy.provisionConfidentialClient", trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
+
+	err := p.createClient(ctx.Context(), client)
 	if err != nil {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}
 	}
@@ -280,20 +300,20 @@ func (p KeyCloakActivityProcessor) provisionConfidentialClient(client *KeycloakC
 }
 
 // deleteClient deletes a client in Keycloak. Important: pass the client ID, _not_ the internal UUID!
-func (p KeyCloakActivityProcessor) deleteClient(clientID string) error {
+func (p KeyCloakActivityProcessor) deleteClient(ctx context.Context, clientID string) error {
 
 	// the human-readable client-ID cannot be used to delete the client directly, we need to look up KC's internal UUID
-	clientUUID, err := p.getClientUUID(clientID)
+	clientUUID, err := p.getClientUUID(ctx, clientID)
 	// clientURL should be <HOST>/admin/realms/edcv/clients/<CLIENT_UID>
 	clientURL := fmt.Sprintf(clientUrl, p.keycloakURL, p.realm)
 	clientURL = fmt.Sprintf("%s/%s", clientURL, clientUUID)
 
-	req, err := http.NewRequest(http.MethodDelete, clientURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, clientURL, nil)
 	if err != nil {
 		return fmt.Errorf("error creating client request: %w", err)
 	}
 
-	token, err := p.getToken()
+	token, err := p.getToken(ctx)
 	if err != nil {
 		return fmt.Errorf("error authenticating with Keycloak: %w", err)
 	}
@@ -312,7 +332,7 @@ func (p KeyCloakActivityProcessor) deleteClient(clientID string) error {
 }
 
 // createClient creates a confidential client with the specified secret
-func (p KeyCloakActivityProcessor) createClient(clientData *KeycloakClientData) error {
+func (p KeyCloakActivityProcessor) createClient(ctx context.Context, clientData *KeycloakClientData) error {
 	clientURL := fmt.Sprintf(clientUrl, p.keycloakURL, p.realm)
 
 	jsonData, err := json.Marshal(clientData)
@@ -320,13 +340,13 @@ func (p KeyCloakActivityProcessor) createClient(clientData *KeycloakClientData) 
 		return err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, clientURL, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, clientURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("error creating client request: %w", err)
 	}
 
 	req.Header.Set(contentTypeHeader, jsonContentType)
-	token, err := p.getToken()
+	token, err := p.getToken(ctx)
 	if err != nil {
 		return fmt.Errorf("error authenticating with Keycloak: %w", err)
 	}
@@ -345,13 +365,13 @@ func (p KeyCloakActivityProcessor) createClient(clientData *KeycloakClientData) 
 	return nil
 }
 
-func (p KeyCloakActivityProcessor) getToken() (string, error) {
+func (p KeyCloakActivityProcessor) getToken(ctx context.Context) (string, error) {
 	tokenURL := fmt.Sprintf("%s/realms/master/protocol/openid-connect/token", p.keycloakURL)
 
 	formData := fmt.Sprintf("username=%s&password=%s&client_id=%s&grant_type=password",
 		p.username, p.password, p.clientId)
 
-	req, err := http.NewRequest(http.MethodPost, tokenURL, strings.NewReader(formData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, strings.NewReader(formData))
 	if err != nil {
 		return "", fmt.Errorf("error creating token request: %w", err)
 	}
@@ -377,15 +397,15 @@ func (p KeyCloakActivityProcessor) getToken() (string, error) {
 	return tokenResp.AccessToken, nil
 }
 
-func (p KeyCloakActivityProcessor) getClientUUID(clientID string) (string, error) {
+func (p KeyCloakActivityProcessor) getClientUUID(ctx context.Context, clientID string) (string, error) {
 	clientURL := fmt.Sprintf(clientUrl, p.keycloakURL, p.realm)
 	clientURL = fmt.Sprintf("%s?clientId=%s", clientURL, clientID)
 
-	token, err := p.getToken()
+	token, err := p.getToken(ctx)
 	if err != nil {
 		return "", fmt.Errorf("error authenticating with Keycloak: %w", err)
 	}
-	req, err := http.NewRequest(http.MethodGet, clientURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, clientURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("error creating client request: %w", err)
 	}

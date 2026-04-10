@@ -13,6 +13,7 @@
 package activity
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -25,6 +26,9 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/common/token"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type EDCVActivityProcessor struct {
@@ -40,6 +44,7 @@ type EDCVActivityProcessor struct {
 	CredentialServiceURL string
 	ProtocolServiceURL   string
 	ManagementAPIClient  controlplane.ManagementAPIClient
+	tracer               trace.Tracer
 }
 
 type EDCVData struct {
@@ -64,6 +69,7 @@ func NewProcessor(config *Config) *EDCVActivityProcessor {
 		STSTokenURL:          config.STSTokenURL,
 		CredentialServiceURL: config.CredentialServiceURL,
 		ProtocolServiceURL:   config.ProtocolServiceURL,
+		tracer:               otel.GetTracerProvider().Tracer("cfm.agent.edcv"),
 	}
 }
 
@@ -81,13 +87,19 @@ type Config struct {
 }
 
 func (p EDCVActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
+
+	_, span := p.tracer.Start(ctx.Context(), "cfm.agent.edcv.deploy")
+	defer span.End()
+
 	var data EDCVData
 	err := ctx.ReadValues(&data)
 	if err != nil {
+		span.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing EDC-V activity for orchestration %s: %w", ctx.OID(), err)}
 	}
 
 	participantContextId := data.ApiAccessClientID
+	span.SetAttributes(attribute.String("cfm.participantContextId", participantContextId))
 	return p.handleDeployAction(ctx, data, participantContextId)
 }
 
@@ -97,11 +109,12 @@ func (p EDCVActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.Activ
 	if err != nil {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing EDC-V activity for orchestration %s: %w", ctx.OID(), err)}
 	}
-	return p.handleDisposeAction(data.ApiAccessClientID)
+	return p.handleDisposeAction(ctx.Context(), data.ApiAccessClientID)
 }
 
 // handleDeployAction creates a participant context in IdentityHub and the control plane (incl. participant context config)
 func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data EDCVData, participantContextId string) api.ActivityResult {
+
 	// override if config is provided
 	if p.CredentialServiceURL != "" {
 		data.CredentialServiceURL = fmt.Sprintf(p.CredentialServiceURL, participantContextId)
@@ -134,6 +147,9 @@ func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data 
 		ClientSecret: vaultAccessSecret,
 		TokenURL:     p.TokenURL,
 	}
+
+	_, identyHubSpan := p.tracer.Start(ctx.Context(), "cfm.agent.edcv.deploy.identityhub", trace.WithSpanKind(trace.SpanKindClient))
+
 	manifest := identityhub.NewParticipantManifest(participantContextId, did, data.CredentialServiceURL, data.ProtocolServiceURL, func(m *identityhub.ParticipantManifest) {
 		m.VaultCredentials = vaultCreds
 		m.VaultConfig.VaultURL = p.VaultURL
@@ -141,29 +157,38 @@ func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data 
 		m.CredentialServiceURL = data.CredentialServiceURL
 		m.ProtocolServiceURL = data.ProtocolServiceURL
 	})
-	createResponse, err := p.IdentityAPIClient.CreateParticipantContext(manifest)
+	createResponse, err := p.IdentityAPIClient.CreateParticipantContext(ctx.Context(), manifest)
 	if err != nil {
+		identyHubSpan.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("cannot create participant in identity hub: %w", err)}
 	}
+	identyHubSpan.End()
+
 	vaultConfig := manifest.VaultConfig
 
+	_, ctrl := p.tracer.Start(ctx.Context(), "cfm.agent.edcv.deploy.controlplane", trace.WithSpanKind(trace.SpanKindClient))
+
 	// create participant context in Control Plane
-	if err := p.ManagementAPIClient.CreateParticipantContext(controlplane.ParticipantContext{
+	if err := p.ManagementAPIClient.CreateParticipantContext(ctx.Context(), controlplane.ParticipantContext{
 		ParticipantContextID: participantContextId,
 		Identifier:           did,
 		Properties:           make(map[string]any),
 		State:                controlplane.ParticipantContextStateActivated,
 	}); err != nil {
+		ctrl.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("cannot create participant context in control plane: %w", err)}
 	}
+	ctrl.AddEvent("Created ParticipantContext in Control Plane")
 
 	// create participant config in Control Plane
 	alias := participantContextId + "-sts-client-secret"
 	config := controlplane.NewParticipantContextConfig(participantContextId, createResponse.STSClientID, alias, data.ParticipantID, vaultConfig, vaultCreds, p.STSTokenURL)
-	if err := p.ManagementAPIClient.CreateConfig(participantContextId, config); err != nil {
+	if err := p.ManagementAPIClient.CreateConfig(ctx.Context(), participantContextId, config); err != nil {
+		ctrl.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("cannot create participant config in control plane: %w", err)}
 	}
-
+	ctrl.AddEvent("Created ParticipantContextConfig in Control Plane")
+	ctrl.End()
 	p.Monitor.Infof("EDCV activity for participant '%s' (client ID = %s) completed successfully", data.ParticipantID, data.ApiAccessClientID)
 	if err := p.VaultClient.DeleteSecret(ctx.Context(), data.VaultAccessClientID); err != nil {
 		p.Monitor.Warnf("failed to delete secret '%s': %v", data.VaultAccessClientID, err)
@@ -172,22 +197,22 @@ func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data 
 }
 
 // handleDisposeAction deletes the participant context in IdentityHub and the control plane
-func (p EDCVActivityProcessor) handleDisposeAction(participantContextID string) api.ActivityResult {
+func (p EDCVActivityProcessor) handleDisposeAction(ctx context.Context, participantContextID string) api.ActivityResult {
 	var errors []error
 	// delete from IdentityHub
-	err := p.IdentityAPIClient.DeleteParticipantContext(participantContextID)
+	err := p.IdentityAPIClient.DeleteParticipantContext(ctx, participantContextID)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
 	// delete config from Control Plane
-	err = p.ManagementAPIClient.DeleteConfig(participantContextID)
+	err = p.ManagementAPIClient.DeleteConfig(ctx, participantContextID)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
 	// delete participant context from Control Plane
-	err = p.ManagementAPIClient.DeleteParticipantContext(participantContextID)
+	err = p.ManagementAPIClient.DeleteParticipantContext(ctx, participantContextID)
 	if err != nil {
 		errors = append(errors, err)
 	}

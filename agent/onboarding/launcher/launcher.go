@@ -40,6 +40,7 @@ const (
 func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 	config := natsagent.LauncherConfig{
 		AgentName:    "Onboarding Agent",
+		ServiceName:  "cfm.agent.onboarding",
 		ConfigPrefix: "obagent",
 		ActivityType: ActivityType,
 		AssemblyProvider: func() []system.ServiceAssembly {

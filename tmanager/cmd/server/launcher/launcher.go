@@ -78,6 +78,8 @@ func Launch(shutdown <-chan struct{}) {
 	}
 
 	assembler.Register(natsprovision.NewNatsOrchestrationServiceAssembly(uri, bucketValue, streamValue))
-
+	if err := runtime.SetupTelemetry("cfm.tmanager", shutdown); err != nil {
+		logMonitor.Warnf("Error setting up telemetry: %s. Traces and metrics will not be available.", err.Error())
+	}
 	runtime.AssembleAndLaunch(assembler, "Tenant Manager", logMonitor, shutdown)
 }

@@ -21,6 +21,9 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/eclipse-cfm/cfm/tmanager/model/v1alpha1"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type TMHandler struct {
@@ -32,13 +35,7 @@ type TMHandler struct {
 	txContext          store.TransactionContext
 }
 
-func NewHandler(
-	tenantService api.TenantService,
-	participantService api.ParticipantProfileService,
-	cellService api.CellService,
-	dataspaceService api.DataspaceProfileService,
-	txContext store.TransactionContext,
-	monitor system.LogMonitor) *TMHandler {
+func NewHandler(tenantService api.TenantService, participantService api.ParticipantProfileService, cellService api.CellService, dataspaceService api.DataspaceProfileService, txContext store.TransactionContext, monitor system.LogMonitor) *TMHandler {
 	return &TMHandler{
 		HttpHandler: handler.HttpHandler{
 			Monitor: monitor,
@@ -92,6 +89,9 @@ func (h *TMHandler) deployParticipantProfile(
 	req *http.Request,
 	tenantID string) {
 
+	_, span := otel.GetTracerProvider().Tracer("cfm.tmanager.handler").Start(req.Context(), "deployParticipantProfile")
+	defer span.End()
+
 	if h.InvalidMethod(w, req, http.MethodPost) {
 		return
 	}
@@ -101,8 +101,11 @@ func (h *TMHandler) deployParticipantProfile(
 		return
 	}
 
+	span.SetAttributes(attribute.String("tenant.id", tenantID),
+		attribute.String("profile.did", newDeployment.Identifier),
+		attribute.String("cell.id", newDeployment.CellID))
 	converted := v1alpha1.ToAPINewParticipantProfileDeployment(&newDeployment)
-
+	span.AddEvent("Converted participant deployment")
 	// TODO support specific cell selection
 	profile, err := h.participantService.DeployProfile(
 		req.Context(),
@@ -110,10 +113,12 @@ func (h *TMHandler) deployParticipantProfile(
 		converted)
 
 	if err != nil {
+		span.RecordError(err)
 		h.HandleError(w, err)
 		return
 	}
 
+	span.AddEvent("Profile deployed successfully", trace.WithAttributes(attribute.String("profile.id", profile.ID)))
 	response := v1alpha1.ToParticipantProfile(profile)
 	h.ResponseAccepted(w, response)
 }

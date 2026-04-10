@@ -22,7 +22,9 @@ import (
 
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/common/types"
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	"go.opentelemetry.io/otel"
 )
 
 // RetriableMessageProcessor delegates to a dispatcher to process messages from a JetStream consumer and retries on failure.
@@ -59,12 +61,23 @@ func (n *RetriableMessageProcessor[T]) ProcessLoop(ctx context.Context, consumer
 }
 
 func (n *RetriableMessageProcessor[T]) ProcessMessage(ctx context.Context, message jetstream.Msg) error {
+	// Extract trace context from message headers
+	propagator := otel.GetTextMapPropagator()
+	carrier := &natsHeaderCarrier{headers: message.Headers()}
+	ctx = propagator.Extract(ctx, carrier)
+
+	// Start span with extracted context
+	ctx, span := otel.GetTracerProvider().Tracer("cfm.natsclient").Start(ctx, "nats.process_message")
+	defer span.End()
+
 	var payload T
+
 	if err := json.Unmarshal(message.Data(), &payload); err != nil {
 		err2 := AckMessage(message)
 		if err2 != nil {
 			n.Monitor.Warnf("Failed to ACK message %s: %v", err2)
 		}
+		span.RecordError(err)
 		return fmt.Errorf("failed to unmarshal message: %w", err)
 	}
 
@@ -76,14 +89,18 @@ func (n *RetriableMessageProcessor[T]) ProcessMessage(ctx context.Context, messa
 	switch {
 	case types.IsRecoverable(resultErr):
 		if err := message.Nak(); err != nil {
+			span.RecordError(err)
 			return fmt.Errorf("retriable failure when dispatching message and NAK response (errors: %w, %v)", resultErr, err)
 		}
+		span.RecordError(resultErr)
 		return fmt.Errorf("retriable failure when dispatching message: %w", resultErr)
 	default:
 		// All other errors are fatal
 		if err := message.Ack(); err != nil {
+			span.RecordError(err)
 			return fmt.Errorf("fatal failure when dispatching message (errors: %w, %v)", resultErr, err)
 		}
+		span.RecordError(resultErr)
 		return fmt.Errorf("fatal failure when dispatching message: %w", resultErr)
 	}
 }
@@ -101,4 +118,25 @@ func NakError(message jetstream.Msg, err error) error {
 		err = errors.Join(err, err2)
 	}
 	return err
+}
+
+// natsHeaderCarrier implements propagation.TextMapCarrier for NATS message headers
+type natsHeaderCarrier struct {
+	headers nats.Header
+}
+
+func (c *natsHeaderCarrier) Get(key string) string {
+	return c.headers.Get(key)
+}
+
+func (c *natsHeaderCarrier) Set(key string, value string) {
+	c.headers.Set(key, value)
+}
+
+func (c *natsHeaderCarrier) Keys() []string {
+	keys := make([]string, 0, len(c.headers))
+	for key := range c.headers {
+		keys = append(keys, key)
+	}
+	return keys
 }

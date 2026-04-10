@@ -31,7 +31,7 @@ func (m PMCoreServiceAssembly) Provides() []system.ServiceType {
 }
 
 func (m PMCoreServiceAssembly) Requires() []system.ServiceType {
-	return []system.ServiceType{api.DefinitionStoreKey, api.OrchestratorKey, store.TransactionContextKey}
+	return []system.ServiceType{api.DefinitionStoreKey, api.OrchestratorKey, store.TransactionContextKey, api.OrchestrationIndexKey}
 }
 
 func (m PMCoreServiceAssembly) Init(context *system.InitContext) error {

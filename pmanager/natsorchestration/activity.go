@@ -24,7 +24,10 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/google/uuid"
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 type NatsActivityExecutor struct {
@@ -86,6 +89,7 @@ func (e *NatsActivityExecutor) processLoop(ctx context.Context, consumer jetstre
 //
 // Returns an error if message processing fails.
 func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetstream.Msg) error {
+
 	var oMessage api.ActivityMessage
 	if err := json.Unmarshal(message.Data(), &oMessage); err != nil {
 		ackErr := natsclient.AckMessage(message)
@@ -99,6 +103,24 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 	if err != nil {
 		return fmt.Errorf("failed to read orchestration data: %w", err)
 	}
+
+	// attempt to restore trace ID from stored orchestration
+	if orchestration.ProcessingData["trace_context"] != nil {
+		traceParent := orchestration.ProcessingData["trace_context"].(string)
+		e.Monitor.Infof("Telemetry: continue trace from Orchestration's traceparent: %s", traceParent)
+		carrier := propagation.MapCarrier{"traceparent": traceParent}
+		ctx = otel.GetTextMapPropagator().Extract(ctx, carrier)
+		delete(orchestration.ProcessingData, "trace_context") // Clean up trace context from processing data after restoring it
+	} else {
+		e.Monitor.Debugf("Telemetry: continue trace from NATS message")
+		// Extract trace context from message headers
+		carrier := &natsHeaderCarrier{headers: message.Headers()}
+		ctx = otel.GetTextMapPropagator().Extract(ctx, carrier)
+	}
+
+	// Start span with extracted context
+	ctx, span := otel.GetTracerProvider().Tracer("cfm.pmanager.orchestrator").Start(ctx, "activity.process_message")
+	defer span.End()
 
 	activityContext := api.NewActivityContext(
 		ctx,
@@ -131,6 +153,14 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 	case api.ActivityResultSchedule:
 		// IMPORTANT: Must persist state BEFORE rescheduling
 		// This ensures processing data is saved for the next invocation
+
+		// Inject trace context into processing data so that subsequent executions are under the same trace-id
+		m := propagation.MapCarrier{}
+		otel.GetTextMapPropagator().Inject(ctx, m)
+		if m["traceparent"] != "" {
+			orchestration.ProcessingData["trace_context"] = m["traceparent"]
+		}
+
 		e.persistState(activityContext, orchestration, revision)
 		if err := message.NakWithDelay(result.WaitOnReschedule); err != nil {
 			return fmt.Errorf("failed to reschedule schedule activity %s: %w", oMessage.OrchestrationID, err)
@@ -304,4 +334,25 @@ func (e *NatsActivityExecutor) handleFatalError(
 			orchestration.ID, resultErr, err)
 	}
 	return fmt.Errorf("fatal failure while executing activity %s: %w", orchestration.ID, resultErr)
+}
+
+// natsHeaderCarrier implements propagation.TextMapCarrier for NATS message headers
+type natsHeaderCarrier struct {
+	headers nats.Header
+}
+
+func (c *natsHeaderCarrier) Get(key string) string {
+	return c.headers.Get(key)
+}
+
+func (c *natsHeaderCarrier) Set(key string, value string) {
+	c.headers.Set(key, value)
+}
+
+func (c *natsHeaderCarrier) Keys() []string {
+	keys := make([]string, 0, len(c.headers))
+	for key := range c.headers {
+		keys = append(keys, key)
+	}
+	return keys
 }

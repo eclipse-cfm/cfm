@@ -24,6 +24,7 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/nats-io/nats.go/jetstream"
+	"go.opentelemetry.io/otel"
 )
 
 // NatsOrchestrator is responsible for executing an orchestration using NATS for reliable messaging. For each
@@ -64,6 +65,9 @@ func (o *NatsOrchestrator) GetOrchestration(ctx context.Context, id string) (*ap
 func (o *NatsOrchestrator) Execute(ctx context.Context, orchestration *api.Orchestration) error {
 	// TODO validate orchestration - this should include a check to see if there are no steps or steps with no activities
 
+	_, span := otel.GetTracerProvider().Tracer("cfm.pmanager.orchestrator").Start(ctx, "nats.execute_orchestration")
+	defer span.End()
+
 	serializedOrchestration, err := json.Marshal(orchestration)
 	if err != nil {
 		return fmt.Errorf("error marshalling orchestration: %w", err)
@@ -86,6 +90,7 @@ func (o *NatsOrchestrator) Execute(ctx context.Context, orchestration *api.Orche
 	if len(activities) == 0 {
 		return fmt.Errorf("orchestration has no activities: %s", orchestration.ID)
 	}
+	span.AddEvent("Activity messages enqueued")
 	err = EnqueueActivityMessages(ctx, orchestration.ID, activities, o.Client)
 	if err != nil {
 		return err

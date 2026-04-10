@@ -508,25 +508,25 @@ type MockIdentityHubClient struct {
 	expectedCredentials []identityhub.VerifiableCredentialResource
 }
 
-func (m MockIdentityHubClient) QueryCredentialByType(participantContextID string, credentialType string) ([]identityhub.VerifiableCredentialResource, error) {
+func (m MockIdentityHubClient) QueryCredentialByType(ctx context.Context, participantContextID string, credentialType string) ([]identityhub.VerifiableCredentialResource, error) {
 	return m.expectedCredentials, m.expectedError
 }
 
-func (m MockIdentityHubClient) DeleteParticipantContext(participantContextID string) error {
+func (m MockIdentityHubClient) DeleteParticipantContext(ctx context.Context, participantContextID string) error {
 	return m.expectedError
 }
 
-func (m MockIdentityHubClient) GetCredentialRequestState(string, string) (string, error) {
+func (m MockIdentityHubClient) GetCredentialRequestState(context.Context, string, string) (string, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (m MockIdentityHubClient) RequestCredentials(string, identityhub.CredentialRequest) (string, error) {
+func (m MockIdentityHubClient) RequestCredentials(context.Context, string, identityhub.CredentialRequest) (string, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (m MockIdentityHubClient) CreateParticipantContext(identityhub.ParticipantManifest) (*identityhub.CreateParticipantContextResponse, error) {
+func (m MockIdentityHubClient) CreateParticipantContext(context.Context, identityhub.ParticipantManifest) (*identityhub.CreateParticipantContextResponse, error) {
 	return &identityhub.CreateParticipantContextResponse{
 		STSClientID:     "test-clientid",
 		STSClientSecret: "test-secret-alias",
@@ -538,18 +538,18 @@ type MockManagementApiClient struct {
 	expectedConfigError      error
 }
 
-func (m MockManagementApiClient) DeleteConfig(participantContextID string) error {
+func (m MockManagementApiClient) DeleteConfig(ctx context.Context, participantContextID string) error {
 	return m.expectedConfigError
 }
 
-func (m MockManagementApiClient) DeleteParticipantContext(participantContextID string) error {
+func (m MockManagementApiClient) DeleteParticipantContext(ctx context.Context, participantContextID string) error {
 	return m.expectedParticipantError
 }
 
-func (m MockManagementApiClient) CreateParticipantContext(controlplane.ParticipantContext) error {
+func (m MockManagementApiClient) CreateParticipantContext(context.Context, controlplane.ParticipantContext) error {
 	return m.expectedParticipantError
 }
 
-func (m MockManagementApiClient) CreateConfig(string, controlplane.ParticipantContextConfig) error {
+func (m MockManagementApiClient) CreateConfig(context.Context, string, controlplane.ParticipantContextConfig) error {
 	return m.expectedConfigError
 }
