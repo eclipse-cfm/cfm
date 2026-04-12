@@ -603,12 +603,8 @@ func TestGetNextActivities(t *testing.T) {
 				{
 					Activities: []Activity{
 						{
-							ID:   "complex1",
-							Type: "complex.test.com",
-							Inputs: []MappingEntry{
-								{Source: "input1", Target: "target1"},
-								{Source: "input2", Target: "target2"},
-							},
+							ID:        "complex1",
+							Type:      "complex.test.com",
 							DependsOn: []string{"dependency1", "dependency2"},
 						},
 					},
@@ -618,9 +614,6 @@ func TestGetNextActivities(t *testing.T) {
 						{
 							ID:   "complex2",
 							Type: "another.complex.test.com",
-							Inputs: []MappingEntry{
-								{Source: "input3", Target: "target3"},
-							},
 						},
 					},
 				},
@@ -631,9 +624,6 @@ func TestGetNextActivities(t *testing.T) {
 		require.Len(t, activities, 1)
 		require.Equal(t, "complex2", activities[0].ID)
 		require.Equal(t, "another.complex.test.com", activities[0].Type.String())
-		require.Len(t, activities[0].Inputs, 1)
-		require.Equal(t, "input3", activities[0].Inputs[0].Source)
-		require.Equal(t, "target3", activities[0].Inputs[0].Target)
 	})
 }
 

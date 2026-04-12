@@ -183,5 +183,5 @@ func TestHttpIdentityAPIClient_DeleteParticipantContext_NotFound(t *testing.T) {
 	}
 
 	err := client.DeleteParticipantContext("test")
-	require.ErrorContains(t, err, "participant not found")
+	require.ErrorContains(t, err, "participant context test not found in Identity")
 }
