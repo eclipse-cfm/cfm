@@ -894,7 +894,7 @@ func TestValidateActivitySchema_Success(t *testing.T) {
 		},
 		"type-b": {
 			Type: "type-b",
-			OutputSchema: map[string]any{
+			InputSchema: map[string]any{
 				"properties": map[string]any{
 					"field-a": map[string]any{"type": "string"},
 				},
@@ -964,7 +964,34 @@ func TestValidateActivitySchema_DuplicatedFields(t *testing.T) {
 	assert.Contains(t, err.Error(), "field field-1 is duplicated in multiple dependent activities")
 }
 
-func TestValidateActivitySchema_IncompatibleFieldTypes(t *testing.T) {
+func TestValidateActivitySchema_IncompatibleRequiredFieldTypes(t *testing.T) {
+	activities := []api.Activity{
+		{ID: "activity-a", Type: "type-a", DependsOn: []string{}},
+		{ID: "activity-b", Type: "type-b", DependsOn: []string{"activity-a"}},
+	}
+	activityDefinitions := map[api.ActivityType]*api.ActivityDefinition{
+		"type-a": {
+			OutputSchema: map[string]any{
+				"properties": map[string]any{
+					"field-a": map[string]any{"type": "string"},
+				},
+			},
+		},
+		"type-b": {
+			InputSchema: map[string]any{
+				"properties": map[string]any{
+					"field-a": map[string]any{"type": "array"},
+				},
+				"required": []any{"field-a"},
+			},
+		},
+	}
+	err := validateActivitySchema(activities, activityDefinitions)
+	require.Error(t, err, "Type missmatch in Required Output and Input Field")
+	assert.Contains(t, err.Error(), "type of input field field-a differs from dependent activities output")
+}
+
+func TestValidateActivitySchema_IncompatibleOptionalFieldTypes(t *testing.T) {
 	activities := []api.Activity{
 		{ID: "activity-a", Type: "type-a", DependsOn: []string{}},
 		{ID: "activity-b", Type: "type-b", DependsOn: []string{"activity-a"}},
@@ -986,8 +1013,100 @@ func TestValidateActivitySchema_IncompatibleFieldTypes(t *testing.T) {
 		},
 	}
 	err := validateActivitySchema(activities, activityDefinitions)
-	require.Error(t, err, "Type missmatch in Output and Input Field")
+	require.Error(t, err, "Type missmatch in Optional Output and Input Field")
 	assert.Contains(t, err.Error(), "type of input field field-a differs from dependent activities output")
+}
+
+func TestValidateActivitySchema_OptionalFieldMissing(t *testing.T) {
+	activities := []api.Activity{
+		{ID: "activity-a", Type: "type-a", DependsOn: []string{}},
+		{ID: "activity-b", Type: "type-b", DependsOn: []string{"activity-a"}},
+	}
+	activityDefinitions := map[api.ActivityType]*api.ActivityDefinition{
+		"type-a": {
+			OutputSchema: map[string]any{},
+		},
+		"type-b": {
+			InputSchema: map[string]any{
+				"properties": map[string]any{
+					"field-a": map[string]any{"type": "string"},
+				},
+			},
+		},
+	}
+	err := validateActivitySchema(activities, activityDefinitions)
+	require.NoError(t, err, "Validation should succeed")
+}
+
+func TestValidateActivitySchema_TransitiveDependency(t *testing.T) {
+	activities := []api.Activity{
+		{ID: "activity-a", Type: "type-a", DependsOn: []string{}},
+		{ID: "activity-b", Type: "type-b", DependsOn: []string{}},
+		{ID: "activity-c", Type: "type-c", DependsOn: []string{"activity-a", "activity-b"}},
+	}
+	activityDefinitions := map[api.ActivityType]*api.ActivityDefinition{
+		"type-a": {
+			OutputSchema: map[string]any{
+				"properties": map[string]any{
+					"field-1": map[string]any{"type": "string"},
+				},
+			},
+		},
+		"type-b": {
+			OutputSchema: map[string]any{
+				"properties": map[string]any{
+					"field-2": map[string]any{"type": "string"},
+				},
+			},
+		},
+		"type-c": {
+			InputSchema: map[string]any{
+				"properties": map[string]any{
+					"field-1": map[string]any{"type": "string"},
+					"field-2": map[string]any{"type": "string"},
+				},
+				"required": []any{"field-1", "field-2"},
+			},
+		},
+	}
+	err := validateActivitySchema(activities, activityDefinitions)
+	require.NoError(t, err, "Validation should succeed")
+}
+
+func TestValidateActivitySchema_TransitiveDependencyNotDeclared(t *testing.T) {
+	activities := []api.Activity{
+		{ID: "activity-a", Type: "type-a", DependsOn: []string{}},
+		{ID: "activity-b", Type: "type-b", DependsOn: []string{}},
+		{ID: "activity-c", Type: "type-c", DependsOn: []string{"activity-b"}},
+	}
+	activityDefinitions := map[api.ActivityType]*api.ActivityDefinition{
+		"type-a": {
+			OutputSchema: map[string]any{
+				"properties": map[string]any{
+					"field-1": map[string]any{"type": "string"},
+				},
+			},
+		},
+		"type-b": {
+			OutputSchema: map[string]any{
+				"properties": map[string]any{
+					"field-2": map[string]any{"type": "string"},
+				},
+			},
+		},
+		"type-c": {
+			InputSchema: map[string]any{
+				"properties": map[string]any{
+					"field-1": map[string]any{"type": "string"},
+					"field-2": map[string]any{"type": "string"},
+				},
+				"required": []any{"field-1", "field-2"},
+			},
+		},
+	}
+	err := validateActivitySchema(activities, activityDefinitions)
+	require.Error(t, err, "Transitive dependency not declared")
+	assert.Contains(t, err.Error(), "required input field field-1 is not provided by dependent activities as output")
 }
 
 // Helper mock store for testing error scenarios

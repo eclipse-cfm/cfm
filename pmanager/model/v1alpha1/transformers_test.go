@@ -203,6 +203,27 @@ func TestToAPIOrchestrationDefinition_NilInput(t *testing.T) {
 	})
 }
 
+func TestToOrchestrationEntry_VerifiesInputs(t *testing.T) {
+	testTime := time.Now()
+	input := api.OrchestrationEntry{
+		ID:                "test-id-123",
+		CorrelationID:     "corr-id-456",
+		State:             5,
+		StateTimestamp:    testTime,
+		CreatedTimestamp:  testTime.Add(-time.Hour),
+		OrchestrationType: model.OrchestrationType("TestType"),
+	}
+
+	result := ToOrchestrationEntry(&input)
+
+	assert.Equal(t, input.ID, result.ID)
+	assert.Equal(t, input.CorrelationID, result.CorrelationID)
+	assert.Equal(t, int(input.State), result.State)
+	assert.Equal(t, input.StateTimestamp, result.StateTimestamp)
+	assert.Equal(t, input.CreatedTimestamp, result.CreatedTimestamp)
+	assert.Equal(t, input.OrchestrationType, result.OrchestrationType)
+}
+
 func TestToOrchestration(t *testing.T) {
 	now := time.Now()
 	apiOrchestration := &api.Orchestration{

@@ -199,9 +199,6 @@ func validateActivitySchema(activities []api.Activity, activityDefinitions map[a
 	var validationErrors []error
 
 	for _, activity := range activities {
-		if len(activity.DependsOn) == 0 {
-			continue
-		}
 
 		mergedDependantOutputProperties := make(map[string]any)
 
@@ -210,7 +207,7 @@ func validateActivitySchema(activities []api.Activity, activityDefinitions map[a
 		mergedDependantOutputProperties[model.VPAData] = map[string]any{"type": "array"}
 		mergedDependantOutputProperties[model.CredentialData] = map[string]any{"type": "array"}
 
-		mergeError := false
+		hasDuplicateFieldError := false
 
 		for _, dependencyID := range activity.DependsOn {
 			dependantActivity := activityMapById[dependencyID]
@@ -222,13 +219,13 @@ func validateActivitySchema(activities []api.Activity, activityDefinitions map[a
 			for field := range dependantOutputProperties {
 				if _, exists := mergedDependantOutputProperties[field]; exists {
 					validationErrors = append(validationErrors, types.NewValidationError(activity.ID, fmt.Sprintf("field %s is duplicated in multiple dependent activities", field)))
-					mergeError = true
+					hasDuplicateFieldError = true
 				} else {
 					mergedDependantOutputProperties[field] = dependantOutputProperties[field]
 				}
 			}
 		}
-		if mergeError {
+		if hasDuplicateFieldError {
 			continue
 		}
 
