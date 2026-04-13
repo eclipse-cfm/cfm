@@ -54,9 +54,11 @@ func (d definitionManager) CreateOrchestrationDefinition(ctx context.Context, de
 		if len(missingErrors) > 0 {
 			return nil, errors.Join(missingErrors...)
 		}
-		// Verify schema compatibility between dependent activities
-		if err := validateActivitySchema(definition.Activities, activityDefinitions); err != nil {
-			return nil, err
+		// Verify schema compatibility between dependent activities for deploy orchestrations
+		if definition.Type == model.VPADeployType {
+			if err := validateActivitySchema(definition.Activities, activityDefinitions); err != nil {
+				return nil, err
+			}
 		}
 
 		persisted, err := d.store.StoreOrchestrationDefinition(ctx, definition)
