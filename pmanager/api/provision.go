@@ -91,6 +91,23 @@ func (p BaseActivityProcessor) Process(ctx ActivityContext) ActivityResult {
 
 type ActivityResultType int
 
+func (r ActivityResultType) String() string {
+	switch r {
+	case ActivityResultWait:
+		return "wait"
+	case ActivityResultComplete:
+		return "complete"
+	case ActivityResultSchedule:
+		return "schedule"
+	case ActivityResultRetryError:
+		return "retry_error"
+	case ActivityResultFatalError:
+		return "fatal_error"
+	default:
+		return "unknown"
+	}
+}
+
 const (
 	ActivityResultWait       = 0
 	ActivityResultComplete   = 1
