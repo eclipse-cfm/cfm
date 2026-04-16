@@ -21,8 +21,8 @@ import (
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/tmanager/api"
-
 	_ "github.com/lib/pq" // Register PostgreSQL driver
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 )
 
 const (
@@ -49,12 +49,13 @@ func (a *PostgresServiceAssembly) Init(ictx *system.InitContext) error {
 	}
 	dsn := ictx.Config.GetString(dsnKey)
 
-	db, err := otelsql.Open(driverName, dsn)
+	db, err := otelsql.Open(driverName, dsn, otelsql.WithAttributes(semconv.DBSystemNamePostgreSQL))
 	if err != nil {
 		return fmt.Errorf("error connecting to DB at %s: %w", dsn, err)
 	}
 
 	a.db = db
+	otelsql.RegisterDBStatsMetrics(db, otelsql.WithAttributes(semconv.DBSystemNamePostgreSQL))
 
 	createTables(db)
 

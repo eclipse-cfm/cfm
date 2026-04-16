@@ -26,6 +26,7 @@ import (
 	"go.opentelemetry.io/contrib/exporters/autoexport"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
@@ -215,6 +216,11 @@ func SetupTelemetry(serviceName string, shutdown <-chan struct{}) error {
 		return err
 	}
 
+	metricReader, err := autoexport.NewMetricReader(spanCtx)
+	if err != nil {
+		return err
+	}
+
 	res, err := resource.New(spanCtx,
 		resource.WithFromEnv(),
 		resource.WithAttributes(semconv.ServiceNameKey.String(serviceName)),
@@ -228,6 +234,13 @@ func SetupTelemetry(serviceName string, shutdown <-chan struct{}) error {
 		sdktrace.WithResource(res),
 	)
 	otel.SetTracerProvider(tp) // with this, just use otel.GetTracerProvider() to obtain it
+
+	mp := sdkmetric.NewMeterProvider(
+		sdkmetric.WithReader(metricReader),
+		sdkmetric.WithResource(res),
+	)
+	otel.SetMeterProvider(mp) // with this, just use otel.GetMeterProvider() to obtain it
+
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
 		propagation.Baggage{},
@@ -237,6 +250,9 @@ func SetupTelemetry(serviceName string, shutdown <-chan struct{}) error {
 		<-shutdown
 		if err := tp.Shutdown(spanCtx); err != nil {
 			// Log error but continue shutdown
+			_ = err
+		}
+		if err := mp.Shutdown(spanCtx); err != nil {
 			_ = err
 		}
 	}()

@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -25,7 +26,25 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 )
+
+var (
+	natsMetricsOnce sync.Once
+	natsMsgDuration metric.Float64Histogram
+	natsMsgErrors   metric.Int64Counter
+	natsMsgNaks     metric.Int64Counter
+)
+
+func initNatsMetrics() {
+	natsMetricsOnce.Do(func() {
+		meter := otel.GetMeterProvider().Meter("cfm.natsclient")
+		natsMsgDuration, _ = meter.Float64Histogram("cfm.nats.process.duration", metric.WithUnit("s"))
+		natsMsgErrors, _ = meter.Int64Counter("cfm.nats.process.errors.total")
+		natsMsgNaks, _ = meter.Int64Counter("cfm.nats.message.naks.total")
+	})
+}
 
 // RetriableMessageProcessor delegates to a dispatcher to process messages from a JetStream consumer and retries on failure.
 type RetriableMessageProcessor[T any] struct {
@@ -61,6 +80,14 @@ func (n *RetriableMessageProcessor[T]) ProcessLoop(ctx context.Context, consumer
 }
 
 func (n *RetriableMessageProcessor[T]) ProcessMessage(ctx context.Context, message jetstream.Msg) error {
+	initNatsMetrics()
+	start := time.Now()
+	subject := message.Subject()
+	defer func() {
+		natsMsgDuration.Record(ctx, time.Since(start).Seconds(),
+			metric.WithAttributes(attribute.String("messaging.destination", subject)))
+	}()
+
 	// Extract trace context from message headers
 	propagator := otel.GetTextMapPropagator()
 	carrier := &natsHeaderCarrier{headers: message.Headers()}
@@ -78,6 +105,7 @@ func (n *RetriableMessageProcessor[T]) ProcessMessage(ctx context.Context, messa
 			n.Monitor.Warnf("Failed to ACK message %s: %v", err2)
 		}
 		span.RecordError(err)
+		natsMsgErrors.Add(ctx, 1, metric.WithAttributes(attribute.String("messaging.destination", subject)))
 		return fmt.Errorf("failed to unmarshal message: %w", err)
 	}
 
@@ -90,17 +118,21 @@ func (n *RetriableMessageProcessor[T]) ProcessMessage(ctx context.Context, messa
 	case types.IsRecoverable(resultErr):
 		if err := message.Nak(); err != nil {
 			span.RecordError(err)
+			natsMsgErrors.Add(ctx, 1, metric.WithAttributes(attribute.String("messaging.destination", subject)))
 			return fmt.Errorf("retriable failure when dispatching message and NAK response (errors: %w, %v)", resultErr, err)
 		}
 		span.RecordError(resultErr)
+		natsMsgNaks.Add(ctx, 1, metric.WithAttributes(attribute.String("messaging.destination", subject)))
 		return fmt.Errorf("retriable failure when dispatching message: %w", resultErr)
 	default:
 		// All other errors are fatal
 		if err := message.Ack(); err != nil {
 			span.RecordError(err)
+			natsMsgErrors.Add(ctx, 1, metric.WithAttributes(attribute.String("messaging.destination", subject)))
 			return fmt.Errorf("fatal failure when dispatching message (errors: %w, %v)", resultErr, err)
 		}
 		span.RecordError(resultErr)
+		natsMsgErrors.Add(ctx, 1, metric.WithAttributes(attribute.String("messaging.destination", subject)))
 		return fmt.Errorf("fatal failure when dispatching message: %w", resultErr)
 	}
 }

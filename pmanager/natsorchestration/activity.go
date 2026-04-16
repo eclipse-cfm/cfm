@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/eclipse-cfm/cfm/common/model"
@@ -27,8 +28,25 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
 )
+
+var (
+	activityMetricsOnce       sync.Once
+	activityStartedCounter    metric.Int64Counter
+	activityDurationHistogram metric.Float64Histogram
+)
+
+func initActivityMetrics() {
+	activityMetricsOnce.Do(func() {
+		meter := otel.GetMeterProvider().Meter("cfm.pmanager.orchestrator")
+		activityStartedCounter, _ = meter.Int64Counter("cfm.activity.started.total")
+		activityDurationHistogram, _ = meter.Float64Histogram("cfm.activity.duration",
+			metric.WithUnit("ms"))
+	})
+}
 
 type NatsActivityExecutor struct {
 	Client            natsclient.MsgClient
@@ -118,9 +136,23 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 		ctx = otel.GetTextMapPropagator().Extract(ctx, carrier)
 	}
 
+	// Track attempt number for this activity — persisted across reschedules so all executions can be correlated
+	attemptKey := "activity." + oMessage.Activity.ID + ".attempt"
+	attempt := 1
+	if raw, ok := orchestration.ProcessingData[attemptKey]; ok {
+		if v, ok := raw.(float64); ok { // JSON unmarshal stores numbers as float64
+			attempt = int(v) + 1
+		}
+	}
+	orchestration.ProcessingData[attemptKey] = attempt
+
 	// Start span with extracted context
 	ctx, span := otel.GetTracerProvider().Tracer("cfm.pmanager.orchestrator").Start(ctx, "activity.process_message")
 	defer span.End()
+	span.SetAttributes(
+		attribute.String("activity.type", string(oMessage.Activity.Type)),
+		attribute.Int("activity.attempt", attempt),
+	)
 
 	activityContext := api.NewActivityContext(
 		ctx,
@@ -129,7 +161,16 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 		orchestration.ProcessingData,
 		orchestration.OutputData)
 
-	e.Monitor.Debugf("Received activity message %s for orchestration %s", oMessage.Activity.ID, oMessage.OrchestrationID)
+	e.Monitor.Debugf("Received activity message %s for orchestration %s (attempt %d)", oMessage.Activity.ID, oMessage.OrchestrationID, attempt)
+
+	initActivityMetrics()
+	activityAttrs := metric.WithAttributes(
+		attribute.String("activity.type", string(oMessage.Activity.Type)),
+		attribute.Int("activity.attempt", attempt),
+	)
+	activityStartedCounter.Add(ctx, 1, activityAttrs)
+	activityStart := time.Now()
+
 	var result api.ActivityResult
 	if activityContext.Discriminator() == api.DeployDiscriminator {
 		result = e.ActivityProcessor.ProcessDeploy(activityContext)
@@ -138,6 +179,13 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 	} else {
 		result = e.ActivityProcessor.Process(activityContext)
 	}
+
+	activityDurationHistogram.Record(ctx, float64(time.Since(activityStart).Milliseconds()),
+		metric.WithAttributes(
+			attribute.String("activity.type", string(oMessage.Activity.Type)),
+			attribute.String("result", result.Result.String()),
+			attribute.Int("activity.attempt", attempt),
+		))
 
 	switch result.Result {
 	case api.ActivityResultRetryError:
@@ -255,6 +303,11 @@ func (e *NatsActivityExecutor) handleOrchestrationCompletion(
 		return fmt.Errorf("failed to mark orchestration %s as completed: %v", orchestration.ID, err)
 	}
 
+	initOrchMetrics()
+	orchCompletedCounter.Add(activityContext.Context(), 1, metric.WithAttributes(attribute.String("result", "success")))
+	orchDurationHistogram.Record(activityContext.Context(), float64(time.Since(orchestration.CreatedTimestamp).Milliseconds()),
+		metric.WithAttributes(attribute.String("result", "success")))
+
 	err = e.publishResponse(activityContext, orchestration)
 	if err != nil {
 		return err
@@ -323,6 +376,11 @@ func (e *NatsActivityExecutor) handleFatalError(
 	}); err != nil {
 		e.Monitor.Warnf("Failed to mark orchestration %s as fatal: %v", orchestration.ID, err)
 	}
+
+	initOrchMetrics()
+	orchCompletedCounter.Add(activityContext.Context(), 1, metric.WithAttributes(attribute.String("result", "fatal")))
+	orchDurationHistogram.Record(activityContext.Context(), float64(time.Since(orchestration.CreatedTimestamp).Milliseconds()),
+		metric.WithAttributes(attribute.String("result", "fatal")))
 
 	err := e.publishResponse(activityContext, orchestration)
 	if err != nil {

@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/store"
@@ -25,7 +26,25 @@ import (
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/nats-io/nats.go/jetstream"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
 )
+
+var (
+	orchMetricsOnce       sync.Once
+	orchStartedCounter    metric.Int64Counter
+	orchCompletedCounter  metric.Int64Counter
+	orchDurationHistogram metric.Float64Histogram
+)
+
+func initOrchMetrics() {
+	orchMetricsOnce.Do(func() {
+		meter := otel.GetMeterProvider().Meter("cfm.pmanager.orchestrator")
+		orchStartedCounter, _ = meter.Int64Counter("cfm.orchestration.started.total")
+		orchCompletedCounter, _ = meter.Int64Counter("cfm.orchestration.completed.total")
+		orchDurationHistogram, _ = meter.Float64Histogram("cfm.orchestration.duration",
+			metric.WithUnit("ms"))
+	})
+}
 
 // NatsOrchestrator is responsible for executing an orchestration using NATS for reliable messaging. For each
 // activity, a message is published to a durable queue based on the activity type. Activity messages are then dequeued
@@ -64,6 +83,8 @@ func (o *NatsOrchestrator) GetOrchestration(ctx context.Context, id string) (*ap
 
 func (o *NatsOrchestrator) Execute(ctx context.Context, orchestration *api.Orchestration) error {
 	// TODO validate orchestration - this should include a check to see if there are no steps or steps with no activities
+	initOrchMetrics()
+	orchStartedCounter.Add(ctx, 1)
 
 	_, span := otel.GetTracerProvider().Tracer("cfm.pmanager.orchestrator").Start(ctx, "nats.execute_orchestration")
 	defer span.End()
