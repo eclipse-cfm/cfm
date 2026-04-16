@@ -122,6 +122,10 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 		return fmt.Errorf("failed to read orchestration data: %w", err)
 	}
 
+	if orchestration.ProcessingData == nil {
+		orchestration.ProcessingData = make(map[string]any)
+	}
+
 	// attempt to restore trace ID from stored orchestration
 	if orchestration.ProcessingData["trace_context"] != nil {
 		traceParent := orchestration.ProcessingData["trace_context"].(string)

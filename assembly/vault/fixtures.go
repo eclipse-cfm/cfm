@@ -68,6 +68,7 @@ func StartVaultContainer(ctx context.Context, networkName string) (*ContainerRes
 		Name:         name,
 		Env: map[string]string{
 			"VAULT_DEV_ROOT_TOKEN_ID": vaultRootToken,
+			"SKIP_SETCAP":             "true", // this is required to run as non-root user in some environments, such as M1 macs
 		},
 		Cmd: []string{"server", "-dev"},
 		WaitingFor: wait.ForAll(

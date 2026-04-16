@@ -45,6 +45,7 @@ func TestNatsOrchestrationClient_ProcessMessage_Errors(t *testing.T) {
 			setupMessage: func(m *mockJetStreamMsg) {
 				m.On("Data").Return([]byte(`invalid json`))
 				m.On("Ack").Return(nil)
+				m.On("Subject").Return("test-subject")
 			},
 			expectedError: "failed to unmarshal ",
 		},
@@ -59,6 +60,7 @@ func TestNatsOrchestrationClient_ProcessMessage_Errors(t *testing.T) {
 			setupMessage: func(m *mockJetStreamMsg) {
 				m.On("Data").Return([]byte(`{"id":"test-id","success":true,"manifestId":"manifest-1","correlationId":"123","orchestrationType":"cfm.vpa"}`))
 				m.On("Nak").Return(nil)
+				m.On("Subject").Return("test-subject")
 			},
 			expectedError: "retriable failure when dispatching ",
 		},
@@ -73,6 +75,7 @@ func TestNatsOrchestrationClient_ProcessMessage_Errors(t *testing.T) {
 			setupMessage: func(m *mockJetStreamMsg) {
 				m.On("Data").Return([]byte(`{"id":"test-id-2","success":true,"manifestId":"manifest-2","correlationId":"corr-2","orchestrationType":"cfm.vpa"}`))
 				m.On("Nak").Return(errors.New("NAK failed"))
+				m.On("Subject").Return("test-subject")
 			},
 			expectedError: "retriable failure when dispatching ",
 		},
@@ -88,6 +91,7 @@ func TestNatsOrchestrationClient_ProcessMessage_Errors(t *testing.T) {
 			setupMessage: func(m *mockJetStreamMsg) {
 				m.On("Data").Return([]byte(`{"id":"test-id-3","success":false,"manifestId":"manifest-3","correlationId":"corr-3","orchestrationType":"cfm.vpa"}`))
 				m.On("Ack").Return(nil)
+				m.On("Subject").Return("test-subject")
 			},
 			expectedError: "fatal failure when dispatching ",
 		},
@@ -102,6 +106,7 @@ func TestNatsOrchestrationClient_ProcessMessage_Errors(t *testing.T) {
 			setupMessage: func(m *mockJetStreamMsg) {
 				m.On("Data").Return([]byte(`{"id":"test-id-4","success":false,"manifestId":"manifest-4","correlationId":"corr-4","orchestrationType":"cfm.vpa"}`))
 				m.On("Ack").Return(errors.New("ACK failed"))
+				m.On("Subject").Return("test-subject")
 			},
 			expectedError: "fatal failure when dispatching ",
 		},
@@ -116,6 +121,7 @@ func TestNatsOrchestrationClient_ProcessMessage_Errors(t *testing.T) {
 			setupMessage: func(m *mockJetStreamMsg) {
 				m.On("Data").Return([]byte(`{"id":"test-id-5","success":true,"manifestId":"manifest-5","correlationId":"corr-5","orchestrationType":"cfm.vpa"}`))
 				m.On("Ack").Return(errors.New("ACK failed"))
+				m.On("Subject").Return("test-subject")
 			},
 			expectedError: "failed to ACK ",
 		},
@@ -128,6 +134,7 @@ func TestNatsOrchestrationClient_ProcessMessage_Errors(t *testing.T) {
 			setupMessage: func(m *mockJetStreamMsg) {
 				m.On("Data").Return([]byte(`invalid json`))
 				m.On("Ack").Return(errors.New("ACK failed"))
+				m.On("Subject").Return("test-subject")
 			},
 			expectedError: "failed to unmarshal ",
 		},
@@ -140,6 +147,7 @@ func TestNatsOrchestrationClient_ProcessMessage_Errors(t *testing.T) {
 			setupMessage: func(m *mockJetStreamMsg) {
 				m.On("Data").Return([]byte(`{"id":"test-id","manifestId":"manifest-1","orchestrationType":"cfm.vpa","success":true}`))
 				m.On("Ack").Return(nil)
+				m.On("Subject").Return("test-subject")
 			},
 			expectedError: "invalid response: ",
 		},
