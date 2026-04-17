@@ -19,7 +19,7 @@ require (
 	github.com/hashicorp/vault-client-go v0.4.3
 	github.com/lib/pq v1.12.3
 	github.com/nats-io/nats.go v1.51.0
-	github.com/oaswrap/spec v0.3.6
+	github.com/oaswrap/spec v0.4.1
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.42.0
@@ -86,7 +86,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nats-io/nkeys v0.4.15 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
-	github.com/oaswrap/spec-ui v0.1.4 // indirect
+	github.com/oaswrap/spec-ui v0.2.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
