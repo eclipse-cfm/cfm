@@ -27,7 +27,7 @@ import (
 )
 
 // The image used for testing
-const natsImage = "nats:2.10-alpine"
+const natsImage = "nats:alpine"
 
 type NatsTestContainer struct {
 	Container testcontainers.Container
@@ -38,21 +38,21 @@ type NatsTestContainer struct {
 func SetupNatsContainer(ctx context.Context, bucket string) (*NatsTestContainer, error) {
 	// Create NATS configuration
 	natsConfig := fmt.Sprintf(`
-# Basic server configuration
-port: 4222
-monitor_port: 8222
-
-# JetStream configuration
-jetstream {
-    store_dir: "/tmp/jetstream"
-    max_memory_store: 64MB
-    max_file_store: 512MB
-}
-
-# Enable debug/trace
-debug: true
-trace: true
-`)
+		# Basic server configuration
+		port: 4222
+		monitor_port: 8222
+		
+		# JetStream configuration
+		jetstream {
+			store_dir: "/tmp/jetstream"
+			max_memory_store: 64MB
+			max_file_store: 512MB
+		}
+		
+		# Enable debug/trace
+		debug: true
+		trace: true
+		`)
 
 	// Create temporary config file
 	tmpDir, err := os.MkdirTemp("", "nats-config-*")
@@ -68,7 +68,7 @@ trace: true
 
 	req := testcontainers.ContainerRequest{
 		Image:        natsImage,
-		ExposedPorts: []string{"0:4222/tcp"},
+		ExposedPorts: []string{"4222/tcp"},
 		WaitingFor: wait.ForAll(
 			wait.ForExposedPort(),
 			wait.ForLog(".*Server is ready.*").AsRegexp(),
