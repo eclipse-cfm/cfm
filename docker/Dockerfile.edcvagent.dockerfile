@@ -10,13 +10,20 @@
 #       Metaform Systems, Inc. - initial API and implementation
 #
 
-FROM golang:1.25-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
+ARG TARGETOS
+ARG TARGETARCH
 
 WORKDIR /app
-COPY .. .
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
 
 # Build the agent binary
-RUN CGO_ENABLED=0 go build -o bin/edcvagent ./agent/edcv/cmd/server/main.go
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -ldflags="-s -w" -o bin/edcvagent ./agent/edcv/cmd/server/main.go
 
 # Production stage
 FROM gcr.io/distroless/static-debian12:nonroot
