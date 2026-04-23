@@ -19,7 +19,7 @@ require (
 	github.com/hashicorp/vault-client-go v0.4.3
 	github.com/lib/pq v1.12.3
 	github.com/nats-io/nats.go v1.51.0
-	github.com/oaswrap/spec v0.4.1
+	github.com/oaswrap/spec v0.4.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.42.0
@@ -107,8 +107,8 @@ require (
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
-	github.com/swaggest/jsonschema-go v0.3.78 // indirect
-	github.com/swaggest/openapi-go v0.2.60 // indirect
+	github.com/swaggest/jsonschema-go v0.3.79 // indirect
+	github.com/swaggest/openapi-go v0.2.61 // indirect
 	github.com/swaggest/refl v1.4.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
