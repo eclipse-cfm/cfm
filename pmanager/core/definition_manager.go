@@ -15,9 +15,11 @@ package core
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/eclipse-cfm/cfm/common/collection"
+	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/query"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/types"
@@ -34,19 +36,29 @@ func (d definitionManager) CreateOrchestrationDefinition(ctx context.Context, de
 	return store.Trx[api.OrchestrationDefinition](d.trxContext).AndReturn(ctx, func(ctx context.Context) (*api.OrchestrationDefinition, error) {
 		var missingErrors []error
 
+		activityDefinitions := make(map[api.ActivityType]*api.ActivityDefinition)
+
 		// Verify that all referenced activities exist
 		for _, activity := range definition.Activities {
-			exists, err := d.store.ExistsActivityDefinition(ctx, activity.Type)
+			activityDefinition, err := d.store.FindActivityDefinition(ctx, activity.Type)
 			if err != nil {
+				if errors.Is(err, types.ErrNotFound) {
+					missingErrors = append(missingErrors, types.NewClientError("activity type '%s' not found", activity.Type))
+					continue
+				}
 				return nil, err
 			}
-			if !exists {
-				missingErrors = append(missingErrors, types.NewClientError("activity type '%s' not found", activity.Type))
-			}
+			activityDefinitions[activity.Type] = activityDefinition
 		}
 
 		if len(missingErrors) > 0 {
 			return nil, errors.Join(missingErrors...)
+		}
+		// Verify schema compatibility between dependent activities for deploy orchestrations
+		if definition.Type == model.VPADeployType {
+			if err := validateActivitySchema(definition.Activities, activityDefinitions); err != nil {
+				return nil, err
+			}
 		}
 
 		persisted, err := d.store.StoreOrchestrationDefinition(ctx, definition)
@@ -177,4 +189,77 @@ func (d definitionManager) GetActivityDefinitions(ctx context.Context) ([]api.Ac
 		return nil
 	})
 	return result, err
+}
+
+func validateActivitySchema(activities []api.Activity, activityDefinitions map[api.ActivityType]*api.ActivityDefinition) error {
+	activityMapById := make(map[string]api.Activity)
+
+	for _, activity := range activities {
+		activityMapById[activity.ID] = activity
+	}
+
+	var validationErrors []error
+
+	for _, activity := range activities {
+
+		mergedDependantOutputProperties := make(map[string]any)
+
+		//The following 3 fields are always injected as part of the orchestration manifest. In a future this could be modified and maybe derived from the orchestration schema
+		mergedDependantOutputProperties[model.ParticipantIdentifier] = map[string]any{"type": "string"}
+		mergedDependantOutputProperties[model.VPAData] = map[string]any{"type": "array"}
+		mergedDependantOutputProperties[model.CredentialData] = map[string]any{"type": "array"}
+
+		hasDuplicateFieldError := false
+
+		for _, dependencyID := range activity.DependsOn {
+			dependantActivity := activityMapById[dependencyID]
+			dependantActivityDefinition := activityDefinitions[dependantActivity.Type]
+			dependantOutputProperties, ok := dependantActivityDefinition.OutputSchema["properties"].(map[string]any)
+			if !ok {
+				continue
+			}
+			for field := range dependantOutputProperties {
+				if _, exists := mergedDependantOutputProperties[field]; exists {
+					validationErrors = append(validationErrors, types.NewValidationError(activity.ID, fmt.Sprintf("field %s is duplicated in multiple dependent activities", field)))
+					hasDuplicateFieldError = true
+				} else {
+					mergedDependantOutputProperties[field] = dependantOutputProperties[field]
+				}
+			}
+		}
+		if hasDuplicateFieldError {
+			continue
+		}
+
+		requiredFields, _ := activityDefinitions[activity.Type].InputSchema["required"].([]any)
+		inputProperties, _ := activityDefinitions[activity.Type].InputSchema["properties"].(map[string]any)
+
+		for _, required := range requiredFields {
+			field, ok := required.(string)
+			if !ok {
+				continue
+			}
+
+			if _, exists := mergedDependantOutputProperties[field]; !exists {
+				validationErrors = append(validationErrors, types.NewValidationError(activity.ID, fmt.Sprintf("required input field %s is not provided by dependent activities as output", field)))
+			}
+		}
+
+		for field := range inputProperties {
+			dependantField, exists := mergedDependantOutputProperties[field]
+			if !exists {
+				continue
+			}
+			inputFieldType, _ := inputProperties[field].(map[string]any)["type"].(string)
+			dependantFieldType, _ := dependantField.(map[string]any)["type"].(string)
+
+			if inputFieldType != "" && dependantFieldType != "" && inputFieldType != dependantFieldType {
+				validationErrors = append(validationErrors, types.NewValidationError(activity.ID, fmt.Sprintf("type of input field %s differs from dependent activities output", field)))
+			}
+
+		}
+
+	}
+
+	return errors.Join(validationErrors...)
 }

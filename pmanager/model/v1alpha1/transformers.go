@@ -77,7 +77,6 @@ func ToOrchestrationDefinition(template *OrchestrationTemplate) (string, []*api.
 				ID:            activityDto.ID,
 				Type:          api.ActivityType(activityDto.Type),
 				Discriminator: api.Discriminator(orchType),
-				Inputs:        ToAPIMappingEntries(activityDto.Inputs),
 				DependsOn:     activityDto.DependsOn,
 			}
 			convertedActivities[i] = activity
@@ -110,7 +109,6 @@ func ToOrchestrationDefinitionDto(definition *api.OrchestrationDefinition) *Orch
 		convertedActivities[activity.Discriminator.String()] = append(convertedActivities[activity.Discriminator.String()], ActivityDto{
 			ID:        activity.ID,
 			Type:      string(activity.Type),
-			Inputs:    ToMappingEntries(activity.Inputs),
 			DependsOn: activity.DependsOn,
 		})
 	}
@@ -121,28 +119,6 @@ func ToOrchestrationDefinitionDto(definition *api.OrchestrationDefinition) *Orch
 		Activities:  convertedActivities,
 		TemplateRef: definition.TemplateRef,
 	}
-}
-
-func ToAPIMappingEntries(entries []MappingEntry) []api.MappingEntry {
-	apiEntries := make([]api.MappingEntry, len(entries))
-	for i, entry := range entries {
-		apiEntries[i] = api.MappingEntry{
-			Source: entry.Source,
-			Target: entry.Target,
-		}
-	}
-	return apiEntries
-}
-
-func ToMappingEntries(entries []api.MappingEntry) []MappingEntry {
-	apiEntries := make([]MappingEntry, len(entries))
-	for i, entry := range entries {
-		apiEntries[i] = MappingEntry{
-			Source: entry.Source,
-			Target: entry.Target,
-		}
-	}
-	return apiEntries
 }
 
 func ToOrchestrationEntry(entry *api.OrchestrationEntry) OrchestrationEntry {
@@ -189,19 +165,7 @@ func toActivities(activities []api.Activity) []ActivityDto {
 		result[i] = ActivityDto{
 			ID:        activity.ID,
 			Type:      string(activity.Type),
-			Inputs:    toMappingEntries(activity.Inputs),
 			DependsOn: activity.DependsOn,
-		}
-	}
-	return result
-}
-
-func toMappingEntries(entries []api.MappingEntry) []MappingEntry {
-	result := make([]MappingEntry, len(entries))
-	for i, entry := range entries {
-		result[i] = MappingEntry{
-			Source: entry.Source,
-			Target: entry.Target,
 		}
 	}
 	return result
