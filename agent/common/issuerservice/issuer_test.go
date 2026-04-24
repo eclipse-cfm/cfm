@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/eclipse-cfm/cfm/common/mocks"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -49,7 +50,7 @@ func TestHttpApiClient_CreateHolder(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("test token", nil)
+	tp.On("GetToken", mock.Anything).Return("test token", nil)
 	client := HttpApiClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -57,14 +58,14 @@ func TestHttpApiClient_CreateHolder(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.CreateHolder("did:web:test-participant", "did:web:test-participant", "test holder")
+	err := client.CreateHolder(t.Context(), "did:web:test-participant", "did:web:test-participant", "test holder")
 	require.NoError(t, err)
 }
 
 func TestHttpApiClient_CreateHolder_AuthError(t *testing.T) {
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("", fmt.Errorf("test error"))
+	tp.On("GetToken", mock.Anything).Return("", fmt.Errorf("test error"))
 	client := HttpApiClient{
 		BaseURL:       "http://foo.bar",
 		TokenProvider: tp,
@@ -72,7 +73,7 @@ func TestHttpApiClient_CreateHolder_AuthError(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.CreateHolder("did:web:test-participant", "did:web:test-participant", "test holder")
+	err := client.CreateHolder(t.Context(), "did:web:test-participant", "did:web:test-participant", "test holder")
 	require.ErrorContains(t, err, "test error")
 }
 
@@ -90,7 +91,7 @@ func TestHttpApiClient_CreateHolder_ApiReturnsError(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("test token", nil)
+	tp.On("GetToken", mock.Anything).Return("test token", nil)
 	client := HttpApiClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -98,7 +99,7 @@ func TestHttpApiClient_CreateHolder_ApiReturnsError(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.CreateHolder("did:web:test-participant", "did:web:test-participant", "test holder")
+	err := client.CreateHolder(t.Context(), "did:web:test-participant", "did:web:test-participant", "test holder")
 	require.ErrorContains(t, err, "failed to create Holder")
 }
 
@@ -115,7 +116,7 @@ func TestHttpApiClient_RevokeCredential(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("test token", nil)
+	tp.On("GetToken", mock.Anything).Return("test token", nil)
 	client := HttpApiClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -123,7 +124,7 @@ func TestHttpApiClient_RevokeCredential(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.RevokeCredential("did:web:test-participant", "test-credential-id")
+	err := client.RevokeCredential(t.Context(), "did:web:test-participant", "test-credential-id")
 	require.NoError(t, err)
 }
 
@@ -140,7 +141,7 @@ func TestHttpApiClient_RevokeCredential_ClientError(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("test token", nil)
+	tp.On("GetToken", mock.Anything).Return("test token", nil)
 	client := HttpApiClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -148,7 +149,7 @@ func TestHttpApiClient_RevokeCredential_ClientError(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.RevokeCredential("did:web:test-participant", "test-credential-id")
+	err := client.RevokeCredential(t.Context(), "did:web:test-participant", "test-credential-id")
 	require.ErrorContains(t, err, "failed to revoke credential")
 }
 
@@ -165,7 +166,7 @@ func TestHttpApiClient_RevokeCredential_NotFound(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("test token", nil)
+	tp.On("GetToken", mock.Anything).Return("test token", nil)
 	client := HttpApiClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -173,7 +174,7 @@ func TestHttpApiClient_RevokeCredential_NotFound(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.RevokeCredential("did:web:test-participant", "test-credential-id")
+	err := client.RevokeCredential(t.Context(), "did:web:test-participant", "test-credential-id")
 	require.ErrorContains(t, err, "failed to revoke credential")
 }
 
@@ -190,7 +191,7 @@ func TestHttpApiClient_DeleteHolder(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("test token", nil)
+	tp.On("GetToken", mock.Anything).Return("test token", nil)
 	client := HttpApiClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -198,7 +199,7 @@ func TestHttpApiClient_DeleteHolder(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.DeleteHolder("did:web:test-participant")
+	err := client.DeleteHolder(t.Context(), "did:web:test-participant")
 	require.NoError(t, err)
 }
 
@@ -215,7 +216,7 @@ func TestHttpApiClient_DeleteHolder_NotFound(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("test token", nil)
+	tp.On("GetToken", mock.Anything).Return("test token", nil)
 	client := HttpApiClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -223,7 +224,7 @@ func TestHttpApiClient_DeleteHolder_NotFound(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.DeleteHolder("did:web:test-participant")
+	err := client.DeleteHolder(t.Context(), "did:web:test-participant")
 	require.ErrorContains(t, err, "received status code 404")
 }
 func TestHttpApiClient_DeleteHolder_AuthError(t *testing.T) {
@@ -239,7 +240,7 @@ func TestHttpApiClient_DeleteHolder_AuthError(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("test token", nil)
+	tp.On("GetToken", mock.Anything).Return("test token", nil)
 	client := HttpApiClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -247,6 +248,6 @@ func TestHttpApiClient_DeleteHolder_AuthError(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.DeleteHolder("did:web:test-participant")
+	err := client.DeleteHolder(t.Context(), "did:web:test-participant")
 	require.ErrorContains(t, err, "received status code 401")
 }

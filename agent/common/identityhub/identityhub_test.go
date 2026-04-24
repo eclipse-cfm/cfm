@@ -24,6 +24,7 @@ import (
 
 	"github.com/eclipse-cfm/cfm/agent/edcv"
 	"github.com/eclipse-cfm/cfm/common/mocks"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -72,7 +73,7 @@ func TestIdentityAPIClient_CreateParticipantContext(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("token", nil)
+	tp.On("GetToken", mock.Anything).Return("token", nil)
 	client := HttpIdentityAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -88,14 +89,14 @@ func TestIdentityAPIClient_CreateParticipantContext(t *testing.T) {
 			manifest.VaultCredentials.ClientID = "client-id"
 			manifest.VaultCredentials.TokenURL = "https://example.com/idp/token"
 		})
-	_, err := client.CreateParticipantContext(manifest)
+	_, err := client.CreateParticipantContext(t.Context(), manifest)
 	require.NoError(t, err)
 
 }
 
 func TestIdentityAPIClient_AuthError(t *testing.T) {
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("", fmt.Errorf("test error"))
+	tp.On("GetToken", mock.Anything).Return("", fmt.Errorf("test error"))
 	client := HttpIdentityAPIClient{
 		BaseURL:       "http://foo.bar",
 		TokenProvider: tp,
@@ -111,7 +112,7 @@ func TestIdentityAPIClient_AuthError(t *testing.T) {
 			manifest.VaultCredentials.ClientID = "client-id"
 			manifest.VaultCredentials.TokenURL = "https://example.com/idp/token"
 		})
-	_, err := client.CreateParticipantContext(manifest)
+	_, err := client.CreateParticipantContext(t.Context(), manifest)
 	require.ErrorContains(t, err, "failed to get API access token: test error")
 }
 
@@ -123,7 +124,7 @@ func TestIdentityAPIClient_BadRequest(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("token", nil)
+	tp.On("GetToken", mock.Anything).Return("token", nil)
 	client := HttpIdentityAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -139,7 +140,7 @@ func TestIdentityAPIClient_BadRequest(t *testing.T) {
 			manifest.VaultCredentials.ClientID = "client-id"
 			manifest.VaultCredentials.TokenURL = "https://example.com/idp/token"
 		})
-	_, err := client.CreateParticipantContext(manifest)
+	_, err := client.CreateParticipantContext(t.Context(), manifest)
 	require.ErrorContains(t, err, "foobar")
 }
 
@@ -156,14 +157,14 @@ func TestHttpIdentityAPIClient_DeleteParticipantContext(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("token", nil)
+	tp.On("GetToken", mock.Anything).Return("token", nil)
 	client := HttpIdentityAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.DeleteParticipantContext("test-id")
+	err := client.DeleteParticipantContext(t.Context(), "test-id")
 	require.NoError(t, err)
 }
 
@@ -175,13 +176,13 @@ func TestHttpIdentityAPIClient_DeleteParticipantContext_NotFound(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken").Return("token", nil)
+	tp.On("GetToken", mock.Anything).Return("token", nil)
 	client := HttpIdentityAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.DeleteParticipantContext("test")
-	require.ErrorContains(t, err, "participant not found")
+	err := client.DeleteParticipantContext(t.Context(), "test")
+	require.ErrorContains(t, err, "participant context test not found")
 }

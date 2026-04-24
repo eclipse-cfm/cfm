@@ -189,7 +189,6 @@ func (c *ApiClient) deleteRequest(url string) error {
 	return nil
 }
 
-
 func (c *ApiClient) getRequest(baseUrl string, endpoint string, result any) error {
 	url := fmt.Sprintf("%s/%s", baseUrl, endpoint)
 	req, err := http.NewRequest("GET", url, nil)
@@ -214,5 +213,3 @@ func (c *ApiClient) getRequest(baseUrl string, endpoint string, result any) erro
 
 	return json.Unmarshal(body, result)
 }
-
-
