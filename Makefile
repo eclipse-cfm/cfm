@@ -13,6 +13,7 @@ EDCV_DIR=agent/edcv
 KEYCLOAK_DIR=agent/keycloak
 REG_DIR=agent/registration
 ONBOARDING_DIR=agent/onboarding
+AGENT_COMMON=agent/common
 KIND_CLUSTER_NAME=edcv
 
 E2E_DIR=e2e
@@ -101,6 +102,7 @@ test: install-gotestsum
 	$(MAKE) -C $(REG_DIR) test
 	$(MAKE) -C $(ONBOARDING_DIR) test
 	$(MAKE) -C $(ASSEMBLY_DIR) test
+	$(MAKE) -C $(AGENT_COMMON) test
 
 test-common:
 	@echo "Testing common..."
@@ -125,6 +127,10 @@ test-reg:
 test-onboarding:
 	@echo "Testing Onboarding agent..."
 	$(MAKE) -C $(ONBOARDING_DIR) test
+
+test-agent-common:
+	@echo "Testing agent common..."
+	$(MAKE) -C $(AGENT_COMMON) test
 
 #==============================================================================
 # Development Commands - Delegate to Service Makefiles
