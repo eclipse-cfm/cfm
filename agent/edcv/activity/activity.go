@@ -47,7 +47,7 @@ type EDCVActivityProcessor struct {
 	tracer               trace.Tracer
 }
 
-type EDCVData struct {
+type edcData struct {
 	ParticipantID       string `json:"cfm.participant.id" validate:"required"`
 	VaultAccessClientID string `json:"clientID.vaultAccess" validate:"required"`
 	ApiAccessClientID   string `json:"clientID.apiAccess" validate:"required"`
@@ -91,7 +91,7 @@ func (p EDCVActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.Activi
 	_, span := p.tracer.Start(ctx.Context(), "cfm.agent.edcv.deploy")
 	defer span.End()
 
-	var data EDCVData
+	var data edcData
 	err := ctx.ReadValues(&data)
 	if err != nil {
 		span.RecordError(err)
@@ -104,7 +104,7 @@ func (p EDCVActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.Activi
 }
 
 func (p EDCVActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.ActivityResult {
-	var data EDCVData
+	var data edcData
 	err := ctx.ReadValues(&data)
 	if err != nil {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing EDC-V activity for orchestration %s: %w", ctx.OID(), err)}
@@ -113,7 +113,7 @@ func (p EDCVActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.Activ
 }
 
 // handleDeployAction creates a participant context in IdentityHub and the control plane (incl. participant context config)
-func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data EDCVData, participantContextId string) api.ActivityResult {
+func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data edcData, participantContextId string) api.ActivityResult {
 
 	// override if config is provided
 	if p.CredentialServiceURL != "" {
