@@ -41,7 +41,6 @@ func validConfig(opts ...ConfigOptions) *Config {
 		LogMonitor:          system.NoopMonitor{},
 		TokenURL:            "http://auth.example.com/oauth2/token",
 		VaultURL:            "https://vault.example.com:8200",
-		STSTokenURL:         "test-sts-client-id",
 	}
 	for _, opt := range opts {
 		opt(&c)

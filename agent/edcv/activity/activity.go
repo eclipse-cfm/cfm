@@ -61,6 +61,7 @@ func NewProcessor(config *Config) *EDCVActivityProcessor {
 		ManagementAPIClient: config.ManagementAPIClient,
 		TokenURL:            config.TokenURL,
 		VaultURL:            config.VaultURL,
+		STSTokenURL:         config.STSTokenURL,
 		tracer:              otel.GetTracerProvider().Tracer("cfm.agent.edcv"),
 	}
 }
@@ -69,8 +70,9 @@ type Config struct {
 	serviceapi.VaultClient
 	system.LogMonitor
 	controlplane.ManagementAPIClient
-	TokenURL string
-	VaultURL string
+	TokenURL    string
+	VaultURL    string
+	STSTokenURL string
 }
 
 func (p EDCVActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {

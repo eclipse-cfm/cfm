@@ -28,12 +28,13 @@ import (
 )
 
 const (
-	urlKey             = "vault.url" // duplicate of common/vault/assembly.go
-	ActivityType       = "edcv-activity"
-	clientIDKey        = "keycloak.clientID"
-	clientSecretKey    = "keycloak.clientSecret"
-	tokenURLKey        = "keycloak.tokenUrl"
-	controlPlaneURLKey = "controlplane.url"
+	urlKey               = "vault.url" // duplicate of common/vault/assembly.go
+	ActivityType         = "edcv-activity"
+	clientIDKey          = "keycloak.clientID"
+	clientSecretKey      = "keycloak.clientSecret"
+	tokenURLKey          = "keycloak.tokenUrl"
+	identityHubStsURLKey = "identityhub.sts.url"
+	controlPlaneURLKey   = "controlplane.url"
 )
 
 func LaunchAndWaitSignal(shutdown <-chan struct{}) {
@@ -54,10 +55,11 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 			clientID := ctx.Config.GetString(clientIDKey)
 			clientSecret := ctx.Config.GetString(clientSecretKey)
 			tokenURL := ctx.Config.GetString(tokenURLKey)
+			ihStsURL := ctx.Config.GetString(identityHubStsURLKey)
 			cpURL := ctx.Config.GetString(controlPlaneURLKey)
 			vaultURL := ctx.Config.GetString(urlKey)
 
-			if err := runtime.CheckRequiredParams(clientIDKey, clientID, clientSecretKey, clientSecret, controlPlaneURLKey, cpURL, tokenURLKey, tokenURL); err != nil {
+			if err := runtime.CheckRequiredParams(clientIDKey, clientID, clientSecretKey, clientSecret, controlPlaneURLKey, cpURL, tokenURLKey, tokenURL, identityHubStsURLKey, ihStsURL); err != nil {
 				panic(err)
 			}
 
@@ -73,6 +75,7 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 				LogMonitor:  ctx.Monitor,
 				TokenURL:    tokenURL,
 				VaultURL:    vaultURL,
+				STSTokenURL: ihStsURL,
 				ManagementAPIClient: controlplane.HttpManagementAPIClient{
 					BaseURL:       cpURL,
 					TokenProvider: provider,
