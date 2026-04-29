@@ -210,41 +210,6 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenPendingRequestCreated(t *
 	assert.Empty(t, activityContext.OutputValues())
 }
 
-func TestOnboardingActivityProcessor_ProcessDeploy_WhenPendingRequestRejected(t *testing.T) {
-	ih := MockIdentityHubClient{
-		expectedState: identityhub.CredentialRequestStateRejected,
-	}
-	processor := OnboardingActivityProcessor{
-		Monitor:           system.NoopMonitor{},
-		IdentityApiClient: ih,
-	}
-
-	var processingData = map[string]any{
-		"clientID.apiAccess":   "test-participant",
-		"participantContextId": "test-participant",
-		"holderPid":            "test-holder-pid",
-		"credentialRequest":    "https://example.com/credentialservice/request/123",
-	}
-
-	ctx := context.Background()
-	outputData := make(map[string]any)
-
-	activity := api.Activity{
-		ID:            "test-activity",
-		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
-	}
-
-	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
-
-	result := processor.ProcessDeploy(activityContext)
-
-	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
-	assert.ErrorContains(t, result.Error, "credential request for participant 'test-participant' was rejected")
-
-	assert.Empty(t, activityContext.OutputValues())
-}
-
 func TestOnboardingActivityProcessor_ProcessDeploy_WhenPendingRequestError(t *testing.T) {
 	ih := MockIdentityHubClient{
 		expectedState: identityhub.CredentialRequestStateError,

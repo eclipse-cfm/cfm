@@ -131,8 +131,6 @@ func (p OnboardingActivityProcessor) processExistingRequest(ctx api.ActivityCont
 		ctx.SetOutputValue("credentialRequest", credentialRequest.CredentialRequestURL)
 		ctx.SetOutputValue("participantContextId", credentialRequest.ParticipantContextID)
 		return api.ActivityResult{Result: api.ActivityResultComplete}
-	case identityhub.CredentialRequestStateRejected:
-		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("credential request for participant '%s' was rejected", credentialRequest.ParticipantContextID)}
 	case identityhub.CredentialRequestStateError:
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("credential request for participant '%s' failed", credentialRequest.ParticipantContextID)}
 	default:

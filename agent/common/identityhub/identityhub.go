@@ -30,10 +30,9 @@ const (
 )
 
 const (
-	CredentialRequestStateCreated  = "CREATED"
-	CredentialRequestStateIssued   = "ISSUED"
-	CredentialRequestStateRejected = "REJECTED"
-	CredentialRequestStateError    = "ERROR"
+	CredentialRequestStateCreated = "CREATED"
+	CredentialRequestStateIssued  = "ISSUED"
+	CredentialRequestStateError   = "ERROR"
 )
 
 type IdentityAPIClient interface {
