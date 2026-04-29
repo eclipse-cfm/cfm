@@ -41,6 +41,7 @@ func validConfig(opts ...ConfigOptions) *Config {
 		LogMonitor:          system.NoopMonitor{},
 		TokenURL:            "http://auth.example.com/oauth2/token",
 		VaultURL:            "https://vault.example.com:8200",
+		STSTokenURL:         "test-sts-client-id",
 	}
 	for _, opt := range opts {
 		opt(&c)
@@ -245,6 +246,27 @@ func TestEDCVActivityProcessor_Process_MultipleUnknownFields(t *testing.T) {
 }
 
 func TestEDCVActivityProcessor_Process_MissingVaultEntry(t *testing.T) {
+	invalidConfig := validConfig()
+	invalidConfig.VaultClient = NewMockVaultClient() // does not contain any secrets
+	processor := NewProcessor(invalidConfig)
+
+	ctx := context.Background()
+	outputData := make(map[string]any)
+
+	activity := api.Activity{
+		ID:   "activity-multi",
+		Type: "edcv",
+	}
+
+	activityContext := api.NewActivityContext(ctx, "orch-multi", activity, copyOf(processingData), outputData)
+
+	result := processor.ProcessDeploy(activityContext)
+
+	assert.NotNil(t, result.Error)
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
+}
+
+func TestEDCVActivityProcessor_Process_MissingStsClientId(t *testing.T) {
 	invalidConfig := validConfig()
 	invalidConfig.VaultClient = NewMockVaultClient() // does not contain any secrets
 	processor := NewProcessor(invalidConfig)

@@ -28,13 +28,12 @@ import (
 )
 
 const (
-	urlKey               = "vault.url" // duplicate of common/vault/assembly.go
-	ActivityType         = "edcv-activity"
-	clientIDKey          = "keycloak.clientID"
-	clientSecretKey      = "keycloak.clientSecret"
-	tokenURLKey          = "keycloak.tokenUrl"
-	controlPlaneURLKey   = "controlplane.url"
-	identityHubStsURLKey = "identityhub.sts.url"
+	urlKey             = "vault.url" // duplicate of common/vault/assembly.go
+	ActivityType       = "edcv-activity"
+	clientIDKey        = "keycloak.clientID"
+	clientSecretKey    = "keycloak.clientSecret"
+	tokenURLKey        = "keycloak.tokenUrl"
+	controlPlaneURLKey = "controlplane.url"
 )
 
 func LaunchAndWaitSignal(shutdown <-chan struct{}) {
@@ -57,9 +56,8 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 			tokenURL := ctx.Config.GetString(tokenURLKey)
 			cpURL := ctx.Config.GetString(controlPlaneURLKey)
 			vaultURL := ctx.Config.GetString(urlKey)
-			ihStsURL := ctx.Config.GetString(identityHubStsURLKey)
 
-			if err := runtime.CheckRequiredParams(clientIDKey, clientID, clientSecretKey, clientSecret, controlPlaneURLKey, cpURL, tokenURLKey, tokenURL, identityHubStsURLKey, ihStsURL); err != nil {
+			if err := runtime.CheckRequiredParams(clientIDKey, clientID, clientSecretKey, clientSecret, controlPlaneURLKey, cpURL, tokenURLKey, tokenURL); err != nil {
 				panic(err)
 			}
 
@@ -75,7 +73,6 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 				LogMonitor:  ctx.Monitor,
 				TokenURL:    tokenURL,
 				VaultURL:    vaultURL,
-				STSTokenURL: ihStsURL,
 				ManagementAPIClient: controlplane.HttpManagementAPIClient{
 					BaseURL:       cpURL,
 					TokenProvider: provider,

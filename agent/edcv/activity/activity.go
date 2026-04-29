@@ -61,7 +61,6 @@ func NewProcessor(config *Config) *EDCVActivityProcessor {
 		ManagementAPIClient: config.ManagementAPIClient,
 		TokenURL:            config.TokenURL,
 		VaultURL:            config.VaultURL,
-		STSTokenURL:         config.STSTokenURL,
 		tracer:              otel.GetTracerProvider().Tracer("cfm.agent.edcv"),
 	}
 }
@@ -70,9 +69,8 @@ type Config struct {
 	serviceapi.VaultClient
 	system.LogMonitor
 	controlplane.ManagementAPIClient
-	TokenURL    string
-	VaultURL    string
-	STSTokenURL string
+	TokenURL string
+	VaultURL string
 }
 
 func (p EDCVActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
@@ -160,6 +158,11 @@ func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data 
 	ctrl.AddEvent("Created ParticipantContextConfig in Control Plane")
 	ctrl.End()
 	p.Monitor.Infof("EDCV activity for participant '%s' (client ID = %s) completed successfully", data.ParticipantID, data.ApiAccessClientID)
+
+	// delete the vault access secret, since it's no longer needed'
+	if err := p.VaultClient.DeleteSecret(ctx.Context(), data.VaultAccessClientID); err != nil {
+		p.Monitor.Warnf("failed to delete secret '%s': %v", data.VaultAccessClientID, err)
+	}
 
 	return api.ActivityResult{Result: api.ActivityResultComplete}
 }

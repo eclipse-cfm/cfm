@@ -33,7 +33,7 @@ import (
 // activity processing data, so that downstream agents (e.g. the edcv-agent) can read it.
 const STSClientIDKey = "ih.sts.clientId"
 
-type IHActivityProcessor struct {
+type IdentityHubActivityProcessor struct {
 	api.BaseActivityProcessor
 	VaultClient       serviceapi.VaultClient
 	HTTPClient        *http.Client
@@ -56,8 +56,8 @@ type ihData struct {
 	ProtocolServiceURL   string `json:"cfm.participant.protocolservice"`
 }
 
-func NewProcessor(config *Config) *IHActivityProcessor {
-	return &IHActivityProcessor{
+func NewProcessor(config *Config) *IdentityHubActivityProcessor {
+	return &IdentityHubActivityProcessor{
 		VaultClient:          config.VaultClient,
 		HTTPClient:           config.Client,
 		Monitor:              config.LogMonitor,
@@ -81,7 +81,7 @@ type Config struct {
 	ProtocolServiceURL   string
 }
 
-func (p IHActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
+func (p IdentityHubActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
 	_, span := p.tracer.Start(ctx.Context(), "cfm.agent.identityhub.deploy")
 	defer span.End()
 
@@ -96,7 +96,7 @@ func (p IHActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.Activity
 	return p.handleDeployAction(ctx, data, participantContextId)
 }
 
-func (p IHActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.ActivityResult {
+func (p IdentityHubActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.ActivityResult {
 	var data ihData
 	if err := ctx.ReadValues(&data); err != nil {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing IH activity for orchestration %s: %w", ctx.OID(), err)}
@@ -106,7 +106,7 @@ func (p IHActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.Activit
 
 // handleDeployAction creates the participant context in IdentityHub and stores the returned STSClientID
 // in the activity context so that downstream agents can use it.
-func (p IHActivityProcessor) handleDeployAction(ctx api.ActivityContext, data ihData, participantContextId string) api.ActivityResult {
+func (p IdentityHubActivityProcessor) handleDeployAction(ctx api.ActivityContext, data ihData, participantContextId string) api.ActivityResult {
 
 	// apply URL templates if configured
 	if p.CredentialServiceURL != "" {
@@ -157,17 +157,12 @@ func (p IHActivityProcessor) handleDeployAction(ctx api.ActivityContext, data ih
 	// make the STS client ID available to downstream agents
 	ctx.SetValue(STSClientIDKey, createResponse.STSClientID)
 
-	// delete the vault access secret, since it's no longer needed'
-	if err := p.VaultClient.DeleteSecret(ctx.Context(), data.VaultAccessClientID); err != nil {
-		p.Monitor.Warnf("failed to delete secret '%s': %v", data.VaultAccessClientID, err)
-	}
-
 	p.Monitor.Infof("IH activity for participant '%s' (client ID = %s) completed successfully", data.ParticipantID, participantContextId)
 	return api.ActivityResult{Result: api.ActivityResultComplete}
 }
 
 // handleDisposeAction deletes the participant context from IdentityHub
-func (p IHActivityProcessor) handleDisposeAction(ctx context.Context, participantContextID string) api.ActivityResult {
+func (p IdentityHubActivityProcessor) handleDisposeAction(ctx context.Context, participantContextID string) api.ActivityResult {
 	err := p.IdentityAPIClient.DeleteParticipantContext(ctx, participantContextID)
 	if err != nil {
 		p.Monitor.Warnf("error deleting participant context '%s' from IdentityHub: %v", participantContextID, err)
