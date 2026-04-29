@@ -14,23 +14,10 @@
 
 package edcv
 
-// VaultConfig defines configuration for accessing a vault, including its URL, secret path, and folder path.
-type VaultConfig struct {
-	// VaultURL the base URL of the vault
-	VaultURL string `json:"vaultUrl"`
-	// SecretPath the path of the mount point of the secret engine
-	SecretPath string `json:"secretPath"`
-	// FolderPath the path of the folder within the secret engine where the participant's manifest will be stored. Note that this will be prefixed with the
-	// participant context ID
-	FolderPath string `json:"folderPath"`
-}
+import commonvault "github.com/eclipse-cfm/cfm/agent/common/vault"
 
-// VaultCredentials defines the credentials which are needed to get a JWT which is used to access a vault
-type VaultCredentials struct {
-	// ClientID client ID of the service account of the IdP which is configured in Vault
-	ClientID string `json:"clientId"`
-	// ClientSecret secret of the service account of the IdP, which is configured in Vault
-	ClientSecret string `json:"clientSecret"`
-	// TokenURL URL of the token endpoint of the IdP which is configured in Vault
-	TokenURL string `json:"tokenUrl"`
-}
+// VaultConfig re-exports the common VaultConfig type.
+type VaultConfig = commonvault.Config
+
+// VaultCredentials re-exports the common VaultCredentials type.
+type VaultCredentials = commonvault.Credentials

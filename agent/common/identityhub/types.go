@@ -17,7 +17,7 @@ package identityhub
 import (
 	"strings"
 
-	"github.com/eclipse-cfm/cfm/agent/edcv"
+	commonvault "github.com/eclipse-cfm/cfm/agent/common/vault"
 )
 
 const (
@@ -57,9 +57,9 @@ type ParticipantManifest struct {
 	// KeyGeneratorParameters the parameters used to generate the cryptographic key for the participant. Supplying a pre-generated key is not supported yet.
 	KeyGeneratorParameters KeyGeneratorParameters
 	// VaultConfig configuration for accessing a vault
-	VaultConfig edcv.VaultConfig
+	VaultConfig commonvault.Config
 	// VaultCredentials credentials which are needed to get a JWT which is used to access a vault
-	VaultCredentials edcv.VaultCredentials
+	VaultCredentials commonvault.Credentials
 }
 
 type CreateParticipantContextResponse struct {
@@ -89,7 +89,7 @@ func NewParticipantManifest(
 			KeyAlgorithm:    DefaultAlgorithm,
 			Curve:           DefaultCurve,
 		},
-		VaultConfig: edcv.VaultConfig{
+		VaultConfig: commonvault.Config{
 			SecretPath: "v1/participants",
 			FolderPath: participantContextID + "/identityhub",
 		},

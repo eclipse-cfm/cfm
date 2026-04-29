@@ -15,8 +15,8 @@ package launcher
 import (
 	"net/http"
 
-	"github.com/eclipse-cfm/cfm/agent/edcv/activity"
-	"github.com/eclipse-cfm/cfm/agent/edcv/controlplane"
+	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
+	"github.com/eclipse-cfm/cfm/agent/ih/activity"
 	"github.com/eclipse-cfm/cfm/assembly/httpclient"
 	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
 	"github.com/eclipse-cfm/cfm/assembly/vault"
@@ -28,20 +28,21 @@ import (
 )
 
 const (
-	urlKey               = "vault.url" // duplicate of common/vault/assembly.go
-	ActivityType         = "edcv-activity"
-	clientIDKey          = "keycloak.clientID"
-	clientSecretKey      = "keycloak.clientSecret"
-	tokenURLKey          = "keycloak.tokenUrl"
-	controlPlaneURLKey   = "controlplane.url"
-	identityHubStsURLKey = "identityhub.sts.url"
+	ActivityType                       = "identityhub-activity"
+	urlKey                             = "vault.url"
+	clientIDKey                        = "keycloak.clientID"
+	clientSecretKey                    = "keycloak.clientSecret"
+	tokenURLKey                        = "keycloak.tokenUrl"
+	identityHubURLKey                  = "identityhub.url"
+	identityHubCredentialServiceURLKey = "identityhub.cs.url"
+	controlPlaneProtocolURLKey         = "controlplane.protocol.url"
 )
 
 func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 	config := natsagent.LauncherConfig{
-		AgentName:    "EDC-V Agent",
-		ServiceName:  "cfm.agent.edcv",
-		ConfigPrefix: "edcvagent",
+		AgentName:    "IdentityHub Agent",
+		ServiceName:  "cfm.agent.identityhub",
+		ConfigPrefix: "ihagent",
 		ActivityType: ActivityType,
 		AssemblyProvider: func() []system.ServiceAssembly {
 			return []system.ServiceAssembly{
@@ -55,11 +56,12 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 			clientID := ctx.Config.GetString(clientIDKey)
 			clientSecret := ctx.Config.GetString(clientSecretKey)
 			tokenURL := ctx.Config.GetString(tokenURLKey)
-			cpURL := ctx.Config.GetString(controlPlaneURLKey)
+			ihURL := ctx.Config.GetString(identityHubURLKey)
 			vaultURL := ctx.Config.GetString(urlKey)
-			ihStsURL := ctx.Config.GetString(identityHubStsURLKey)
+			ihCsURL := ctx.Config.GetString(identityHubCredentialServiceURLKey)
+			cpProtocolURL := ctx.Config.GetString(controlPlaneProtocolURLKey)
 
-			if err := runtime.CheckRequiredParams(clientIDKey, clientID, clientSecretKey, clientSecret, controlPlaneURLKey, cpURL, tokenURLKey, tokenURL, identityHubStsURLKey, ihStsURL); err != nil {
+			if err := runtime.CheckRequiredParams(clientIDKey, clientID, clientSecretKey, clientSecret, tokenURLKey, tokenURL, identityHubURLKey, ihURL); err != nil {
 				panic(err)
 			}
 
@@ -70,17 +72,20 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 					TokenURL:     tokenURL,
 					GrantType:    oauth2.ClientCredentials,
 				}, &httpClient)
+
 			return activity.NewProcessor(&activity.Config{
 				VaultClient: vaultClient,
+				Client:      &httpClient,
 				LogMonitor:  ctx.Monitor,
-				TokenURL:    tokenURL,
-				VaultURL:    vaultURL,
-				STSTokenURL: ihStsURL,
-				ManagementAPIClient: controlplane.HttpManagementAPIClient{
-					BaseURL:       cpURL,
+				IdentityAPIClient: identityhub.HttpIdentityAPIClient{
+					BaseURL:       ihURL,
 					TokenProvider: provider,
 					HttpClient:    &httpClient,
 				},
+				TokenURL:             tokenURL,
+				VaultURL:             vaultURL,
+				CredentialServiceURL: ihCsURL,
+				ProtocolServiceURL:   cpProtocolURL,
 			})
 		},
 	}

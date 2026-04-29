@@ -15,36 +15,33 @@ package activity
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strings"
 
-	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
 	"github.com/eclipse-cfm/cfm/agent/edcv"
 	"github.com/eclipse-cfm/cfm/agent/edcv/controlplane"
 	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
 	. "github.com/eclipse-cfm/cfm/common/collection"
 	"github.com/eclipse-cfm/cfm/common/system"
-	"github.com/eclipse-cfm/cfm/common/token"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
+const (
+	// STSClientIDKey is the context key written by the ih-agent and read here
+	STSClientIDKey = "ih.sts.clientId"
+)
+
 type EDCVActivityProcessor struct {
 	api.BaseActivityProcessor
-	VaultClient          serviceapi.VaultClient
-	HTTPClient           *http.Client
-	Monitor              system.LogMonitor
-	TokenProvider        token.TokenProvider
-	IdentityAPIClient    identityhub.IdentityAPIClient
-	TokenURL             string
-	VaultURL             string
-	STSTokenURL          string
-	CredentialServiceURL string
-	ProtocolServiceURL   string
-	ManagementAPIClient  controlplane.ManagementAPIClient
-	tracer               trace.Tracer
+	VaultClient         serviceapi.VaultClient
+	Monitor             system.LogMonitor
+	ManagementAPIClient controlplane.ManagementAPIClient
+	TokenURL            string
+	VaultURL            string
+	STSTokenURL         string
+	tracer              trace.Tracer
 }
 
 type edcData struct {
@@ -59,31 +56,23 @@ type edcData struct {
 
 func NewProcessor(config *Config) *EDCVActivityProcessor {
 	return &EDCVActivityProcessor{
-		VaultClient:          config.VaultClient,
-		HTTPClient:           config.Client,
-		Monitor:              config.LogMonitor,
-		IdentityAPIClient:    config.IdentityAPIClient,
-		ManagementAPIClient:  config.ManagementAPIClient,
-		TokenURL:             config.TokenURL,
-		VaultURL:             config.VaultURL,
-		STSTokenURL:          config.STSTokenURL,
-		CredentialServiceURL: config.CredentialServiceURL,
-		ProtocolServiceURL:   config.ProtocolServiceURL,
-		tracer:               otel.GetTracerProvider().Tracer("cfm.agent.edcv"),
+		VaultClient:         config.VaultClient,
+		Monitor:             config.LogMonitor,
+		ManagementAPIClient: config.ManagementAPIClient,
+		TokenURL:            config.TokenURL,
+		VaultURL:            config.VaultURL,
+		STSTokenURL:         config.STSTokenURL,
+		tracer:              otel.GetTracerProvider().Tracer("cfm.agent.edcv"),
 	}
 }
 
 type Config struct {
 	serviceapi.VaultClient
-	*http.Client
 	system.LogMonitor
-	identityhub.IdentityAPIClient
 	controlplane.ManagementAPIClient
-	TokenURL             string
-	VaultURL             string
-	STSTokenURL          string
-	CredentialServiceURL string
-	ProtocolServiceURL   string
+	TokenURL    string
+	VaultURL    string
+	STSTokenURL string
 }
 
 func (p EDCVActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
@@ -112,34 +101,28 @@ func (p EDCVActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.Activ
 	return p.handleDisposeAction(ctx.Context(), data.ApiAccessClientID)
 }
 
-// handleDeployAction creates a participant context in IdentityHub and the control plane (incl. participant context config)
+// handleDeployAction creates the participant context and config in the EDC control plane.
+// It expects the STSClientID to already be present in the activity context (written by the ih-agent).
 func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data edcData, participantContextId string) api.ActivityResult {
 
-	// override if config is provided
-	if p.CredentialServiceURL != "" {
-		data.CredentialServiceURL = fmt.Sprintf(p.CredentialServiceURL, participantContextId)
+	stsClientIDVal, ok := ctx.Value(STSClientIDKey)
+	if !ok || stsClientIDVal == nil {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("'%s' not found in activity context for orchestration %s — ensure the ih-agent runs before the edcv-agent", STSClientIDKey, ctx.OID())}
 	}
-	if p.ProtocolServiceURL != "" {
-		data.ProtocolServiceURL = fmt.Sprintf(p.ProtocolServiceURL, participantContextId)
-	}
-
-	if data.CredentialServiceURL == "" {
-		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("CredentialServiceURL is empty")}
-	}
-	if data.ProtocolServiceURL == "" {
-		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("ProtocolServiceURL is empty")}
+	stsClientID, ok := stsClientIDVal.(string)
+	if !ok || stsClientID == "" {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("'%s' in activity context is not a valid string for orchestration %s", STSClientIDKey, ctx.OID())}
 	}
 
-	// resolve vault client secret for the new participant
+	did := data.ParticipantID
+	if !strings.HasPrefix(did, "did:web:") {
+		p.Monitor.Warnf("Participant identifiers are expected to be Web-DIDs, but this one was not: '%s'. Subsequent communication may be severely impacted!", did)
+	}
+
+	// resolve vault credentials for the control plane config
 	vaultAccessSecret, err := p.VaultClient.ResolveSecret(ctx.Context(), data.VaultAccessClientID)
 	if err != nil {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error retrieving client secret for orchestration %s: %w", ctx.OID(), err)}
-	}
-	// create participant-context in IdentityHub
-	did := data.ParticipantID
-
-	if !strings.HasPrefix(did, "did:web:") {
-		p.Monitor.Warnf("Participant identifiers are expected to be Web-DIDs, but this one was not: '%s'. Subsequent communication may be severely impacted!", did)
 	}
 
 	vaultCreds := edcv.VaultCredentials{
@@ -147,24 +130,11 @@ func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data 
 		ClientSecret: vaultAccessSecret,
 		TokenURL:     p.TokenURL,
 	}
-
-	_, identyHubSpan := p.tracer.Start(ctx.Context(), "cfm.agent.edcv.deploy.identityhub", trace.WithSpanKind(trace.SpanKindClient))
-
-	manifest := identityhub.NewParticipantManifest(participantContextId, did, data.CredentialServiceURL, data.ProtocolServiceURL, func(m *identityhub.ParticipantManifest) {
-		m.VaultCredentials = vaultCreds
-		m.VaultConfig.VaultURL = p.VaultURL
-		m.VaultConfig.FolderPath = participantContextId + "/identityhub"
-		m.CredentialServiceURL = data.CredentialServiceURL
-		m.ProtocolServiceURL = data.ProtocolServiceURL
-	})
-	createResponse, err := p.IdentityAPIClient.CreateParticipantContext(ctx.Context(), manifest)
-	if err != nil {
-		identyHubSpan.RecordError(err)
-		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("cannot create participant in identity hub: %w", err)}
+	vaultConfig := edcv.VaultConfig{
+		VaultURL:   p.VaultURL,
+		SecretPath: "v1/participants",
+		FolderPath: participantContextId + "/identityhub",
 	}
-	identyHubSpan.End()
-
-	vaultConfig := manifest.VaultConfig
 
 	_, ctrl := p.tracer.Start(ctx.Context(), "cfm.agent.edcv.deploy.controlplane", trace.WithSpanKind(trace.SpanKindClient))
 
@@ -182,7 +152,7 @@ func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data 
 
 	// create participant config in Control Plane
 	alias := participantContextId + "-sts-client-secret"
-	config := controlplane.NewParticipantContextConfig(participantContextId, createResponse.STSClientID, alias, data.ParticipantID, vaultConfig, vaultCreds, p.STSTokenURL)
+	config := controlplane.NewParticipantContextConfig(participantContextId, stsClientID, alias, data.ParticipantID, vaultConfig, vaultCreds, p.STSTokenURL)
 	if err := p.ManagementAPIClient.CreateConfig(ctx.Context(), participantContextId, config); err != nil {
 		ctrl.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("cannot create participant config in control plane: %w", err)}
@@ -190,23 +160,16 @@ func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data 
 	ctrl.AddEvent("Created ParticipantContextConfig in Control Plane")
 	ctrl.End()
 	p.Monitor.Infof("EDCV activity for participant '%s' (client ID = %s) completed successfully", data.ParticipantID, data.ApiAccessClientID)
-	if err := p.VaultClient.DeleteSecret(ctx.Context(), data.VaultAccessClientID); err != nil {
-		p.Monitor.Warnf("failed to delete secret '%s': %v", data.VaultAccessClientID, err)
-	}
+
 	return api.ActivityResult{Result: api.ActivityResultComplete}
 }
 
-// handleDisposeAction deletes the participant context in IdentityHub and the control plane
+// handleDisposeAction deletes the participant context and config from the EDC control plane
 func (p EDCVActivityProcessor) handleDisposeAction(ctx context.Context, participantContextID string) api.ActivityResult {
 	var errors []error
-	// delete from IdentityHub
-	err := p.IdentityAPIClient.DeleteParticipantContext(ctx, participantContextID)
-	if err != nil {
-		errors = append(errors, err)
-	}
 
 	// delete config from Control Plane
-	err = p.ManagementAPIClient.DeleteConfig(ctx, participantContextID)
+	err := p.ManagementAPIClient.DeleteConfig(ctx, participantContextID)
 	if err != nil {
 		errors = append(errors, err)
 	}
@@ -216,23 +179,11 @@ func (p EDCVActivityProcessor) handleDisposeAction(ctx context.Context, particip
 	if err != nil {
 		errors = append(errors, err)
 	}
+
 	if len(errors) > 0 {
 		errorStrings := Collect(Map(From(errors), func(err error) string { return err.Error() }))
 		errStr := strings.Join(errorStrings, ", ")
 		p.Monitor.Warnf("one or more errors occurred while rolling back participant context '%s': [%s]", participantContextID, errStr)
-
 	}
 	return api.ActivityResult{Result: api.ActivityResultComplete}
-}
-
-// extractWebDid extracts a WebDID from a given URL. Currently not used, as the participant profile contains an "identifier" which is the DID.
-func (p EDCVActivityProcessor) extractWebDid(url string) (string, error) {
-
-	did := strings.Replace(url, "https", "http", -1)
-	did = strings.Replace(did, "http://", "", -1)
-	did = strings.Replace(did, ":", "%3A", 8)
-	did = strings.ReplaceAll(did, "/", ":")
-	did = "did:web:" + did
-
-	return did, nil
 }

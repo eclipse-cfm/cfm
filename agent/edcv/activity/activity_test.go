@@ -15,10 +15,8 @@ package activity
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"testing"
 
-	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
 	"github.com/eclipse-cfm/cfm/agent/edcv/controlplane"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/system"
@@ -30,12 +28,6 @@ import (
 
 type ConfigOptions func(*Config)
 
-func WithIdentityHub(client identityhub.IdentityAPIClient) ConfigOptions {
-	return func(config *Config) {
-		config.IdentityAPIClient = client
-	}
-}
-
 func WithControlPlane(client controlplane.ManagementAPIClient) ConfigOptions {
 	return func(config *Config) {
 		config.ManagementAPIClient = client
@@ -46,8 +38,6 @@ func validConfig(opts ...ConfigOptions) *Config {
 	c := Config{
 		VaultClient:         NewMockVaultClient("client-123", "123"),
 		ManagementAPIClient: MockManagementApiClient{},
-		IdentityAPIClient:   MockIdentityHubClient{},
-		Client:              &http.Client{},
 		LogMonitor:          system.NoopMonitor{},
 		TokenURL:            "http://auth.example.com/oauth2/token",
 		VaultURL:            "https://vault.example.com:8200",
@@ -65,11 +55,11 @@ var processingData = map[string]any{
 	"cfm.participant.credentialservice": "https://example.com/credentialservice",
 	"cfm.participant.protocolservice":   "https://example.com/protocolservice",
 	"publicURL":                         "http://test.example.com:1234/fizz/buzz",
+	STSClientIDKey:                      "test-sts-client-id",
 }
 
 func TestEDCVActivityProcessor_Process_WithValidData(t *testing.T) {
-	ih := MockIdentityHubClient{}
-	processor := NewProcessor(validConfig(WithIdentityHub(ih)))
+	processor := NewProcessor(validConfig())
 
 	ctx := context.Background()
 	outputData := make(map[string]any)
@@ -80,7 +70,7 @@ func TestEDCVActivityProcessor_Process_WithValidData(t *testing.T) {
 		Discriminator: api.DeployDiscriminator,
 	}
 
-	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
+	activityContext := api.NewActivityContext(ctx, "orch-123", activity, copyOf(processingData), outputData)
 
 	result := processor.ProcessDeploy(activityContext)
 
@@ -115,8 +105,8 @@ func TestEDCVActivityProcessor_Process_MissingParticipantID(t *testing.T) {
 func TestEDCVActivityProcessor_Process_MissingClientID(t *testing.T) {
 	processor := NewProcessor(validConfig())
 	ctx := context.Background()
-	processingData := copyOf(processingData)
-	delete(processingData, "clientID.vaultAccess")
+	pd := copyOf(processingData)
+	delete(pd, "clientID.vaultAccess")
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
@@ -125,7 +115,7 @@ func TestEDCVActivityProcessor_Process_MissingClientID(t *testing.T) {
 		Discriminator: api.DeployDiscriminator,
 	}
 
-	activityContext := api.NewActivityContext(ctx, "orchestration-2", activity, processingData, outputData)
+	activityContext := api.NewActivityContext(ctx, "orchestration-2", activity, pd, outputData)
 
 	result := processor.ProcessDeploy(activityContext)
 
@@ -135,50 +125,27 @@ func TestEDCVActivityProcessor_Process_MissingClientID(t *testing.T) {
 	assert.Contains(t, result.Error.Error(), "error processing EDC-V activity")
 }
 
-func TestEDCVActivityProcessor_Process_MissingCredentialServiceUrl(t *testing.T) {
+func TestEDCVActivityProcessor_Process_MissingSTSClientID(t *testing.T) {
 	processor := NewProcessor(validConfig())
 	ctx := context.Background()
-	processingData := copyOf(processingData)
-	delete(processingData, "cfm.participant.credentialservice")
+	pd := copyOf(processingData)
+	delete(pd, STSClientIDKey)
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
-		ID:            "activity-2",
+		ID:            "activity-sts",
 		Type:          "edcv",
 		Discriminator: api.DeployDiscriminator,
 	}
 
-	activityContext := api.NewActivityContext(ctx, "orchestration-2", activity, processingData, outputData)
+	activityContext := api.NewActivityContext(ctx, "orchestration-sts", activity, pd, outputData)
 
 	result := processor.ProcessDeploy(activityContext)
 
 	require.NotNil(t, result)
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	assert.NotNil(t, result.Error)
-	assert.Contains(t, result.Error.Error(), "CredentialServiceURL is empty")
-}
-
-func TestEDCVActivityProcessor_Process_MissingProtocolServiceUrl(t *testing.T) {
-	processor := NewProcessor(validConfig())
-	ctx := context.Background()
-	processingData := copyOf(processingData)
-	delete(processingData, "cfm.participant.protocolservice")
-	outputData := make(map[string]any)
-
-	activity := api.Activity{
-		ID:            "activity-2",
-		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
-	}
-
-	activityContext := api.NewActivityContext(ctx, "orchestration-2", activity, processingData, outputData)
-
-	result := processor.ProcessDeploy(activityContext)
-
-	require.NotNil(t, result)
-	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
-	assert.NotNil(t, result.Error)
-	assert.Contains(t, result.Error.Error(), "ProtocolServiceURL is empty")
+	assert.Contains(t, result.Error.Error(), STSClientIDKey)
 }
 
 func TestEDCVActivityProcessor_Process_EmptyProcessingData(t *testing.T) {
@@ -253,9 +220,7 @@ func TestEDCVActivityProcessor_Process_OrchestrationIDInError(t *testing.T) {
 }
 
 func TestEDCVActivityProcessor_Process_MultipleUnknownFields(t *testing.T) {
-	ih := MockIdentityHubClient{}
-
-	processor := NewProcessor(validConfig(WithIdentityHub(ih)))
+	processor := NewProcessor(validConfig())
 
 	ctx := context.Background()
 	pd := copyOf(processingData)
@@ -280,15 +245,11 @@ func TestEDCVActivityProcessor_Process_MultipleUnknownFields(t *testing.T) {
 }
 
 func TestEDCVActivityProcessor_Process_MissingVaultEntry(t *testing.T) {
-
-	ih := MockIdentityHubClient{}
-
-	invalidConfig := validConfig(WithIdentityHub(ih))
+	invalidConfig := validConfig()
 	invalidConfig.VaultClient = NewMockVaultClient() // does not contain any secrets
 	processor := NewProcessor(invalidConfig)
 
 	ctx := context.Background()
-
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
@@ -296,32 +257,12 @@ func TestEDCVActivityProcessor_Process_MissingVaultEntry(t *testing.T) {
 		Type: "edcv",
 	}
 
-	activityContext := api.NewActivityContext(ctx, "orch-multi", activity, processingData, outputData)
+	activityContext := api.NewActivityContext(ctx, "orch-multi", activity, copyOf(processingData), outputData)
 
 	result := processor.ProcessDeploy(activityContext)
 
 	assert.NotNil(t, result.Error)
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
-}
-
-func TestEDCVActivityProcessor_Process_IdentityHubFailure(t *testing.T) {
-	ih := MockIdentityHubClient{expectedError: fmt.Errorf("some error")}
-	processor := NewProcessor(validConfig(WithIdentityHub(ih)))
-
-	ctx := context.Background()
-	outputData := make(map[string]any)
-
-	activity := api.Activity{
-		ID:   "test-activity",
-		Type: "edcv",
-	}
-
-	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
-
-	result := processor.ProcessDeploy(activityContext)
-
-	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
-	assert.Error(t, result.Error, "some error")
 }
 
 func TestEDCVActivityProcessor_Process_ManagementAPIFailure(t *testing.T) {
@@ -336,7 +277,7 @@ func TestEDCVActivityProcessor_Process_ManagementAPIFailure(t *testing.T) {
 		Discriminator: api.DeployDiscriminator,
 	}
 
-	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
+	activityContext := api.NewActivityContext(ctx, "orch-123", activity, copyOf(processingData), outputData)
 
 	result := processor.ProcessDeploy(activityContext)
 
@@ -356,7 +297,7 @@ func TestEDCVActivityProcessor_Process_ManagementAPIFailureConfig(t *testing.T) 
 		Discriminator: api.DeployDiscriminator,
 	}
 
-	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
+	activityContext := api.NewActivityContext(ctx, "orch-123", activity, copyOf(processingData), outputData)
 
 	result := processor.ProcessDeploy(activityContext)
 
@@ -365,8 +306,7 @@ func TestEDCVActivityProcessor_Process_ManagementAPIFailureConfig(t *testing.T) 
 }
 
 func TestEDCVActivityProcessor_ProcessDispose(t *testing.T) {
-	ih := MockIdentityHubClient{}
-	processor := NewProcessor(validConfig(WithIdentityHub(ih)))
+	processor := NewProcessor(validConfig())
 
 	ctx := context.Background()
 	outputData := make(map[string]any)
@@ -377,7 +317,7 @@ func TestEDCVActivityProcessor_ProcessDispose(t *testing.T) {
 		Discriminator: api.DisposeDiscriminator,
 	}
 
-	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
+	activityContext := api.NewActivityContext(ctx, "orch-123", activity, copyOf(processingData), outputData)
 
 	result := processor.ProcessDispose(activityContext)
 
@@ -386,8 +326,7 @@ func TestEDCVActivityProcessor_ProcessDispose(t *testing.T) {
 }
 
 func TestEDCVActivityProcessor_ProcessDispose_CtrlPlaneParticipantError(t *testing.T) {
-	ih := MockIdentityHubClient{}
-	processor := NewProcessor(validConfig(WithIdentityHub(ih), WithControlPlane(MockManagementApiClient{
+	processor := NewProcessor(validConfig(WithControlPlane(MockManagementApiClient{
 		expectedParticipantError: fmt.Errorf("some error"),
 	})))
 
@@ -400,7 +339,7 @@ func TestEDCVActivityProcessor_ProcessDispose_CtrlPlaneParticipantError(t *testi
 		Discriminator: api.DisposeDiscriminator,
 	}
 
-	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
+	activityContext := api.NewActivityContext(ctx, "orch-123", activity, copyOf(processingData), outputData)
 
 	result := processor.ProcessDispose(activityContext)
 
@@ -409,8 +348,7 @@ func TestEDCVActivityProcessor_ProcessDispose_CtrlPlaneParticipantError(t *testi
 }
 
 func TestEDCVActivityProcessor_ProcessDispose_CtrlPlaneConfigError(t *testing.T) {
-	ih := MockIdentityHubClient{}
-	processor := NewProcessor(validConfig(WithIdentityHub(ih), WithControlPlane(MockManagementApiClient{
+	processor := NewProcessor(validConfig(WithControlPlane(MockManagementApiClient{
 		expectedConfigError: fmt.Errorf("some error"),
 	})))
 
@@ -423,30 +361,7 @@ func TestEDCVActivityProcessor_ProcessDispose_CtrlPlaneConfigError(t *testing.T)
 		Discriminator: api.DisposeDiscriminator,
 	}
 
-	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
-
-	result := processor.ProcessDispose(activityContext)
-
-	// expect to complete successfully, to unblock subsequent agents
-	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
-}
-
-func TestEDCVActivityProcessor_ProcessDispose_IdentityHubError(t *testing.T) {
-	ih := MockIdentityHubClient{
-		expectedError: fmt.Errorf("some error"),
-	}
-	processor := NewProcessor(validConfig(WithIdentityHub(ih)))
-
-	ctx := context.Background()
-	outputData := make(map[string]any)
-
-	activity := api.Activity{
-		ID:            "test-activity",
-		Type:          "edcv",
-		Discriminator: api.DisposeDiscriminator,
-	}
-
-	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
+	activityContext := api.NewActivityContext(ctx, "orch-123", activity, copyOf(processingData), outputData)
 
 	result := processor.ProcessDispose(activityContext)
 
@@ -501,36 +416,6 @@ func copyOf(m map[string]any) map[string]any {
 		result[k] = v
 	}
 	return result
-}
-
-type MockIdentityHubClient struct {
-	expectedError       error
-	expectedCredentials []identityhub.VerifiableCredentialResource
-}
-
-func (m MockIdentityHubClient) QueryCredentialByType(ctx context.Context, participantContextID string, credentialType string) ([]identityhub.VerifiableCredentialResource, error) {
-	return m.expectedCredentials, m.expectedError
-}
-
-func (m MockIdentityHubClient) DeleteParticipantContext(ctx context.Context, participantContextID string) error {
-	return m.expectedError
-}
-
-func (m MockIdentityHubClient) GetCredentialRequestState(context.Context, string, string) (string, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (m MockIdentityHubClient) RequestCredentials(context.Context, string, identityhub.CredentialRequest) (string, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (m MockIdentityHubClient) CreateParticipantContext(context.Context, identityhub.ParticipantManifest) (*identityhub.CreateParticipantContextResponse, error) {
-	return &identityhub.CreateParticipantContextResponse{
-		STSClientID:     "test-clientid",
-		STSClientSecret: "test-secret-alias",
-	}, m.expectedError
 }
 
 type MockManagementApiClient struct {

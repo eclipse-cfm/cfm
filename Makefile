@@ -10,6 +10,7 @@ COMMON_DIR=common
 PMANAGER_DIR=pmanager
 TMANAGER_DIR=tmanager
 EDCV_DIR=agent/edcv
+IH_DIR=agent/ih
 KEYCLOAK_DIR=agent/keycloak
 REG_DIR=agent/registration
 ONBOARDING_DIR=agent/onboarding
@@ -66,6 +67,7 @@ build:
 	$(MAKE) -C $(PMANAGER_DIR) build
 	$(MAKE) -C $(TMANAGER_DIR) build
 	$(MAKE) -C $(EDCV_DIR) build
+	$(MAKE) -C $(IH_DIR) build
 	$(MAKE) -C $(KEYCLOAK_DIR) build
 	$(MAKE) -C $(REG_DIR) build
 	$(MAKE) -C $(ONBOARDING_DIR) build
@@ -83,6 +85,7 @@ build-all:
 	$(MAKE) -C $(PMANAGER_DIR) build-all
 	$(MAKE) -C $(TMANAGER_DIR) build-all
 	$(MAKE) -C $(EDCV_DIR) build-all
+	$(MAKE) -C $(IH_DIR) build-all
 	$(MAKE) -C $(KEYCLOAK_DIR) build-all
 	$(MAKE) -C $(REG_DIR) build-all
 	$(MAKE) -C $(ONBOARDING_DIR) build-all
@@ -97,6 +100,7 @@ test: install-gotestsum
 	$(MAKE) -C $(PMANAGER_DIR) test
 	$(MAKE) -C $(TMANAGER_DIR) test
 	$(MAKE) -C $(EDCV_DIR) test
+	$(MAKE) -C $(IH_DIR) test
 	$(MAKE) -C $(E2E_DIR) test
 	$(MAKE) -C $(KEYCLOAK_DIR) test
 	$(MAKE) -C $(REG_DIR) test
@@ -150,6 +154,7 @@ clean:
 	$(MAKE) -C $(PMANAGER_DIR) clean
 	$(MAKE) -C $(TMANAGER_DIR) clean
 	$(MAKE) -C $(EDCV_DIR) clean
+	$(MAKE) -C $(IH_DIR) clean
 	$(MAKE) -C $(REG_DIR) clean
 	$(MAKE) -C $(ONBOARDING_DIR) clean
 
@@ -182,7 +187,7 @@ generate-docs:
 # Docker Commands - Handled at Top Level
 #==============================================================================
 
-docker-build: docker-build-pmanager docker-build-tmanager docker-build-testagent docker-build-edcvagent docker-build-kcagent docker-build-regagent docker-build-obagent
+docker-build: docker-build-pmanager docker-build-tmanager docker-build-testagent docker-build-edcvagent docker-build-ihagent docker-build-kcagent docker-build-regagent docker-build-obagent
 
 docker-build-pmanager:
 	@echo "Building pmanager Docker image..."
@@ -200,6 +205,10 @@ docker-build-edcvagent:
 	@echo "Building EDC-V agent Docker image..."
 	docker buildx build -f docker/Dockerfile.edcvagent.dockerfile -t $(DOCKER_REGISTRY)edcvagent:$(DOCKER_TAG) .
 
+docker-build-ihagent:
+	@echo "Building IdentityHub agent Docker image..."
+	docker buildx build -f docker/Dockerfile.ihagent.dockerfile -t $(DOCKER_REGISTRY)ihagent:$(DOCKER_TAG) .
+
 docker-build-kcagent:
 	@echo "Building Keycloak agent Docker image..."
 	docker buildx build -f docker/Dockerfile.kcagent.dockerfile -t $(DOCKER_REGISTRY)kcagent:$(DOCKER_TAG) .
@@ -212,7 +221,7 @@ docker-build-obagent:
 	@echo "Building Onboarding agent Docker image..."
 	docker buildx build -f docker/Dockerfile.obagent.dockerfile -t $(DOCKER_REGISTRY)obagent:$(DOCKER_TAG) .
 
-docker-clean: docker-clean-pmanager docker-clean-tmanager docker-clean-testagent docker-clean-regagent docker-clean-obagent
+docker-clean: docker-clean-pmanager docker-clean-tmanager docker-clean-testagent docker-clean-edcvagent docker-clean-ihagent docker-clean-regagent docker-clean-obagent
 
 docker-clean-pmanager:
 	docker rmi $(DOCKER_REGISTRY)pmanager:$(DOCKER_TAG) || true
@@ -225,6 +234,9 @@ docker-clean-testagent:
 
 docker-clean-edcvagent:
 	docker rmi $(DOCKER_REGISTRY)edcvagent:$(DOCKER_TAG) || true
+
+docker-clean-ihagent:
+	docker rmi $(DOCKER_REGISTRY)ihagent:$(DOCKER_TAG) || true
 
 docker-clean-regagent:
 	docker rmi $(DOCKER_REGISTRY)regagent:$(DOCKER_TAG) || true
@@ -244,6 +256,9 @@ load-into-kind-tmanager: docker-build-tmanager
 
 load-into-kind-edcvagent: docker-build-edcvagent
 	kind load docker-image -n $(KIND_CLUSTER_NAME) $(DOCKER_REGISTRY)edcvagent:$(DOCKER_TAG)
+
+load-into-kind-ihagent: docker-build-ihagent
+	kind load docker-image -n $(KIND_CLUSTER_NAME) $(DOCKER_REGISTRY)ihagent:$(DOCKER_TAG)
 
 load-into-kind-kcagent: docker-build-kcagent
 	kind load docker-image -n $(KIND_CLUSTER_NAME) $(DOCKER_REGISTRY)kcagent:$(DOCKER_TAG)
