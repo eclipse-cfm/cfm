@@ -60,7 +60,7 @@ func (p RegistrationActivityProcessor) ProcessDeploy(ctx api.ActivityContext) ap
 	}
 
 	holderID := regData.DID
-	properties, err := readVpaData(model.IssuerServiceType, ctx)
+	properties, err := ctx.VpaProperties(model.IssuerServiceType)
 	if err != nil {
 		span.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error reading vpa data: %w", err)}
@@ -72,37 +72,6 @@ func (p RegistrationActivityProcessor) ProcessDeploy(ctx api.ActivityContext) ap
 	}
 
 	return api.ActivityResult{Result: api.ActivityResultComplete}
-}
-
-func readVpaData(vpaType model.VPAType, ctx api.ActivityContext) (map[string]any, error) {
-	vpaData, ok := ctx.Value(model.VPAData)
-	if !ok {
-		return nil, fmt.Errorf("error reading %s", model.VPAData)
-	}
-	if vpaData == nil {
-		return nil, fmt.Errorf("vpa data ('%s') not found in activity context", model.VPAData)
-	}
-
-	vpaList, ok := vpaData.([]any)
-	if !ok {
-		return nil, fmt.Errorf("vpa data is not a slice")
-	}
-
-	for _, item := range vpaList {
-		vpaEntry, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-		if entryType, exists := vpaEntry["vpaType"]; exists && entryType == vpaType.String() {
-			if properties, ok := vpaEntry["properties"].(map[string]any); ok {
-				return properties, nil
-			}
-			return make(map[string]any), nil
-		}
-		return nil, fmt.Errorf("no vpa entry for type '%s' found", vpaType)
-	}
-
-	return nil, fmt.Errorf("vpa entry with type '%s' not found", vpaType)
 }
 
 func (p RegistrationActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.ActivityResult {

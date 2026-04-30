@@ -16,6 +16,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -217,6 +218,94 @@ func getTestActivity() Activity {
 		Type:          "test",
 		Discriminator: DeployDiscriminator,
 	}
+}
+
+const testVpaType model.VPAType = "cfm.test.vpa.type"
+const otherVpaType model.VPAType = "cfm.test.vpa.other"
+
+func TestVpaProperties_MissingKey(t *testing.T) {
+	ctx := NewActivityContext(context.Background(), "orch-1", getTestActivity(), map[string]any{}, map[string]any{})
+
+	_, err := ctx.VpaProperties(testVpaType)
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, model.VPAData)
+}
+
+func TestVpaProperties_NilValue(t *testing.T) {
+	processingData := map[string]any{model.VPAData: nil}
+	ctx := NewActivityContext(context.Background(), "orch-1", getTestActivity(), processingData, map[string]any{})
+
+	_, err := ctx.VpaProperties(testVpaType)
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, model.VPAData)
+}
+
+func TestVpaProperties_NotASlice(t *testing.T) {
+	processingData := map[string]any{model.VPAData: "not-a-slice"}
+	ctx := NewActivityContext(context.Background(), "orch-1", getTestActivity(), processingData, map[string]any{})
+
+	_, err := ctx.VpaProperties(testVpaType)
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "not a slice")
+}
+
+func TestVpaProperties_EmptySlice(t *testing.T) {
+	processingData := map[string]any{model.VPAData: []any{}}
+	ctx := NewActivityContext(context.Background(), "orch-1", getTestActivity(), processingData, map[string]any{})
+
+	_, err := ctx.VpaProperties(testVpaType)
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, testVpaType.String())
+}
+
+func TestVpaProperties_NoMatchingType(t *testing.T) {
+	processingData := map[string]any{
+		model.VPAData: []any{
+			map[string]any{"vpaType": otherVpaType.String()},
+		},
+	}
+	ctx := NewActivityContext(context.Background(), "orch-1", getTestActivity(), processingData, map[string]any{})
+
+	_, err := ctx.VpaProperties(testVpaType)
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, testVpaType.String())
+}
+
+func TestVpaProperties_MatchingTypeWithProperties(t *testing.T) {
+	props := map[string]any{"region": "eu-west", "tier": "standard"}
+	processingData := map[string]any{
+		model.VPAData: []any{
+			map[string]any{
+				"vpaType":    testVpaType.String(),
+				"properties": props,
+			},
+		},
+	}
+	ctx := NewActivityContext(context.Background(), "orch-1", getTestActivity(), processingData, map[string]any{})
+
+	result, err := ctx.VpaProperties(testVpaType)
+
+	require.NoError(t, err)
+	assert.Equal(t, props, result)
+}
+
+func TestVpaProperties_MatchingTypeWithoutProperties(t *testing.T) {
+	processingData := map[string]any{
+		model.VPAData: []any{
+			map[string]any{"vpaType": testVpaType.String()},
+		},
+	}
+	ctx := NewActivityContext(context.Background(), "orch-1", getTestActivity(), processingData, map[string]any{})
+
+	result, err := ctx.VpaProperties(testVpaType)
+
+	require.NoError(t, err)
+	assert.Empty(t, result)
 }
 
 func TestActivityContext_Delete(t *testing.T) {

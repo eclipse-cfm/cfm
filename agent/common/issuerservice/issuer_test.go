@@ -61,7 +61,7 @@ func TestHttpApiClient_CreateHolder(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.CreateHolder(t.Context(), "did:web:test-participant", "did:web:test-participant", "test holder")
+	err := client.CreateHolder(t.Context(), "did:web:test-participant", "did:web:test-participant", "test holder", nil)
 	require.NoError(t, err)
 }
 
@@ -76,7 +76,7 @@ func TestHttpApiClient_CreateHolder_AuthError(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.CreateHolder(t.Context(), "did:web:test-participant", "did:web:test-participant", "test holder")
+	err := client.CreateHolder(t.Context(), "did:web:test-participant", "did:web:test-participant", "test holder", nil)
 	require.ErrorContains(t, err, "test error")
 }
 
@@ -102,7 +102,7 @@ func TestHttpApiClient_CreateHolder_ApiReturnsError(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.CreateHolder(t.Context(), "did:web:test-participant", "did:web:test-participant", "test holder")
+	err := client.CreateHolder(t.Context(), "did:web:test-participant", "did:web:test-participant", "test holder", nil)
 	require.ErrorContains(t, err, "failed to create Holder")
 }
 

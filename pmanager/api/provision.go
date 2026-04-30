@@ -165,6 +165,9 @@ type ActivityContext interface {
 
 	// Context returns the underlying context
 	Context() context.Context
+
+	// VpaProperties returns the properties for the given VPA type from the activity context.
+	VpaProperties(vpaType model.VPAType) (map[string]any, error)
 }
 
 type DefinitionManager interface {
@@ -263,4 +266,35 @@ func (d defaultActivityContext) SetOutputValue(key string, value any) {
 
 func (d defaultActivityContext) OutputValues() map[string]any {
 	return d.outputData
+}
+
+func (d defaultActivityContext) VpaProperties(vpaType model.VPAType) (map[string]any, error) {
+	vpaData, ok := d.processingData[model.VPAData]
+	if !ok {
+		return nil, fmt.Errorf("error reading %s", model.VPAData)
+	}
+	if vpaData == nil {
+		return nil, fmt.Errorf("vpa data ('%s') not found in activity context", model.VPAData)
+	}
+
+	vpaList, ok := vpaData.([]any)
+	if !ok {
+		return nil, fmt.Errorf("vpa data is not a slice")
+	}
+
+	for _, item := range vpaList {
+		vpaEntry, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if entryType, exists := vpaEntry["vpaType"]; exists && entryType == vpaType.String() {
+			if properties, ok := vpaEntry["properties"].(map[string]any); ok {
+				return properties, nil
+			}
+			return make(map[string]any), nil
+		}
+		return nil, fmt.Errorf("no vpa entry for type '%s' found", vpaType)
+	}
+
+	return nil, fmt.Errorf("vpa entry with type '%s' not found", vpaType)
 }
