@@ -207,8 +207,7 @@ type MockIssuerService struct {
 }
 
 func (m *MockIssuerService) QueryCredentialsByType(ctx context.Context, participantContextID string, credentialType string) ([]issuerservice.IssuerCredentialResourceDto, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, nil
 }
 
 func (m *MockIssuerService) DeleteHolder(ctx context.Context, holderID string) error {
@@ -216,8 +215,7 @@ func (m *MockIssuerService) DeleteHolder(ctx context.Context, holderID string) e
 }
 
 func (m *MockIssuerService) RevokeCredential(ctx context.Context, participantContextID string, credentialID string) error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (m *MockIssuerService) CreateHolder(ctx context.Context, did string, holderID string, name string) error {

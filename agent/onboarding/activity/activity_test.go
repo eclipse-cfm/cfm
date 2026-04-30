@@ -354,24 +354,21 @@ func TestOnboardingActivityProcessor_ProcessDispose(t *testing.T) {
 }
 
 func TestOnboardingActivityProcessor_ProcessDispose_RevocationFails(t *testing.T) {
-	ih := MockIdentityHubClient{
-		expectedCredentials: []common.VerifiableCredentialResource{
+	is := MockIssuerServiceApiClient{
+		expectedCredentials: []issuerservice.IssuerCredentialResourceDto{
 			{
+				ID:                   "test-credential-id",
 				ParticipantContextID: "test-participant",
-				IssuerID:             "test-issuer",
-				HolderID:             "test-participant",
-				Metadata:             nil,
-				State:                0,
-				VerifiableCredential: common.CredentialContainer{},
+				CredentialFormat:     common.CredentialFormat_VCDM20_COSE,
+				VerifiableCredential: common.VerifiableCredential{},
 			},
 		},
+		expectedError: fmt.Errorf("some error"),
 	}
 	processor := OnboardingActivityProcessor{
-		Monitor:           system.NoopMonitor{},
-		IdentityApiClient: ih,
-		IssuerServiceApiClient: MockIssuerServiceApiClient{
-			expectedError: fmt.Errorf("some error"),
-		},
+		Monitor:                system.NoopMonitor{},
+		IdentityApiClient:      MockIdentityHubClient{},
+		IssuerServiceApiClient: is,
 	}
 
 	var processingData = map[string]any{
@@ -405,7 +402,7 @@ func TestOnboardingActivityProcessor_ProcessDispose_RevocationFails(t *testing.T
 
 func TestOnboardingActivityProcessor_ProcessDispose_NoCredentials(t *testing.T) {
 	ih := MockIdentityHubClient{
-		expectedError: fmt.Errorf("some error"), // should never be invoked, because there are no credentials
+		expectedError: fmt.Errorf("some error"),
 	}
 	processor := OnboardingActivityProcessor{
 		Monitor:           system.NoopMonitor{},
@@ -478,7 +475,7 @@ type MockIssuerServiceApiClient struct {
 }
 
 func (m MockIssuerServiceApiClient) QueryCredentialsByType(ctx context.Context, participantContextID string, credentialType string) ([]issuerservice.IssuerCredentialResourceDto, error) {
-	return m.expectedCredentials, m.expectedError
+	return m.expectedCredentials, nil
 
 }
 

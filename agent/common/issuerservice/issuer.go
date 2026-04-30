@@ -50,7 +50,7 @@ type HttpApiClient struct {
 	HttpClient    *http.Client
 }
 
-func (i HttpApiClient) QueryCredentialsByType(ctx context.Context, participantContextID string, credentialType string) ([]IssuerCredentialResourceDto, error) {
+func (i HttpApiClient) QueryCredentialsByType(ctx context.Context, holderID string, credentialType string) ([]IssuerCredentialResourceDto, error) {
 	accessToken, err := i.TokenProvider.GetToken(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get API access token: %w", err)
@@ -66,7 +66,7 @@ func (i HttpApiClient) QueryCredentialsByType(ctx context.Context, participantCo
 		common.Criterion{
 			OperandLeft:  "holderId",
 			Operator:     "=",
-			OperandRight: participantContextID,
+			OperandRight: holderID,
 		}))
 
 	payload, err := json.Marshal(body)
