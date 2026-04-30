@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/eclipse-cfm/cfm/agent/common"
 	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
@@ -309,14 +310,14 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenInvalidStateReceived(t *t
 
 func TestOnboardingActivityProcessor_ProcessDispose(t *testing.T) {
 	ih := MockIdentityHubClient{
-		expectedCredentials: []identityhub.VerifiableCredentialResource{
+		expectedCredentials: []common.VerifiableCredentialResource{
 			{
 				ParticipantContextID: "test-participant",
 				IssuerID:             "test-issuer",
 				HolderID:             "test-participant",
 				Metadata:             nil,
 				State:                0,
-				VerifiableCredential: identityhub.CredentialContainer{},
+				VerifiableCredential: common.CredentialContainer{},
 			},
 		},
 	}
@@ -357,14 +358,14 @@ func TestOnboardingActivityProcessor_ProcessDispose(t *testing.T) {
 
 func TestOnboardingActivityProcessor_ProcessDispose_RevocationFails(t *testing.T) {
 	ih := MockIdentityHubClient{
-		expectedCredentials: []identityhub.VerifiableCredentialResource{
+		expectedCredentials: []common.VerifiableCredentialResource{
 			{
 				ParticipantContextID: "test-participant",
 				IssuerID:             "test-issuer",
 				HolderID:             "test-participant",
 				Metadata:             nil,
 				State:                0,
-				VerifiableCredential: identityhub.CredentialContainer{},
+				VerifiableCredential: common.CredentialContainer{},
 			},
 		},
 	}
@@ -407,7 +408,7 @@ func TestOnboardingActivityProcessor_ProcessDispose_RevocationFails(t *testing.T
 
 func TestOnboardingActivityProcessor_ProcessDispose_NoCredentials(t *testing.T) {
 	ih := MockIdentityHubClient{
-		expectedCredentials: []identityhub.VerifiableCredentialResource{},
+		expectedCredentials: []common.VerifiableCredentialResource{},
 	}
 	processor := OnboardingActivityProcessor{
 		Monitor:           system.NoopMonitor{},
@@ -450,10 +451,10 @@ type MockIdentityHubClient struct {
 	expectedError       error
 	expectedState       string
 	expectedURL         string
-	expectedCredentials []identityhub.VerifiableCredentialResource
+	expectedCredentials []common.VerifiableCredentialResource
 }
 
-func (m MockIdentityHubClient) QueryCredentialByType(ctx context.Context, participantContextID string, credentialType string) ([]identityhub.VerifiableCredentialResource, error) {
+func (m MockIdentityHubClient) QueryCredentialByType(ctx context.Context, participantContextID string, credentialType string) ([]common.VerifiableCredentialResource, error) {
 	return m.expectedCredentials, m.expectedError
 }
 
@@ -476,6 +477,11 @@ func (m MockIdentityHubClient) GetCredentialRequestState(context.Context, string
 
 type MockIssuerServiceApiClient struct {
 	expectedError error
+}
+
+func (m MockIssuerServiceApiClient) QueryCredentialsByType(participantContextID string, credentialType string) ([]VerifiableCredentialResource, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (m MockIssuerServiceApiClient) DeleteHolder(ctx context.Context, holderID string) error {

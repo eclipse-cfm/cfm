@@ -22,13 +22,25 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/eclipse-cfm/cfm/agent/common"
 	"github.com/eclipse-cfm/cfm/common/token"
 )
+
+// IssuerCredentialResourceDto represents a DTO for verifiable credentials that the IssuerService has issued to holders.
+// note that these DTOs are simplified representations of the actual verifiable credentials and NEVER include the actual
+// signed credential
+type IssuerCredentialResourceDto struct {
+	ID                   string                      `json:"id"`
+	ParticipantContextID string                      `json:"participantContextId"`
+	CredentialFormat     string                      `json:"format"`
+	VerifiableCredential common.VerifiableCredential `json:"credential"`
+}
 
 type ApiClient interface {
 	CreateHolder(ctx context.Context, did string, holderID string, name string) error
 	DeleteHolder(ctx context.Context, holderID string) error
 	RevokeCredential(ctx context.Context, participantContextID string, credentialID string) error
+	QueryCredentialsByType(ctx context.Context, participantContextID string, credentialType string) ([]IssuerCredentialResourceDto, error)
 }
 
 type HttpApiClient struct {
@@ -36,6 +48,63 @@ type HttpApiClient struct {
 	TokenProvider token.TokenProvider
 	IssuerID      string
 	HttpClient    *http.Client
+}
+
+func (i HttpApiClient) QueryCredentialsByType(ctx context.Context, participantContextID string, credentialType string) ([]IssuerCredentialResourceDto, error) {
+	accessToken, err := i.TokenProvider.GetToken(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get API access token: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/v1alpha/participants/%s/credentials/query", i.BaseURL, i.IssuerID)
+	body := common.QuerySpec{
+		FilterExpression: []common.Criterion{
+			{
+				OperandLeft:  "verifiableCredential.credential.type",
+				Operator:     "contains",
+				OperandRight: credentialType,
+			},
+			{
+				OperandLeft:  "holderId",
+				Operator:     "=",
+				OperandRight: participantContextID,
+			},
+		},
+	}
+
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling query body: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	resp, err := i.HttpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error querying credentials on IssuerService: %w", err)
+	}
+
+	defer func() {
+		// drain and close response body to avoid connection/resource leak
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to query credentials on IssuerService: received status code %d, body: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var credentials []IssuerCredentialResourceDto
+	if err := json.NewDecoder(resp.Body).Decode(&credentials); err != nil {
+		return nil, fmt.Errorf("error parsing credentials response: %w", err)
+	}
+
+	return credentials, nil
 }
 
 func (i HttpApiClient) DeleteHolder(ctx context.Context, holderID string) error {

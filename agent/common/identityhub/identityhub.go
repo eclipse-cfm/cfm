@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/eclipse-cfm/cfm/agent/common"
 	"github.com/eclipse-cfm/cfm/common/token"
 )
 
@@ -39,7 +40,7 @@ type IdentityAPIClient interface {
 	CreateParticipantContext(ctx context.Context, manifest ParticipantManifest) (*CreateParticipantContextResponse, error)
 	RequestCredentials(ctx context.Context, participantContextID string, credentialRequest CredentialRequest) (string, error)
 	GetCredentialRequestState(ctx context.Context, participantContextID string, credentialRequestID string) (string, error)
-	QueryCredentialByType(ctx context.Context, participantContextID string, credentialType string) ([]VerifiableCredentialResource, error)
+	QueryCredentialByType(ctx context.Context, participantContextID string, credentialType string) ([]common.VerifiableCredentialResource, error)
 	DeleteParticipantContext(ctx context.Context, participantContextID string) error
 }
 
@@ -77,7 +78,7 @@ func (a HttpIdentityAPIClient) DeleteParticipantContext(ctx context.Context, par
 	}
 }
 
-func (a HttpIdentityAPIClient) QueryCredentialByType(ctx context.Context, participantContextID string, credentialType string) ([]VerifiableCredentialResource, error) {
+func (a HttpIdentityAPIClient) QueryCredentialByType(ctx context.Context, participantContextID string, credentialType string) ([]common.VerifiableCredentialResource, error) {
 
 	accessToken, err := a.TokenProvider.GetToken(ctx)
 	if err != nil {
@@ -104,7 +105,7 @@ func (a HttpIdentityAPIClient) QueryCredentialByType(ctx context.Context, partic
 		return nil, fmt.Errorf("failed to get credential request state: received status code %d, body: %s", resp.StatusCode, string(body))
 	}
 
-	var credentials []VerifiableCredentialResource
+	var credentials []common.VerifiableCredentialResource
 	if err := json.Unmarshal(body, &credentials); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal verifiable credentials array: %w", err)
 	}

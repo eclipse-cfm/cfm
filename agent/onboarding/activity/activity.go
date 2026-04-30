@@ -83,7 +83,8 @@ func (p OnboardingActivityProcessor) ProcessDispose(ctx api.ActivityContext) api
 	for _, spec := range data.CredentialSpecs {
 		credentialType := spec.Type
 
-		credentials, err := p.IdentityApiClient.QueryCredentialByType(ctx.Context(), participantContextID, credentialType)
+		credentials, err := p.IssuerServiceApiClient.QueryCredentialsByType(ctx.Context(), participantContextID, credentialType)
+
 		if err != nil {
 			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error querying credentials by type %s for participant context %s: %w", credentialType, participantContextID, err)}
 		}
@@ -94,8 +95,8 @@ func (p OnboardingActivityProcessor) ProcessDispose(ctx api.ActivityContext) api
 		}
 
 		// for each credential, send a revocation request
-		for _, credential := range credentials {
-			err := p.IssuerServiceApiClient.RevokeCredential(ctx.Context(), participantContextID, credential.VerifiableCredential.Credential.ID)
+		for _, credentialDto := range credentials {
+			err := p.IssuerServiceApiClient.RevokeCredential(ctx.Context(), participantContextID, credentialDto.VerifiableCredential.ID)
 			if err != nil {
 				revocationErrors = append(revocationErrors, err)
 			}

@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/eclipse-cfm/cfm/agent/common"
 	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/system"
@@ -252,7 +253,7 @@ func (m MockIdentityHubClient) GetCredentialRequestState(_ context.Context, _ st
 	panic("not implemented")
 }
 
-func (m MockIdentityHubClient) QueryCredentialByType(_ context.Context, _ string, _ string) ([]identityhub.VerifiableCredentialResource, error) {
+func (m MockIdentityHubClient) QueryCredentialByType(_ context.Context, _ string, _ string) ([]common.VerifiableCredentialResource, error) {
 	panic("not implemented")
 }
 
