@@ -206,7 +206,7 @@ type MockIssuerService struct {
 	recorded      regData
 }
 
-func (m *MockIssuerService) QueryCredentialsByType(participantContextID string, credentialType string) ([]issuerservice.IssuerCredentialResourceDto, error) {
+func (m *MockIssuerService) QueryCredentialsByType(ctx context.Context, participantContextID string, credentialType string) ([]issuerservice.IssuerCredentialResourceDto, error) {
 	//TODO implement me
 	panic("implement me")
 }

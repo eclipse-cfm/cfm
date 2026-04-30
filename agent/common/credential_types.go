@@ -18,7 +18,7 @@ import "time"
 
 // VerifiableCredentialResource represents a container for verifiable credentials as returned by the Identity Hub API.
 // This object contains the raw, signed verifiable credential data and additional metadata and state information, representing
-// the actual credential as issued by the IssuerService.
+
 type VerifiableCredentialResource struct {
 	ParticipantContextID string              `json:"participantContextId" validate:"required"`
 	IssuerID             string              `json:"issuerId" validate:"required"`
@@ -42,6 +42,16 @@ type VerifiableCredential struct {
 	Description       string              `json:"description,omitempty"`
 	DataModelVersion  DataModelVersion    `json:"dataModelVersion,omitempty"`
 }
+
+type CredentialFormat string
+
+const (
+	CredentialFormat_VCDM10_LD     CredentialFormat = "VC1_0_LD"
+	CredentialFormat_VCDM10_JWT    CredentialFormat = "VC1_0_JWT"
+	CredentialFormat_VCDM20_JOSE   CredentialFormat = "VC2_0_JOSE"
+	CredentialFormat_VCDM20_SD_JWT CredentialFormat = "VC2_0_SD_JWT"
+	CredentialFormat_VCDM20_COSE   CredentialFormat = "VC2_0_COSE"
+)
 
 // Issuer can be either a simple URI or an object with an ID.
 // We'll model it as a struct with a flexible form.
@@ -76,6 +86,6 @@ const (
 
 type CredentialContainer struct {
 	RawCredential    string               `json:"rawVc" validate:"required"`
-	CredentialFormat string               `json:"format" validate:"required"`
+	CredentialFormat CredentialFormat     `json:"format" validate:"required"`
 	Credential       VerifiableCredential `json:"credential" validate:"required"`
 }

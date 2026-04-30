@@ -19,6 +19,7 @@ import (
 
 	"github.com/eclipse-cfm/cfm/agent/common"
 	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
+	"github.com/eclipse-cfm/cfm/agent/common/issuerservice"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/stretchr/testify/assert"
@@ -309,22 +310,18 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenInvalidStateReceived(t *t
 }
 
 func TestOnboardingActivityProcessor_ProcessDispose(t *testing.T) {
-	ih := MockIdentityHubClient{
-		expectedCredentials: []common.VerifiableCredentialResource{
-			{
-				ParticipantContextID: "test-participant",
-				IssuerID:             "test-issuer",
-				HolderID:             "test-participant",
-				Metadata:             nil,
-				State:                0,
-				VerifiableCredential: common.CredentialContainer{},
+	processor := OnboardingActivityProcessor{
+		Monitor: system.NoopMonitor{},
+		IssuerServiceApiClient: MockIssuerServiceApiClient{
+			expectedCredentials: []issuerservice.IssuerCredentialResourceDto{
+				{
+					ID:                   "",
+					ParticipantContextID: "test-participant",
+					CredentialFormat:     common.CredentialFormat_VCDM20_COSE,
+					VerifiableCredential: common.VerifiableCredential{},
+				},
 			},
 		},
-	}
-	processor := OnboardingActivityProcessor{
-		Monitor:                system.NoopMonitor{},
-		IdentityApiClient:      ih,
-		IssuerServiceApiClient: MockIssuerServiceApiClient{},
 	}
 
 	var processingData = map[string]any{
@@ -408,13 +405,13 @@ func TestOnboardingActivityProcessor_ProcessDispose_RevocationFails(t *testing.T
 
 func TestOnboardingActivityProcessor_ProcessDispose_NoCredentials(t *testing.T) {
 	ih := MockIdentityHubClient{
-		expectedCredentials: []common.VerifiableCredentialResource{},
+		expectedError: fmt.Errorf("some error"), // should never be invoked, because there are no credentials
 	}
 	processor := OnboardingActivityProcessor{
 		Monitor:           system.NoopMonitor{},
 		IdentityApiClient: ih,
 		IssuerServiceApiClient: MockIssuerServiceApiClient{
-			expectedError: fmt.Errorf("some error"), // should never be invoked, because there are no credentials
+			expectedCredentials: []issuerservice.IssuerCredentialResourceDto{},
 		},
 	}
 
@@ -476,12 +473,13 @@ func (m MockIdentityHubClient) GetCredentialRequestState(context.Context, string
 }
 
 type MockIssuerServiceApiClient struct {
-	expectedError error
+	expectedError       error
+	expectedCredentials []issuerservice.IssuerCredentialResourceDto
 }
 
-func (m MockIssuerServiceApiClient) QueryCredentialsByType(participantContextID string, credentialType string) ([]VerifiableCredentialResource, error) {
-	//TODO implement me
-	panic("implement me")
+func (m MockIssuerServiceApiClient) QueryCredentialsByType(ctx context.Context, participantContextID string, credentialType string) ([]issuerservice.IssuerCredentialResourceDto, error) {
+	return m.expectedCredentials, m.expectedError
+
 }
 
 func (m MockIssuerServiceApiClient) DeleteHolder(ctx context.Context, holderID string) error {

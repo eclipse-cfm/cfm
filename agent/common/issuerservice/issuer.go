@@ -32,7 +32,7 @@ import (
 type IssuerCredentialResourceDto struct {
 	ID                   string                      `json:"id"`
 	ParticipantContextID string                      `json:"participantContextId"`
-	CredentialFormat     string                      `json:"format"`
+	CredentialFormat     common.CredentialFormat     `json:"format"`
 	VerifiableCredential common.VerifiableCredential `json:"credential"`
 }
 
@@ -57,20 +57,17 @@ func (i HttpApiClient) QueryCredentialsByType(ctx context.Context, participantCo
 	}
 
 	url := fmt.Sprintf("%s/v1alpha/participants/%s/credentials/query", i.BaseURL, i.IssuerID)
-	body := common.QuerySpec{
-		FilterExpression: []common.Criterion{
-			{
-				OperandLeft:  "verifiableCredential.credential.type",
-				Operator:     "contains",
-				OperandRight: credentialType,
-			},
-			{
-				OperandLeft:  "holderId",
-				Operator:     "=",
-				OperandRight: participantContextID,
-			},
+	body := common.NewQuerySpec(common.WithFilterCriteria(
+		common.Criterion{
+			OperandLeft:  "verifiableCredential.credential.type",
+			Operator:     "contains",
+			OperandRight: credentialType,
 		},
-	}
+		common.Criterion{
+			OperandLeft:  "holderId",
+			Operator:     "=",
+			OperandRight: participantContextID,
+		}))
 
 	payload, err := json.Marshal(body)
 	if err != nil {
