@@ -134,11 +134,11 @@ func Test_VerifyAutoCompensation(t *testing.T) {
 				t.Logf("VPA %s is in state %s", vpa.ID, vpa.State)
 			}
 		}
-		if disposeCount == 3 {
+		if disposeCount == 4 {
 			break
 		}
 	}
-	require.Equal(t, 3, disposeCount, "Expected 3 VPAs to be disposed")
+	require.Equal(t, 4, disposeCount, "Expected 4 VPAs to be disposed")
 
 	// verify that the compensation orchestration ran
 	assert.True(t, disposed, "Expected dispose orchestration to be run")
@@ -253,9 +253,9 @@ func Test_VerifyAutoCompensation_NoCompensationOrchestration(t *testing.T) {
 				t.Logf("VPA %s is in state %s", vpa.ID, vpa.State)
 			}
 		}
-		if disposeCount == 3 {
+		if disposeCount == 4 {
 			break
 		}
 	}
-	require.Equal(t, 3, disposeCount, "Expected 3 VPAs to be in state error")
+	require.Equal(t, 4, disposeCount, "Expected 4 VPAs to be in state error")
 }

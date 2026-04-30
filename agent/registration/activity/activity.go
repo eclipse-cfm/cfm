@@ -16,6 +16,7 @@ import (
 	"fmt"
 
 	"github.com/eclipse-cfm/cfm/agent/common/issuerservice"
+	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"go.opentelemetry.io/otel"
@@ -59,13 +60,49 @@ func (p RegistrationActivityProcessor) ProcessDeploy(ctx api.ActivityContext) ap
 	}
 
 	holderID := regData.DID
-	if err := p.IssuerService.CreateHolder(ctx.Context(), regData.DID, holderID, regData.HolderName); err != nil {
+	properties, err := readVpaData(model.IssuerServiceType, ctx)
+	if err != nil {
+		span.RecordError(err)
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error reading vpa data: %w", err)}
+	}
+	if err := p.IssuerService.CreateHolder(ctx.Context(), regData.DID, holderID, regData.HolderName, properties); err != nil {
 		span.RecordError(err)
 		// todo: inspect error if it is retryable
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating holder in ApiClient: %w", err)}
 	}
 
 	return api.ActivityResult{Result: api.ActivityResultComplete}
+}
+
+func readVpaData(vpaType model.VPAType, ctx api.ActivityContext) (map[string]any, error) {
+	vpaData, ok := ctx.Value(model.VPAData)
+	if !ok {
+		return nil, fmt.Errorf("error reading %s", model.VPAData)
+	}
+	if vpaData == nil {
+		return nil, fmt.Errorf("vpa data ('%s') not found in activity context", model.VPAData)
+	}
+
+	vpaList, ok := vpaData.([]any)
+	if !ok {
+		return nil, fmt.Errorf("vpa data is not a slice")
+	}
+
+	for _, item := range vpaList {
+		vpaEntry, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if entryType, exists := vpaEntry["vpaType"]; exists && entryType == vpaType.String() {
+			if properties, ok := vpaEntry["properties"].(map[string]any); ok {
+				return properties, nil
+			}
+			return make(map[string]any), nil
+		}
+		return nil, fmt.Errorf("no vpa entry for type '%s' found", vpaType)
+	}
+
+	return nil, fmt.Errorf("vpa entry with type '%s' not found", vpaType)
 }
 
 func (p RegistrationActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.ActivityResult {

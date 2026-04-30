@@ -92,11 +92,11 @@ func Test_VerifyE2E(t *testing.T) {
 				deployCount++
 			}
 		}
-		if deployCount == 3 {
+		if deployCount == 4 {
 			break
 		}
 	}
-	require.Equal(t, 3, deployCount, "Expected 3 deployments to be active")
+	require.Equal(t, 4, deployCount, "Expected 4 deployments to be active")
 
 	var participantProfiles []api.ParticipantProfile
 	err = client.PostToTManagerWithResponse(
@@ -136,7 +136,7 @@ func Test_VerifyE2E(t *testing.T) {
 		model.Query{Predicate: fmt.Sprintf("correlationId = '%s'", statusProfile.ID)}, &orchestrations)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(orchestrations), "Expected 1 orchestration to be created")
-	assert.Equal(t, papi.OrchestrationStateCompleted, papi.OrchestrationState(orchestrations[0].State))
+	assert.Equal(t, papi.OrchestrationStateCompleted, orchestrations[0].State)
 
 	// Dispose VPAs
 	err = client.DeleteToTManager(fmt.Sprintf("tenants/%s/participant-profiles/%s", tenant.ID, participantProfile.ID))
@@ -151,9 +151,9 @@ func Test_VerifyE2E(t *testing.T) {
 				disposeCount++
 			}
 		}
-		if disposeCount == 3 {
+		if disposeCount == 4 {
 			break
 		}
 	}
-	require.Equal(t, 3, disposeCount, "Expected 3 deployments to be disposed")
+	require.Equal(t, 4, disposeCount, "Expected 4 deployments to be disposed")
 }

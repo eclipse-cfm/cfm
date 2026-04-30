@@ -68,10 +68,7 @@ func (p participantService) QueryProfiles(ctx context.Context, predicate query.P
 	})
 }
 
-func (p participantService) DeployProfile(
-	ctx context.Context,
-	tenantID string,
-	deployment *api.NewParticipantProfileDeployment) (*api.ParticipantProfile, error) {
+func (p participantService) DeployProfile(ctx context.Context, tenantID string, deployment *api.NewParticipantProfileDeployment) (*api.ParticipantProfile, error) {
 
 	// TODO perform property validation against a custom schema
 	return store.Trx[api.ParticipantProfile](p.trxContext).AndReturn(ctx, func(ctx context.Context) (*api.ParticipantProfile, error) {

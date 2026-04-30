@@ -98,13 +98,14 @@ func TestParticipantProfileGenerator_Generate(t *testing.T) {
 		assert.Equal(t, dProfileIDs, profile.DataspaceProfileIDs)
 
 		// Validate VPAs
-		assert.Len(t, profile.VPAs, 3)
+		assert.Len(t, profile.VPAs, 4)
 
 		// Extract VPA types and verify they match expected types
 		expectedTypes := []model.VPAType{
 			model.ConnectorType,
 			model.CredentialServiceType,
 			model.DataPlaneType,
+			model.IssuerServiceType,
 		}
 		actualTypes := make([]model.VPAType, len(profile.VPAs))
 		for i, vpa := range profile.VPAs {

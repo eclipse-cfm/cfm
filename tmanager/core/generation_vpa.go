@@ -47,7 +47,8 @@ func (g participantGenerator) Generate(
 	connector := g.generateVPA(model.ConnectorType, vpaProperties, cell)
 	cService := g.generateVPA(model.CredentialServiceType, vpaProperties, cell)
 	dPlane := g.generateVPA(model.DataPlaneType, vpaProperties, cell)
-	vpas := []api.VirtualParticipantAgent{connector, cService, dPlane}
+	issuer := g.generateVPA(model.IssuerServiceType, vpaProperties, cell)
+	vpas := []api.VirtualParticipantAgent{connector, cService, dPlane, issuer}
 
 	pProfile := &api.ParticipantProfile{
 		Entity: api.Entity{

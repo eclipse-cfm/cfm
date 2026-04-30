@@ -484,7 +484,7 @@ func (m MockIssuerServiceApiClient) DeleteHolder(ctx context.Context, holderID s
 	panic("implement me")
 }
 
-func (m MockIssuerServiceApiClient) CreateHolder(ctx context.Context, did string, holderID string, name string) error {
+func (m MockIssuerServiceApiClient) CreateHolder(ctx context.Context, did string, holderID string, name string, properties map[string]any) error {
 	return m.expectedError
 }
 

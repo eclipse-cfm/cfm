@@ -22,6 +22,7 @@ const (
 	ConnectorType         VPAType = "cfm.connector"
 	CredentialServiceType VPAType = "cfm.credentialservice"
 	DataPlaneType         VPAType = "cfm.dataplane"
+	IssuerServiceType     VPAType = "cfm.issuer"
 	ParticipantIdentifier         = "cfm.participant.id"
 
 	VPADeployType  OrchestrationType = "cfm.orchestration.vpa.deploy"
