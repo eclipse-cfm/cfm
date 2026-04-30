@@ -28,7 +28,7 @@ type RegistrationActivityProcessor struct {
 	IssuerService issuerservice.ApiClient
 }
 
-type RegistrationData struct {
+type registrationData struct {
 	DID        string `json:"cfm.participant.id" validate:"required"`
 	HolderName string `json:"cfm.participant.holdername"`
 }
@@ -49,17 +49,17 @@ func (p RegistrationActivityProcessor) ProcessDeploy(ctx api.ActivityContext) ap
 	tracer := otel.GetTracerProvider().Tracer("cfm.agent.registration")
 	_, span := tracer.Start(ctx.Context(), "cfm.agent.registration.create-holder", trace.WithSpanKind(trace.SpanKindClient))
 	defer span.End()
-	var registrationData RegistrationData
-	if err := ctx.ReadValues(&registrationData); err != nil {
+	var regData registrationData
+	if err := ctx.ReadValues(&regData); err != nil {
 		span.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Registration activity for orchestration %s: %w", ctx.OID(), err)}
 	}
-	if registrationData.HolderName == "" {
-		registrationData.HolderName = registrationData.DID
+	if regData.HolderName == "" {
+		regData.HolderName = regData.DID
 	}
 
-	holderID := registrationData.DID
-	if err := p.IssuerService.CreateHolder(ctx.Context(), registrationData.DID, holderID, registrationData.HolderName); err != nil {
+	holderID := regData.DID
+	if err := p.IssuerService.CreateHolder(ctx.Context(), regData.DID, holderID, regData.HolderName); err != nil {
 		span.RecordError(err)
 		// todo: inspect error if it is retryable
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating holder in ApiClient: %w", err)}
@@ -69,7 +69,7 @@ func (p RegistrationActivityProcessor) ProcessDeploy(ctx api.ActivityContext) ap
 }
 
 func (p RegistrationActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.ActivityResult {
-	var registrationData RegistrationData
+	var registrationData registrationData
 	if err := ctx.ReadValues(&registrationData); err != nil {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Registration activity for orchestration %s: %w", ctx.OID(), err)}
 	}

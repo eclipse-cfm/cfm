@@ -37,7 +37,7 @@ type IssuerCredentialResourceDto struct {
 }
 
 type ApiClient interface {
-	CreateHolder(ctx context.Context, did string, holderID string, name string) error
+	CreateHolder(ctx context.Context, did string, holderID string, name string, properties map[string]any) error
 	DeleteHolder(ctx context.Context, holderID string) error
 	RevokeCredential(ctx context.Context, participantContextID string, credentialID string) error
 	QueryCredentialsByType(ctx context.Context, participantContextID string, credentialType string) ([]IssuerCredentialResourceDto, error)
@@ -133,7 +133,7 @@ func (i HttpApiClient) DeleteHolder(ctx context.Context, holderID string) error 
 	return nil
 }
 
-func (i HttpApiClient) CreateHolder(ctx context.Context, did string, holderID string, name string) error {
+func (i HttpApiClient) CreateHolder(ctx context.Context, did string, holderID string, name string, properties map[string]any) error {
 	accessToken, err := i.TokenProvider.GetToken(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
@@ -143,6 +143,10 @@ func (i HttpApiClient) CreateHolder(ctx context.Context, did string, holderID st
 		"did":      did,
 		"holderId": holderID,
 		"name":     name,
+	}
+
+	if properties != nil {
+		data["properties"] = properties
 	}
 
 	payload, err := json.Marshal(data)
