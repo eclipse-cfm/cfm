@@ -161,8 +161,8 @@ func TestRegistrationActivityProcessor_VpaDataMissing(t *testing.T) {
 
 	result := processor.ProcessDeploy(activityContext)
 
-	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
-	assert.ErrorContains(t, result.Error, model.VPAData)
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
+	assert.NoError(t, result.Error)
 }
 
 func TestRegistrationActivityProcessor_VpaDataEmptySlice(t *testing.T) {
@@ -185,8 +185,8 @@ func TestRegistrationActivityProcessor_VpaDataEmptySlice(t *testing.T) {
 
 	result := processor.ProcessDeploy(activityContext)
 
-	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
-	assert.ErrorContains(t, result.Error, model.IssuerServiceType.String())
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
+	assert.NoError(t, result.Error)
 }
 
 func TestRegistrationActivityProcessor_VpaDataTypeMismatch(t *testing.T) {
@@ -213,8 +213,8 @@ func TestRegistrationActivityProcessor_VpaDataTypeMismatch(t *testing.T) {
 
 	result := processor.ProcessDeploy(activityContext)
 
-	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
-	assert.ErrorContains(t, result.Error, model.IssuerServiceType.String())
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
+	assert.NoError(t, result.Error)
 }
 
 func TestRegistrationActivityProcessor_VpaDataPropertiesPassedToIssuerService(t *testing.T) {

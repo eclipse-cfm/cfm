@@ -268,15 +268,15 @@ func (d defaultActivityContext) OutputValues() map[string]any {
 	return d.outputData
 }
 
+// VpaProperties retrieves the properties for a specific VPA type from the activity context. If the `cfm.vpa.data` object is not present,
+// if it does not contain an entry for the specified VPA type, nil is returned. The contents of the `cfm.vpa.data`.`<vpatype>` entry are
+// returned
+// if the `cfm.vpa.data` object is not a slice, an error is returned
 func (d defaultActivityContext) VpaProperties(vpaType model.VPAType) (map[string]any, error) {
 	vpaData, ok := d.processingData[model.VPAData]
-	if !ok {
-		return nil, fmt.Errorf("error reading %s", model.VPAData)
+	if !ok || vpaData == nil {
+		return nil, nil
 	}
-	if vpaData == nil {
-		return nil, fmt.Errorf("vpa data ('%s') not found in activity context", model.VPAData)
-	}
-
 	vpaList, ok := vpaData.([]any)
 	if !ok {
 		return nil, fmt.Errorf("vpa data is not a slice")
@@ -293,8 +293,8 @@ func (d defaultActivityContext) VpaProperties(vpaType model.VPAType) (map[string
 			}
 			return make(map[string]any), nil
 		}
-		return nil, fmt.Errorf("no vpa entry for type '%s' found", vpaType)
+		return nil, nil
 	}
 
-	return nil, fmt.Errorf("vpa entry with type '%s' not found", vpaType)
+	return nil, nil
 }
