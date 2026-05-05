@@ -390,3 +390,13 @@ func (h *TMHandler) deployDataspaceProfile(w http.ResponseWriter, req *http.Requ
 func (h *TMHandler) health(w http.ResponseWriter, _ *http.Request) {
 	h.ResponseOK(w, response{Message: "OK"})
 }
+
+func (h *TMHandler) rotateParticipantProfileKeys(w http.ResponseWriter, req *http.Request, tenantID string, participantProfileID string) {
+	if h.InvalidMethod(w, req, http.MethodPost) {
+		return
+	}
+
+	//todo: implement orchestration creation
+
+	h.Accepted(w)
+}

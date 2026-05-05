@@ -13,10 +13,16 @@
 package v1alpha1
 
 import (
+	"encoding/json"
+	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/eclipse-cfm/cfm/common/model"
 )
+
+var iso8601DurationRe = regexp.MustCompile(`^P(?:\d+Y)?(?:\d+M)?(?:\d+W)?(?:\d+D)?(?:T(?:\d+H)?(?:\d+M)?(?:\d+S)?)?$`)
 
 type Entity struct {
 	ID      string `json:"id" required:"true"`
@@ -118,4 +124,54 @@ type DeployableEntity struct {
 type TenantPropertiesDiff struct {
 	Properties map[string]any `json:"properties"`
 	Removed    []string       `json:"removed"`
+}
+
+// KeyRotationRequest represents a request to rotate a key, with optional parameters for algorithm (default: eddsa), curve (default: ed25519), and
+// grace period (default: P3M, 3 months).
+type KeyRotationRequest struct {
+	KeyID       string          `json:"keyId" required:"true"`
+	Algorithm   string          `json:"algorithm,omitempty"`
+	Curve       string          `json:"curve,omitempty"`
+	GracePeriod DurationISO8601 `json:"gracePeriod,omitempty"`
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface to provide default values
+func (r *KeyRotationRequest) UnmarshalJSON(b []byte) error {
+	r.Algorithm = "eddsa"
+	r.Curve = "ed25519"
+	r.GracePeriod = NewDuration("P3M")
+
+	// use a type alias to break infinite recursion
+	type Alias KeyRotationRequest
+	return json.Unmarshal(b, (*Alias)(r))
+}
+
+// DurationISO8601 is an ISO 8601 duration (e.g. "P3M", "P1Y2M3DT4H5M6S").
+type DurationISO8601 struct {
+	raw string
+}
+
+// NewDuration creates a new DurationISO8601 from a string and panics if the string is not a valid ISO 8601 duration.
+func NewDuration(s string) DurationISO8601 {
+	if !iso8601DurationRe.MatchString(s) {
+		panic(fmt.Errorf("invalid ISO 8601 duration: %q", s))
+	}
+	return DurationISO8601{raw: s}
+}
+
+func (d *DurationISO8601) String() string {
+	return d.raw
+}
+
+func (d *DurationISO8601) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(string(b), `"`)
+	if !iso8601DurationRe.MatchString(s) {
+		return fmt.Errorf("invalid ISO 8601 duration: %q", s)
+	}
+	d.raw = s
+	return nil
+}
+
+func (d *DurationISO8601) MarshalJSON() ([]byte, error) {
+	return []byte(`"` + d.raw + `"`), nil
 }
