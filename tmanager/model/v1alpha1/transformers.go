@@ -269,3 +269,12 @@ func ToDataspaceProfile(input *api.DataspaceProfile) *DataspaceProfile {
 		Properties:  input.Properties,
 	}
 }
+
+func ToKeyRotationRequest(input *KeyRotationRequest) api.KeyRotationRequest {
+	return api.KeyRotationRequest{
+		KeyID:       input.KeyID,
+		Algorithm:   input.Algorithm,
+		Curve:       input.Curve,
+		GracePeriod: input.GracePeriod,
+	}
+}

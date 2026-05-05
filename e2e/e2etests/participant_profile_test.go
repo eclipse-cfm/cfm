@@ -1,0 +1,95 @@
+/*
+ *  Copyright (c) 2026 Metaform Systems, Inc.
+ *
+ *  This program and the accompanying materials are made available under the
+ *  terms of the Apache License, Version 2.0 which is available at
+ *  https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  SPDX-License-Identifier: Apache-2.0
+ *
+ *  Contributors:
+ *       Metaform Systems, Inc. - initial API and implementation
+ *
+ */
+
+package e2etests
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"testing"
+
+	"github.com/eclipse-cfm/cfm/common/natsfixtures"
+	"github.com/eclipse-cfm/cfm/common/sqlstore"
+	"github.com/eclipse-cfm/cfm/e2e/e2efixtures"
+	"github.com/eclipse-cfm/cfm/tmanager/model/v1alpha1"
+	_ "github.com/lib/pq"
+	"github.com/stretchr/testify/require"
+)
+
+// this test verifies all operations executed on a participant profile
+
+func Test_ParticipantProfileOperations(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	defer cancel()
+
+	nt, err := natsfixtures.SetupNatsContainer(ctx, cfmBucket)
+
+	require.NoError(t, err)
+
+	defer natsfixtures.TeardownNatsContainer(ctx, nt)
+	defer cleanup()
+
+	pg, dsn, err := sqlstore.SetupTestContainer(t)
+	require.NoError(t, err)
+	defer pg.Terminate(context.Background())
+
+	client := launchPlatformWithAgent(t, nt.URI, dsn)
+	require.NotNil(t, client)
+
+	waitPManager(t, client)
+	waitTManager(t, client)
+
+	tenant, err := e2efixtures.CreateTenant(client, map[string]any{"label": "rotate-key-test"})
+	require.NoError(t, err)
+
+	cell, err := e2efixtures.CreateCell(client)
+	require.NoError(t, err)
+
+	dataspaceProfile, err := e2efixtures.CreateDataspaceProfile(client)
+	require.NoError(t, err)
+
+	deployment := v1alpha1.NewDataspaceProfileDeployment{
+		ProfileID: dataspaceProfile.ID,
+		CellID:    cell.ID,
+	}
+	err = e2efixtures.DeployDataspaceProfile(deployment, client)
+	require.NoError(t, err)
+
+	newParticipantProfile := v1alpha1.NewParticipantProfileDeployment{
+		CellID:           cell.ID,
+		Identifier:       "did:web:foo.com",
+		ParticipantRoles: map[string][]string{dataspaceProfile.ID: {"test-participant"}},
+	}
+
+	var participantProfile v1alpha1.ParticipantProfile
+	err = client.PostToTManagerWithResponse(fmt.Sprintf("tenants/%s/participant-profiles", tenant.ID), newParticipantProfile, &participantProfile)
+	require.NoError(t, err)
+	require.NotNil(t, participantProfile)
+	require.NotNil(t, participantProfile.ID)
+
+	verifyRotateKey(t, client, tenant, participantProfile)
+}
+
+func verifyRotateKey(t *testing.T, client *e2efixtures.ApiClient, tenant *v1alpha1.Tenant, profile v1alpha1.ParticipantProfile) {
+	krReq := v1alpha1.KeyRotationRequest{
+		KeyID: "test-key-id",
+	}
+	jsonData, msErr := json.Marshal(krReq)
+	require.NoError(t, msErr)
+	fmt.Println(string(jsonData))
+	err := client.PostToTManager(fmt.Sprintf("tenants/%s/participant-profiles/%s/rotate-keys", tenant.ID, profile.ID), krReq)
+	require.NoError(t, err)
+
+}

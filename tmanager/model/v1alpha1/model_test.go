@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	common "github.com/eclipse-cfm/cfm/common/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,11 +46,12 @@ func TestKeyRotationRequest_Deserialization(t *testing.T) {
 }
 
 func TestKeyRotationRequest_RoundTrip(t *testing.T) {
+	gracePeriod := common.NewDuration("P1Y2M3DT4H")
 	req := &KeyRotationRequest{
 		KeyID:       "test-key-id",
 		Algorithm:   "eddsa",
 		Curve:       "ed25519",
-		GracePeriod: NewDuration("P1Y2M3DT4H"),
+		GracePeriod: &gracePeriod,
 	}
 	jsonData, err := json.Marshal(req)
 	require.NoError(t, err)

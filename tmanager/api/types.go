@@ -121,6 +121,13 @@ type Cell struct {
 // DeploymentState represents the current state of a deployable entity
 type DeploymentState string
 
+type KeyRotationRequest struct {
+	KeyID       string
+	Algorithm   string
+	Curve       string
+	GracePeriod *model.DurationISO8601
+}
+
 const (
 	DeploymentStateInitial   DeploymentState = "initial"
 	DeploymentStatePending   DeploymentState = "pending"

@@ -19,6 +19,7 @@ import (
 	"github.com/eclipse-cfm/cfm/common/query"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/common/types"
 	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/eclipse-cfm/cfm/tmanager/model/v1alpha1"
 	"go.opentelemetry.io/otel"
@@ -397,6 +398,17 @@ func (h *TMHandler) rotateParticipantProfileKeys(w http.ResponseWriter, req *htt
 	}
 
 	//todo: implement orchestration creation
+	var input v1alpha1.KeyRotationRequest
+	if !h.ReadPayload(w, req, &input) {
+		h.HandleError(w, types.ErrInvalidInput)
+		return
+	}
+	transformed := v1alpha1.ToKeyRotationRequest(&input)
+	err := h.participantService.RotateKeys(req.Context(), tenantID, participantProfileID, &transformed)
+	if err != nil {
+		h.HandleError(w, err)
+		return
+	}
 
 	h.Accepted(w)
 }

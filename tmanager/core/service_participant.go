@@ -135,35 +135,6 @@ func (p participantService) DeployProfile(ctx context.Context, tenantID string, 
 	})
 }
 
-// getFilteredProfiles filters dProfiles based on deployment.DataspaceProfileIDs
-func (p participantService) getFilteredProfiles(
-	ctx context.Context,
-	deployment *api.NewParticipantProfileDeployment) ([]api.DataspaceProfile, error) {
-
-	dProfiles, err := collection.CollectAllDeref(p.dataspaceStore.GetAll(ctx))
-	if err != nil {
-		return nil, err
-	}
-
-	if len(deployment.DataspaceProfileIDs) > 0 {
-		profileIDMap := make(map[string]bool)
-		for _, id := range deployment.DataspaceProfileIDs {
-			profileIDMap[id] = true
-		}
-		filteredProfiles := make([]api.DataspaceProfile, 0)
-		for _, profile := range dProfiles {
-			if profileIDMap[profile.ID] {
-				filteredProfiles = append(filteredProfiles, profile)
-			}
-		}
-		dProfiles = filteredProfiles
-	}
-	if len(dProfiles) == 0 {
-		return nil, fmt.Errorf("no dataspace profiles found")
-	}
-	return dProfiles, nil
-}
-
 func (p participantService) DisposeProfile(ctx context.Context, tenantID string, participantID string) error {
 	return p.trxContext.Execute(ctx, func(c context.Context) error {
 		profile, err := p.participantStore.FindByID(c, participantID)
@@ -228,6 +199,39 @@ func (p participantService) DisposeProfile(ctx context.Context, tenantID string,
 
 		return nil
 	})
+}
+
+func (p participantService) RotateKeys(ctx context.Context, tenantID string, participantID string, rotationRequest *api.KeyRotationRequest) error {
+	return nil
+}
+
+// getFilteredProfiles filters dProfiles based on deployment.DataspaceProfileIDs
+func (p participantService) getFilteredProfiles(
+	ctx context.Context,
+	deployment *api.NewParticipantProfileDeployment) ([]api.DataspaceProfile, error) {
+
+	dProfiles, err := collection.CollectAllDeref(p.dataspaceStore.GetAll(ctx))
+	if err != nil {
+		return nil, err
+	}
+
+	if len(deployment.DataspaceProfileIDs) > 0 {
+		profileIDMap := make(map[string]bool)
+		for _, id := range deployment.DataspaceProfileIDs {
+			profileIDMap[id] = true
+		}
+		filteredProfiles := make([]api.DataspaceProfile, 0)
+		for _, profile := range dProfiles {
+			if profileIDMap[profile.ID] {
+				filteredProfiles = append(filteredProfiles, profile)
+			}
+		}
+		dProfiles = filteredProfiles
+	}
+	if len(dProfiles) == 0 {
+		return nil, fmt.Errorf("no dataspace profiles found")
+	}
+	return dProfiles, nil
 }
 
 // executeStoreIterator wraps store iterator operations in a transaction context

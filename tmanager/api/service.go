@@ -47,6 +47,7 @@ type ParticipantProfileService interface {
 	QueryProfilesCount(ctx context.Context, predicate query.Predicate) (int64, error)
 	DeployProfile(ctx context.Context, tenantID string, deployment *NewParticipantProfileDeployment) (*ParticipantProfile, error)
 	DisposeProfile(ctx context.Context, tenantID string, participantID string) error
+	RotateKeys(ctx context.Context, tenantID string, participantID string, rotationRequest *KeyRotationRequest) error
 }
 
 // DataspaceProfileService performs dataspace profile operations.
