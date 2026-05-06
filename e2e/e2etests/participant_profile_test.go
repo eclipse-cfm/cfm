@@ -24,6 +24,7 @@ import (
 	"github.com/eclipse-cfm/cfm/common/sqlstore"
 	"github.com/eclipse-cfm/cfm/e2e/e2efixtures"
 	"github.com/eclipse-cfm/cfm/tmanager/model/v1alpha1"
+	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 )
@@ -79,7 +80,48 @@ func Test_ParticipantProfileOperations(t *testing.T) {
 	require.NotNil(t, participantProfile)
 	require.NotNil(t, participantProfile.ID)
 
-	verifyRotateKey(t, client, tenant, participantProfile)
+	t.Run("rotate key  success", func(t *testing.T) {
+		verifyRotateKey(t, client, tenant, participantProfile)
+	})
+	t.Run("rotate key invalid request", func(t *testing.T) {
+		verifyRotateKeyInvalidRequest(t, client, tenant, participantProfile)
+	})
+
+	t.Run("profile not found", func(t *testing.T) {
+		err := client.PostToTManager(fmt.Sprintf("tenants/%s/participant-profiles/%s/rotate-keys", tenant.ID, "invalid-profile-id"), v1alpha1.KeyRotationRequest{
+			KeyID: uuid.NewString(),
+		})
+		require.Error(t, err)
+		require.ErrorContains(t, err, "Not Found")
+	})
+
+	t.Run("tenant does not match", func(t *testing.T) {
+		err := client.PostToTManager(fmt.Sprintf("tenants/%s/participant-profiles/%s/rotate-keys", "invalid-tenant-id", participantProfile.ID), v1alpha1.KeyRotationRequest{
+			KeyID: uuid.NewString(),
+		})
+		require.Error(t, err)
+		require.ErrorContains(t, err, "Bad Request")
+	})
+}
+
+func verifyRotateKeyInvalidRequest(t *testing.T, client *e2efixtures.ApiClient, tenant *v1alpha1.Tenant, profile v1alpha1.ParticipantProfile) {
+	krReq := v1alpha1.KeyRotationRequest{
+		// missing: key-id
+	}
+	jsonData, msErr := json.Marshal(krReq)
+	require.NoError(t, msErr)
+	fmt.Println(string(jsonData))
+	t.Run("missing key-id", func(t *testing.T) {
+		err := client.PostToTManager(fmt.Sprintf("tenants/%s/participant-profiles/%s/rotate-keys", tenant.ID, profile.ID), krReq)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "Bad Request")
+	})
+
+	t.Run("missing payload", func(t *testing.T) {
+		err := client.PostToTManager(fmt.Sprintf("tenants/%s/participant-profiles/%s/rotate-keys", tenant.ID, profile.ID), nil)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "Bad Request")
+	})
 }
 
 func verifyRotateKey(t *testing.T, client *e2efixtures.ApiClient, tenant *v1alpha1.Tenant, profile v1alpha1.ParticipantProfile) {
@@ -91,5 +133,4 @@ func verifyRotateKey(t *testing.T, client *e2efixtures.ApiClient, tenant *v1alph
 	fmt.Println(string(jsonData))
 	err := client.PostToTManager(fmt.Sprintf("tenants/%s/participant-profiles/%s/rotate-keys", tenant.ID, profile.ID), krReq)
 	require.NoError(t, err)
-
 }

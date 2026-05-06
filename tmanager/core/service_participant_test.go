@@ -745,6 +745,55 @@ func TestGetFilteredProfiles(t *testing.T) {
 	})
 }
 
+func TestRotateKeys(t *testing.T) {
+	ctx := context.Background()
+	service := newTestParticipantService()
+
+	tenantID := "tenant-1"
+	profile := newTestParticipantProfile(tenantID, "participant-1") // Create a participant profile for the tenant
+	_, err := service.participantStore.Create(ctx, profile)
+	require.NoError(t, err)
+
+	rotationRequest := &api.KeyRotationRequest{
+		KeyID:     "test-key-id",
+		Algorithm: "EdDSA",
+		Curve:     "ed25519",
+		GracePeriod: &model.DurationISO8601{
+			Raw: "P3M",
+		}, // 3 months
+	}
+
+	t.Run("rotate keys normally", func(t *testing.T) {
+		mockClient := &mockProvisionClient{}
+		service.provisionClient = mockClient
+		mockClient.On("Send", ctx, mock.MatchedBy(func(manifest model.OrchestrationManifest) bool {
+			return manifest.OrchestrationType == model.KeyRotationType &&
+				manifest.Payload[model.KeyRotationData] == rotationRequest
+		})).Return(nil)
+
+		err = service.RotateKeys(ctx, tenantID, profile.ID, rotationRequest)
+		require.NoError(t, err)
+	})
+
+	t.Run("return error when profile not found", func(t *testing.T) {
+		err = service.RotateKeys(ctx, tenantID, "non-existent-profile", rotationRequest)
+		require.Error(t, err)
+		require.ErrorIs(t, err, types.ErrNotFound)
+	})
+
+	t.Run("return error when rotation request is invalid", func(t *testing.T) {
+		rotationRequest = &api.KeyRotationRequest{
+			// key-id missing
+		}
+
+		err = service.RotateKeys(ctx, tenantID, profile.ID, rotationRequest)
+		require.Error(t, err)
+		require.ErrorIs(t, err, types.ErrInvalidInput)
+		assert.Contains(t, err.Error(), "key-ID is required")
+	})
+
+}
+
 // Helper functions
 
 func newTestParticipantProfile(tenantID string, participantID string) *api.ParticipantProfile {
