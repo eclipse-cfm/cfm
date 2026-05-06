@@ -22,7 +22,7 @@ import (
 	"github.com/eclipse-cfm/cfm/agent/common/issuerservice"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
-	"github.com/eclipse-cfm/cfm/tmanager/api"
+	tmapi "github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -449,7 +449,7 @@ type MockIdentityHubClient struct {
 	expectedCredentials []common.VerifiableCredentialResource
 }
 
-func (m MockIdentityHubClient) RotateKey(ctx context.context.Context, participantContextID string, keyRotationParams api.api.KeyRotationRequest) error {
+func (m MockIdentityHubClient) RotateKey(ctx context.Context, participantContextID string, keyId string, keyRotationParams tmapi.KeyRotationRequest) error {
 	//TODO implement me
 	panic("implement me")
 }

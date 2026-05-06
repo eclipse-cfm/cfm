@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/natsfixtures"
 	"github.com/eclipse-cfm/cfm/common/sqlstore"
 	"github.com/eclipse-cfm/cfm/e2e/e2efixtures"
@@ -72,6 +73,11 @@ func Test_ParticipantProfileOperations(t *testing.T) {
 		CellID:           cell.ID,
 		Identifier:       "did:web:foo.com",
 		ParticipantRoles: map[string][]string{dataspaceProfile.ID: {"test-participant"}},
+		Properties: map[string]any{
+			model.VPAStateData: map[string]any{
+				"participantContextID": "test-participant-context-id",
+			},
+		},
 	}
 
 	var participantProfile v1alpha1.ParticipantProfile
@@ -80,7 +86,7 @@ func Test_ParticipantProfileOperations(t *testing.T) {
 	require.NotNil(t, participantProfile)
 	require.NotNil(t, participantProfile.ID)
 
-	t.Run("rotate key  success", func(t *testing.T) {
+	t.Run("rotate key success", func(t *testing.T) {
 		verifyRotateKey(t, client, tenant, participantProfile)
 	})
 	t.Run("rotate key invalid request", func(t *testing.T) {

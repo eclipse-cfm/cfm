@@ -43,7 +43,7 @@ type IdentityAPIClient interface {
 	GetCredentialRequestState(ctx context.Context, participantContextID string, credentialRequestID string) (string, error)
 	QueryCredentialByType(ctx context.Context, participantContextID string, credentialType string) ([]common.VerifiableCredentialResource, error)
 	DeleteParticipantContext(ctx context.Context, participantContextID string) error
-	RotateKey(ctx context.Context, participantContextID string, privateKeyAlias string, keyRotationParams api.KeyRotationRequest) error
+	RotateKey(ctx context.Context, participantContextID string, keyId string, keyRotationParams api.KeyRotationRequest) error
 }
 
 type HttpIdentityAPIClient struct {

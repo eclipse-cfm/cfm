@@ -751,6 +751,9 @@ func TestRotateKeys(t *testing.T) {
 
 	tenantID := "tenant-1"
 	profile := newTestParticipantProfile(tenantID, "participant-1") // Create a participant profile for the tenant
+	profile.Properties[model.VPAStateData] = map[string]any{
+		"participantContextID": "test-participant-context-id",
+	}
 	_, err := service.participantStore.Create(ctx, profile)
 	require.NoError(t, err)
 
