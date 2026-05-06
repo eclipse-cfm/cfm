@@ -24,6 +24,7 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/common/types"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
+	tmapi "github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -229,6 +230,11 @@ func (m MockVaultClient) Health(_ context.Context) error { return nil }
 
 type MockIdentityHubClient struct {
 	expectedError error
+}
+
+func (m MockIdentityHubClient) RotateKey(ctx context.Context, participantContextID string, privateKeyAlias string, keyRotationParams tmapi.KeyRotationRequest) error {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (m MockIdentityHubClient) CreateParticipantContext(_ context.Context, _ identityhub.ParticipantManifest) (*identityhub.CreateParticipantContextResponse, error) {

@@ -24,6 +24,7 @@ import (
 
 	"github.com/eclipse-cfm/cfm/agent/common"
 	"github.com/eclipse-cfm/cfm/common/token"
+	"github.com/eclipse-cfm/cfm/tmanager/api"
 )
 
 const (
@@ -42,12 +43,67 @@ type IdentityAPIClient interface {
 	GetCredentialRequestState(ctx context.Context, participantContextID string, credentialRequestID string) (string, error)
 	QueryCredentialByType(ctx context.Context, participantContextID string, credentialType string) ([]common.VerifiableCredentialResource, error)
 	DeleteParticipantContext(ctx context.Context, participantContextID string) error
+	RotateKey(ctx context.Context, participantContextID string, privateKeyAlias string, keyRotationParams api.KeyRotationRequest) error
 }
 
 type HttpIdentityAPIClient struct {
 	BaseURL       string
 	TokenProvider token.TokenProvider
 	HttpClient    *http.Client
+}
+
+// keyDescriptor is the DTO for requesting the rotation of a key in IdentityHub
+type keyDescriptor struct {
+	KeyID           string            `json:"keyId"`
+	PrivateKeyAlias string            `json:"privateKeyAlias"`
+	IsActive        bool              `json:"isActive"`
+	GeneratorParams map[string]string `json:"keyGeneratorParams"`
+}
+
+func (a HttpIdentityAPIClient) RotateKey(ctx context.Context, participantContextID string, privateKeyAlias string, keyRotationParams api.KeyRotationRequest) error {
+	accessToken, err := a.TokenProvider.GetToken(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get API access token: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/participants/%s/keypairs/%s/rotate", a.BaseURL, participantContextID, keyRotationParams.KeyID)
+	body := keyDescriptor{
+		KeyID:           privateKeyAlias,
+		PrivateKeyAlias: privateKeyAlias, // generate a new random alias for the new key version
+		IsActive:        true,
+		GeneratorParams: map[string]string{
+			"algorithm": keyRotationParams.Algorithm,
+			"curve":     keyRotationParams.Curve,
+		},
+	}
+	jsonbody, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonbody))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	resp, err := a.HttpClient.Do(req)
+	defer a.closeResponse(resp)
+
+	if err != nil {
+		return err
+	}
+	switch resp.StatusCode {
+	case http.StatusOK:
+	case http.StatusCreated:
+	case http.StatusAccepted:
+	case http.StatusNoContent:
+		return nil
+	default:
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to delete participant context on IdentityHub: received status code %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
 }
 
 func (a HttpIdentityAPIClient) DeleteParticipantContext(ctx context.Context, participantContextID string) error {

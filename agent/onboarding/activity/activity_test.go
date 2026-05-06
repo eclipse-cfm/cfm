@@ -22,6 +22,7 @@ import (
 	"github.com/eclipse-cfm/cfm/agent/common/issuerservice"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
+	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -446,6 +447,11 @@ type MockIdentityHubClient struct {
 	expectedState       string
 	expectedURL         string
 	expectedCredentials []common.VerifiableCredentialResource
+}
+
+func (m MockIdentityHubClient) RotateKey(ctx context.context.Context, participantContextID string, keyRotationParams api.api.KeyRotationRequest) error {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (m MockIdentityHubClient) QueryCredentialByType(ctx context.Context, participantContextID string, credentialType string) ([]common.VerifiableCredentialResource, error) {

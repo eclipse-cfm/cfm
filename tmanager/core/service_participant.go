@@ -217,6 +217,9 @@ func (p participantService) RotateKeys(ctx context.Context, tenantID string, par
 		if profile.TenantID != tenantID {
 			return nil, types.ErrInvalidInput
 		}
+		if profile.Error {
+			return nil, fmt.Errorf("participant %s is in error state: %s", participantID, profile.ErrorDetail)
+		}
 
 		// resolve orchestration definition by type "cfm.orchestration.key.rotate"
 		orchestrationManifest := model.OrchestrationManifest{
@@ -225,6 +228,11 @@ func (p participantService) RotateKeys(ctx context.Context, tenantID string, par
 			OrchestrationType: model.KeyRotationType,
 			Payload:           make(map[string]any),
 		}
+		stateData := profile.Properties[model.VPAStateData]
+		if stateData == nil {
+			return nil, fmt.Errorf("participant %s is not deployed. The 'participantContextID' property was not found on vpa.state.data", participantID)
+		}
+		orchestrationManifest.Payload["participantContextID"] = stateData.(map[string]any)["participantContextId"]
 		orchestrationManifest.Payload[model.ParticipantIdentifier] = profile.Identifier
 		orchestrationManifest.Payload[model.KeyRotationData] = rotationRequest
 
