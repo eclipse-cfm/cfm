@@ -1104,14 +1104,14 @@ func TestToAPINewParticipantProfileDeployment_NilValuesHandling(t *testing.T) {
 func TestToKeyRotationRequest_NilGracePeriod(t *testing.T) {
 
 	input := &KeyRotationRequest{
-		KeyID:       "key-id",
+		KeyPairID:   "key-id",
 		Algorithm:   "algorithm",
 		Curve:       "curve",
 		GracePeriod: nil,
 	}
 	output := ToKeyRotationRequest(input)
 	require.NotNil(t, output)
-	require.Equal(t, input.KeyID, output.KeyID)
+	require.Equal(t, input.KeyPairID, output.KeyPairID)
 	require.Equal(t, input.Algorithm, output.Algorithm)
 	require.Equal(t, input.Curve, output.Curve)
 	require.Nil(t, output.GracePeriod)
@@ -1120,14 +1120,14 @@ func TestToKeyRotationRequest_NilGracePeriod(t *testing.T) {
 func TestToKeyRotationRequest(t *testing.T) {
 
 	input := &KeyRotationRequest{
-		KeyID:       "key-id",
+		KeyPairID:   "key-id",
 		Algorithm:   "algorithm",
 		Curve:       "curve",
 		GracePeriod: &model.DurationISO8601{},
 	}
 	output := ToKeyRotationRequest(input)
 	require.NotNil(t, output)
-	require.Equal(t, input.KeyID, output.KeyID)
+	require.Equal(t, input.KeyPairID, output.KeyPairID)
 	require.Equal(t, input.Algorithm, output.Algorithm)
 	require.Equal(t, input.Curve, output.Curve)
 	require.Equal(t, input.GracePeriod, output.GracePeriod)

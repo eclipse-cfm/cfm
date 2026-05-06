@@ -89,7 +89,7 @@ func Test_ParticipantProfileOperations(t *testing.T) {
 
 	t.Run("profile not found", func(t *testing.T) {
 		err := client.PostToTManager(fmt.Sprintf("tenants/%s/participant-profiles/%s/rotate-keys", tenant.ID, "invalid-profile-id"), v1alpha1.KeyRotationRequest{
-			KeyID: uuid.NewString(),
+			KeyPairID: uuid.NewString(),
 		})
 		require.Error(t, err)
 		require.ErrorContains(t, err, "Not Found")
@@ -97,7 +97,7 @@ func Test_ParticipantProfileOperations(t *testing.T) {
 
 	t.Run("tenant does not match", func(t *testing.T) {
 		err := client.PostToTManager(fmt.Sprintf("tenants/%s/participant-profiles/%s/rotate-keys", "invalid-tenant-id", participantProfile.ID), v1alpha1.KeyRotationRequest{
-			KeyID: uuid.NewString(),
+			KeyPairID: uuid.NewString(),
 		})
 		require.Error(t, err)
 		require.ErrorContains(t, err, "Bad Request")
@@ -126,7 +126,7 @@ func verifyRotateKeyInvalidRequest(t *testing.T, client *e2efixtures.ApiClient, 
 
 func verifyRotateKey(t *testing.T, client *e2efixtures.ApiClient, tenant *v1alpha1.Tenant, profile v1alpha1.ParticipantProfile) {
 	krReq := v1alpha1.KeyRotationRequest{
-		KeyID: "test-key-id",
+		KeyPairID: "test-key-id",
 	}
 	jsonData, msErr := json.Marshal(krReq)
 	require.NoError(t, msErr)

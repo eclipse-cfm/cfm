@@ -23,9 +23,9 @@ import (
 
 // keyRotationData contains all relevant data for the key rotation activity and is read off of the ActivityContext
 type keyRotationData struct {
-	ParticipantID        string                      `json:"cfm.participant.id" validate:"required"`
-	RotationParams       tmanager.KeyRotationRequest `json:"cfm.key.rotation.data" validate:"required"`
-	ParticipantContextID string                      `json:"participantContextID" validate:"required"`
+	ParticipantIdentifier string                      `json:"cfm.participant.id" validate:"required"`
+	RotationParams        tmanager.KeyRotationRequest `json:"cfm.key.rotation.data" validate:"required"`
+	ParticipantContextID  string                      `json:"participantContextID" validate:"required"`
 }
 type KeyRotationActivityProcessor struct {
 	api.BaseActivityProcessor
@@ -50,8 +50,8 @@ func (p KeyRotationActivityProcessor) Process(ctx api.ActivityContext) api.Activ
 	}
 
 	// call the keyrotation API
-	privateKeyAlias := params.ParticipantID + "#" + uuid.NewString()
-	err = p.IdentityAPIClient.RotateKey(ctx.Context(), params.ParticipantContextID, privateKeyAlias, params.RotationParams)
+	keyId := params.ParticipantIdentifier + "#" + uuid.NewString()
+	err = p.IdentityAPIClient.RotateKey(ctx.Context(), params.ParticipantContextID, keyId, params.RotationParams)
 	if err != nil {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}
 	}

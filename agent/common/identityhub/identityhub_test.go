@@ -24,6 +24,7 @@ import (
 
 	"github.com/eclipse-cfm/cfm/agent/edcv"
 	"github.com/eclipse-cfm/cfm/common/mocks"
+	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -166,6 +167,111 @@ func TestHttpIdentityAPIClient_DeleteParticipantContext(t *testing.T) {
 
 	err := client.DeleteParticipantContext(t.Context(), "test-id")
 	require.NoError(t, err)
+}
+
+func TestHttpIdentityAPIClient_RotateKey(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/participants/test-participant/keypairs/test-keypair-id/rotate" && r.Method == http.MethodPost {
+			require.Equal(t, "Bearer token", r.Header.Get("Authorization"))
+			require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+
+			var data map[string]any
+			err = json.Unmarshal(body, &data)
+			require.NoError(t, err)
+
+			require.Equal(t, "did:web:test#key-1", data["keyId"])
+			require.Equal(t, "did:web:test#key-1", data["privateKeyAlias"])
+			require.True(t, data["isActive"].(bool))
+			params := data["keyGeneratorParams"].(map[string]any)
+			require.Equal(t, "EC", params["algorithm"])
+			require.Equal(t, "P-256", params["curve"])
+
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything).Return("token", nil)
+	client := HttpIdentityAPIClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	err := client.RotateKey(t.Context(), "test-participant", "did:web:test#key-1", api.KeyRotationRequest{
+		KeyPairID: "test-keypair-id",
+		Algorithm: "EC",
+		Curve:     "P-256",
+	})
+	require.NoError(t, err)
+}
+
+func TestHttpIdentityAPIClient_RotateKey_NotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything).Return("token", nil)
+	client := HttpIdentityAPIClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	err := client.RotateKey(t.Context(), "test-participant", "did:web:test#key-1", api.KeyRotationRequest{
+		KeyPairID: "test-keypair-id",
+		Algorithm: "EC",
+		Curve:     "P-256",
+	})
+	require.ErrorContains(t, err, "404")
+}
+
+func TestHttpIdentityAPIClient_RotateKey_AuthError(t *testing.T) {
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything).Return("", fmt.Errorf("auth error"))
+	client := HttpIdentityAPIClient{
+		BaseURL:       "http://foo.bar",
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	err := client.RotateKey(t.Context(), "test-participant", "did:web:test#key-1", api.KeyRotationRequest{
+		KeyPairID: "test-keypair-id",
+		Algorithm: "EC",
+		Curve:     "P-256",
+	})
+	require.ErrorContains(t, err, "failed to get API access token: auth error")
+}
+
+func TestHttpIdentityAPIClient_RotateKey_ServerError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("internal server error"))
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything).Return("token", nil)
+	client := HttpIdentityAPIClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	err := client.RotateKey(t.Context(), "test-participant", "did:web:test#key-1", api.KeyRotationRequest{
+		KeyPairID: "test-keypair-id",
+		Algorithm: "EC",
+		Curve:     "P-256",
+	})
+	require.ErrorContains(t, err, "failed to start key rotation on IdentityHub")
+	require.ErrorContains(t, err, "500")
 }
 
 func TestHttpIdentityAPIClient_DeleteParticipantContext_NotFound(t *testing.T) {

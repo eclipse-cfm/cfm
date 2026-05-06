@@ -54,33 +54,39 @@ type HttpIdentityAPIClient struct {
 
 // keyDescriptor is the DTO for requesting the rotation of a key in IdentityHub
 type keyDescriptor struct {
-	KeyID           string            `json:"keyId"`
-	PrivateKeyAlias string            `json:"privateKeyAlias"`
-	IsActive        bool              `json:"isActive"`
+	// KeyID the Key ID of the key to rotate. This is NOT the key pair resource ID of IdentityHub. Typically, this ID
+	// consists of the Web:DID + "#" + a unique identifier
+	KeyID string `json:"keyId"`
+	// PrivateKeyAlias the alias of the private key to rotate. This is the handle under which the private key is stored in the
+	// vault by IdentityHub. Usually, for simplicity, this is identical to KeyID
+	PrivateKeyAlias string `json:"privateKeyAlias"`
+	// IsActive whether the new key should be set to active
+	IsActive bool `json:"isActive"`
+	// GeneratorParams the parameters used to generate the new key. This typically contains an entry for "algorithm" and "curve"
 	GeneratorParams map[string]string `json:"keyGeneratorParams"`
 }
 
-func (a HttpIdentityAPIClient) RotateKey(ctx context.Context, participantContextID string, privateKeyAlias string, keyRotationParams api.KeyRotationRequest) error {
+func (a HttpIdentityAPIClient) RotateKey(ctx context.Context, participantContextID string, keyId string, keyRotationParams api.KeyRotationRequest) error {
 	accessToken, err := a.TokenProvider.GetToken(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/participants/%s/keypairs/%s/rotate", a.BaseURL, participantContextID, keyRotationParams.KeyID)
+	url := fmt.Sprintf("%s/participants/%s/keypairs/%s/rotate", a.BaseURL, participantContextID, keyRotationParams.KeyPairID)
 	body := keyDescriptor{
-		KeyID:           privateKeyAlias,
-		PrivateKeyAlias: privateKeyAlias, // generate a new random alias for the new key version
+		KeyID:           keyId,
+		PrivateKeyAlias: keyId,
 		IsActive:        true,
 		GeneratorParams: map[string]string{
 			"algorithm": keyRotationParams.Algorithm,
 			"curve":     keyRotationParams.Curve,
 		},
 	}
-	jsonbody, err := json.Marshal(body)
+	jsonBody, err := json.Marshal(body)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonbody))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return err
 	}
@@ -100,7 +106,7 @@ func (a HttpIdentityAPIClient) RotateKey(ctx context.Context, participantContext
 		return nil
 	default:
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to delete participant context on IdentityHub: received status code %d, body: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("failed to start key rotation on IdentityHub: received status code %d, body: %s", resp.StatusCode, string(body))
 	}
 
 	return nil

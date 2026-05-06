@@ -124,7 +124,7 @@ type TenantPropertiesDiff struct {
 // KeyRotationRequest represents a request to rotate a key, with optional parameters for algorithm (default: eddsa), curve (default: ed25519), and
 // grace period (default: P3M, 3 months).
 type KeyRotationRequest struct {
-	KeyID       string                  `json:"keyId" required:"true"`
+	KeyPairID   string                  `json:"keyPairId" required:"true"`
 	Algorithm   string                  `json:"algorithm,omitempty"`
 	Curve       string                  `json:"curve,omitempty"`
 	GracePeriod *common.DurationISO8601 `json:"gracePeriod,omitempty"`

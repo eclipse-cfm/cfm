@@ -203,7 +203,7 @@ func (p participantService) DisposeProfile(ctx context.Context, tenantID string,
 
 func (p participantService) RotateKeys(ctx context.Context, tenantID string, participantID string, rotationRequest *api.KeyRotationRequest) error {
 
-	if rotationRequest == nil || rotationRequest.KeyID == "" {
+	if rotationRequest == nil || rotationRequest.KeyPairID == "" {
 		return fmt.Errorf("%w: key-ID is required", types.ErrInvalidInput)
 	}
 

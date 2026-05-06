@@ -25,21 +25,21 @@ import (
 
 func TestKeyRotationRequest_Serialization(t *testing.T) {
 	req := &KeyRotationRequest{
-		KeyID: "test-key-id",
+		KeyPairID: "test-key-id",
 	}
 
 	jsonData, err := json.Marshal(req)
 	require.NoError(t, err)
-	assert.Contains(t, string(jsonData), `"keyId":"test-key-id"`)
+	assert.Contains(t, string(jsonData), `"keyPairId":"test-key-id"`)
 }
 
 func TestKeyRotationRequest_Deserialization(t *testing.T) {
-	jsonData := `{"keyId": "test-key-id", "algorithm": "EcDSA", "curve": "P-256", "gracePeriod": "P6M"}`
+	jsonData := `{"keyPairId": "test-key-id", "algorithm": "EcDSA", "curve": "P-256", "gracePeriod": "P6M"}`
 
 	var req KeyRotationRequest
 	err := json.Unmarshal([]byte(jsonData), &req)
 	require.NoError(t, err)
-	require.Equal(t, "test-key-id", req.KeyID)
+	require.Equal(t, "test-key-id", req.KeyPairID)
 	require.Equal(t, "EcDSA", req.Algorithm)
 	require.Equal(t, "P-256", req.Curve)
 	require.Equal(t, "P6M", req.GracePeriod.String())
@@ -48,7 +48,7 @@ func TestKeyRotationRequest_Deserialization(t *testing.T) {
 func TestKeyRotationRequest_RoundTrip(t *testing.T) {
 	gracePeriod := common.NewDuration("P1Y2M3DT4H")
 	req := &KeyRotationRequest{
-		KeyID:       "test-key-id",
+		KeyPairID:   "test-key-id",
 		Algorithm:   "eddsa",
 		Curve:       "ed25519",
 		GracePeriod: &gracePeriod,
@@ -64,7 +64,7 @@ func TestKeyRotationRequest_RoundTrip(t *testing.T) {
 }
 
 func TestKeyRotationRequest_VerifyDefaults(t *testing.T) {
-	jsonData := `{"keyId": "test-key-id"}`
+	jsonData := `{"keyPairId": "test-key-id"}`
 
 	request := KeyRotationRequest{}
 	err := json.Unmarshal([]byte(jsonData), &request)

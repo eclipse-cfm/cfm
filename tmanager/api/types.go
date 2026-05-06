@@ -121,8 +121,10 @@ type Cell struct {
 // DeploymentState represents the current state of a deployable entity
 type DeploymentState string
 
+// KeyRotationRequest represents the parameters for rotating a key in the IdentityHub. It includes the key pair ID, algorithm,
+// curve, and an optional grace period for the rotation. This object is intended to be used internally in CFM.
 type KeyRotationRequest struct {
-	KeyID       string
+	KeyPairID   string
 	Algorithm   string
 	Curve       string
 	GracePeriod *model.DurationISO8601

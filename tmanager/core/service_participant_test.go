@@ -755,7 +755,7 @@ func TestRotateKeys(t *testing.T) {
 	require.NoError(t, err)
 
 	rotationRequest := &api.KeyRotationRequest{
-		KeyID:     "test-key-id",
+		KeyPairID: "test-key-id",
 		Algorithm: "EdDSA",
 		Curve:     "ed25519",
 		GracePeriod: &model.DurationISO8601{
