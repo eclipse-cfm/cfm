@@ -135,6 +135,35 @@ func (p participantService) DeployProfile(ctx context.Context, tenantID string, 
 	})
 }
 
+// getFilteredProfiles filters dProfiles based on deployment.DataspaceProfileIDs
+func (p participantService) getFilteredProfiles(
+	ctx context.Context,
+	deployment *api.NewParticipantProfileDeployment) ([]api.DataspaceProfile, error) {
+
+	dProfiles, err := collection.CollectAllDeref(p.dataspaceStore.GetAll(ctx))
+	if err != nil {
+		return nil, err
+	}
+
+	if len(deployment.DataspaceProfileIDs) > 0 {
+		profileIDMap := make(map[string]bool)
+		for _, id := range deployment.DataspaceProfileIDs {
+			profileIDMap[id] = true
+		}
+		filteredProfiles := make([]api.DataspaceProfile, 0)
+		for _, profile := range dProfiles {
+			if profileIDMap[profile.ID] {
+				filteredProfiles = append(filteredProfiles, profile)
+			}
+		}
+		dProfiles = filteredProfiles
+	}
+	if len(dProfiles) == 0 {
+		return nil, fmt.Errorf("no dataspace profiles found")
+	}
+	return dProfiles, nil
+}
+
 func (p participantService) DisposeProfile(ctx context.Context, tenantID string, participantID string) error {
 	return p.trxContext.Execute(ctx, func(c context.Context) error {
 		profile, err := p.participantStore.FindByID(c, participantID)
@@ -201,77 +230,6 @@ func (p participantService) DisposeProfile(ctx context.Context, tenantID string,
 	})
 }
 
-func (p participantService) RotateKeys(ctx context.Context, tenantID string, participantID string, rotationRequest *api.KeyRotationRequest) error {
-
-	if rotationRequest == nil || rotationRequest.KeyPairID == "" {
-		return fmt.Errorf("%w: key-ID is required", types.ErrInvalidInput)
-	}
-
-	_, err := store.Trx[api.ParticipantProfile](p.trxContext).AndReturn(ctx, func(ctx context.Context) (*api.ParticipantProfile, error) {
-
-		// check if participant exists
-		profile, err := p.participantStore.FindByID(ctx, participantID)
-		if err != nil {
-			return nil, err
-		}
-		if profile.TenantID != tenantID {
-			return nil, types.ErrInvalidInput
-		}
-		if profile.Error {
-			return nil, fmt.Errorf("participant %s is in error state: %s", participantID, profile.ErrorDetail)
-		}
-
-		// resolve orchestration definition by type "cfm.orchestration.key.rotate"
-		orchestrationManifest := model.OrchestrationManifest{
-			ID:                uuid.New().String(),
-			CorrelationID:     participantID,
-			OrchestrationType: model.KeyRotationType,
-			Payload:           make(map[string]any),
-		}
-		stateData := profile.Properties[model.VPAStateData]
-		if stateData == nil {
-			return nil, fmt.Errorf("participant %s is not deployed. The 'participantContextID' property was not found on vpa.state.data", participantID)
-		}
-		orchestrationManifest.Payload["participantContextID"] = stateData.(map[string]any)["participantContextId"]
-		orchestrationManifest.Payload[model.ParticipantIdentifier] = profile.Identifier
-		orchestrationManifest.Payload[model.KeyRotationData] = rotationRequest
-
-		err = p.provisionClient.Send(ctx, orchestrationManifest)
-		if err != nil {
-			return nil, fmt.Errorf("error rotating keys for participant %s: %w", participantID, err)
-		}
-		return profile, nil
-	})
-	return err
-}
-
-// getFilteredProfiles filters dProfiles based on deployment.DataspaceProfileIDs
-func (p participantService) getFilteredProfiles(ctx context.Context, deployment *api.NewParticipantProfileDeployment) ([]api.DataspaceProfile, error) {
-
-	dProfiles, err := collection.CollectAllDeref(p.dataspaceStore.GetAll(ctx))
-	if err != nil {
-		return nil, err
-	}
-
-	if len(deployment.DataspaceProfileIDs) > 0 {
-		profileIDMap := make(map[string]bool)
-		for _, id := range deployment.DataspaceProfileIDs {
-			profileIDMap[id] = true
-		}
-		filteredProfiles := make([]api.DataspaceProfile, 0)
-		for _, profile := range dProfiles {
-			if profileIDMap[profile.ID] {
-				filteredProfiles = append(filteredProfiles, profile)
-			}
-		}
-		dProfiles = filteredProfiles
-	}
-	if len(dProfiles) == 0 {
-		return nil, fmt.Errorf("no dataspace profiles found")
-	}
-	return dProfiles, nil
-}
-
 // executeStoreIterator wraps store iterator operations in a transaction context
 func (p participantService) executeStoreIterator(ctx context.Context, storeOp func(context.Context) iter.Seq2[*api.ParticipantProfile, error]) iter.Seq2[*api.ParticipantProfile, error] {
 	return func(yield func(*api.ParticipantProfile, error) bool) {
@@ -289,7 +247,9 @@ func (p participantService) executeStoreIterator(ctx context.Context, storeOp fu
 	}
 }
 
-func generateCredentialSpecs(participantRoles map[string][]string, dProfiles []api.DataspaceProfile) []model.CredentialSpec {
+func generateCredentialSpecs(
+	participantRoles map[string][]string,
+	dProfiles []api.DataspaceProfile) []model.CredentialSpec {
 
 	credentials := make([]model.CredentialSpec, 0)
 	for _, profile := range dProfiles {

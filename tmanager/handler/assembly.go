@@ -201,19 +201,6 @@ func (h *HandlerServiceAssembly) registerParticipantRoutes(r chi.Router, handler
 				}
 				handler.disposeParticipantProfile(w, req, tenantID, participantID)
 			})
-			r.Route("/rotate-keys", func(r chi.Router) {
-				r.Post("/", func(w http.ResponseWriter, req *http.Request) {
-					tenantID, found := handler.ExtractPathVariable(w, req, "tenantID")
-					if !found {
-						return
-					}
-					participantID, found := handler.ExtractPathVariable(w, req, "participantID")
-					if !found {
-						return
-					}
-					handler.rotateParticipantProfileKeys(w, req, tenantID, participantID)
-				})
-			})
 		})
 	})
 }

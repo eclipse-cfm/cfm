@@ -14,7 +14,6 @@ IH_DIR=agent/ih
 KEYCLOAK_DIR=agent/keycloak
 REG_DIR=agent/registration
 ONBOARDING_DIR=agent/onboarding
-IH_KEYROTATE_DIR=agent/ih-keyrotate
 AGENT_COMMON=agent/common
 KIND_CLUSTER_NAME=edcv
 
@@ -72,7 +71,6 @@ build:
 	$(MAKE) -C $(KEYCLOAK_DIR) build
 	$(MAKE) -C $(REG_DIR) build
 	$(MAKE) -C $(ONBOARDING_DIR) build
-	$(MAKE) -C $(IH_KEYROTATE_DIR) build
 
 build-pmanager:
 	@echo "Building pmanager..."
@@ -91,7 +89,6 @@ build-all:
 	$(MAKE) -C $(KEYCLOAK_DIR) build-all
 	$(MAKE) -C $(REG_DIR) build-all
 	$(MAKE) -C $(ONBOARDING_DIR) build-all
-	$(MAKE) -C $(IH_KEYROTATE_DIR) build-all
 
 #==============================================================================
 # Test Commands - Delegate to Service Makefiles
@@ -110,7 +107,6 @@ test: install-gotestsum
 	$(MAKE) -C $(ONBOARDING_DIR) test
 	$(MAKE) -C $(ASSEMBLY_DIR) test
 	$(MAKE) -C $(AGENT_COMMON) test
-	$(MAKE) -C $(IH_KEYROTATE_DIR) test
 
 test-common:
 	@echo "Testing common..."
@@ -161,7 +157,6 @@ clean:
 	$(MAKE) -C $(IH_DIR) clean
 	$(MAKE) -C $(REG_DIR) clean
 	$(MAKE) -C $(ONBOARDING_DIR) clean
-	$(MAKE) -C $(IH_KEYROTATE_DIR) clean
 
 #==============================================================================
 # Tool Commands - Delegate to Service Makefiles
@@ -192,7 +187,7 @@ generate-docs:
 # Docker Commands - Handled at Top Level
 #==============================================================================
 
-docker-build: docker-build-pmanager docker-build-tmanager docker-build-testagent docker-build-edcvagent docker-build-ihagent docker-build-kcagent docker-build-regagent docker-build-obagent docker-build-ihkragent
+docker-build: docker-build-pmanager docker-build-tmanager docker-build-testagent docker-build-edcvagent docker-build-ihagent docker-build-kcagent docker-build-regagent docker-build-obagent
 
 docker-build-pmanager:
 	@echo "Building pmanager Docker image..."
@@ -226,11 +221,7 @@ docker-build-obagent:
 	@echo "Building Onboarding agent Docker image..."
 	docker buildx build -f docker/Dockerfile.obagent.dockerfile -t $(DOCKER_REGISTRY)obagent:$(DOCKER_TAG) .
 
-docker-build-ihkragent:
-	@echo "Building IdentityHub Key Rotation agent Docker image..."
-	docker buildx build -f docker/Dockerfile.ihkragent.dockerfile -t $(DOCKER_REGISTRY)ihkragent:$(DOCKER_TAG) .
-
-docker-clean: docker-clean-pmanager docker-clean-tmanager docker-clean-testagent docker-clean-edcvagent docker-clean-ihagent docker-clean-regagent docker-clean-obagent docker-clean-ihkragent
+docker-clean: docker-clean-pmanager docker-clean-tmanager docker-clean-testagent docker-clean-edcvagent docker-clean-ihagent docker-clean-regagent docker-clean-obagent
 
 docker-clean-pmanager:
 	docker rmi $(DOCKER_REGISTRY)pmanager:$(DOCKER_TAG) || true
@@ -252,9 +243,6 @@ docker-clean-regagent:
 
 docker-clean-obagent:
 	docker rmi $(DOCKER_REGISTRY)obagent:$(DOCKER_TAG) || true
-
-docker-clean-ihkragent:
-	docker rmi $(DOCKER_REGISTRY)ihkragent:$(DOCKER_TAG) || true
 
 #==============================================================================
 # Load images into KinD Cluster
@@ -280,9 +268,6 @@ load-into-kind-obagent: docker-build-obagent
 
 load-into-kind-regagent: docker-build-regagent
 	kind load docker-image -n $(KIND_CLUSTER_NAME) $(DOCKER_REGISTRY)regagent:$(DOCKER_TAG)
-
-load-into-kind-ihkragent: docker-build-ihkragent
-	kind load docker-image -n $(KIND_CLUSTER_NAME) $(DOCKER_REGISTRY)ihkragent:$(DOCKER_TAG)
 
 # builds and loads all images into KinD cluster. Will require kind to be installed and a kind cluster named KIND_CLUSTER_NAME running.
 load-into-kind: docker-build

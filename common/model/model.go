@@ -13,9 +13,7 @@
 package model
 
 import (
-	"fmt"
 	"regexp"
-	"strings"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -27,18 +25,14 @@ const (
 	IssuerServiceType     VPAType = "cfm.issuer"
 	ParticipantIdentifier         = "cfm.participant.id"
 
-	VPADeployType   OrchestrationType = "cfm.orchestration.vpa.deploy"
-	VPADisposeType  OrchestrationType = "cfm.orchestration.vpa.dispose"
-	KeyRotationType OrchestrationType = "cfm.orchestration.key.rotate"
+	VPADeployType  OrchestrationType = "cfm.orchestration.vpa.deploy"
+	VPADisposeType OrchestrationType = "cfm.orchestration.vpa.dispose"
 
 	VPAData        = "cfm.vpa.data"
 	CredentialData = "cfm.vpa.credentials"
 	VPAStateData   = "cfm.vpa.state"
-
-	KeyRotationData = "cfm.key.rotation.data"
 )
 
-var Iso8601DurationPattern = regexp.MustCompile(`^P(?:\d+Y)?(?:\d+M)?(?:\d+W)?(?:\d+D)?(?:T(?:\d+H)?(?:\d+M)?(?:\d+S)?)?$`)
 var Validator = initValidator()
 
 // OrchestrationManifest represents the configuration details for the execution of an orchestration.
@@ -114,34 +108,4 @@ func initValidator() *validator.Validate {
 		return match
 	})
 	return v
-}
-
-// DurationISO8601 is an ISO 8601 duration (e.g. "P3M", "P1Y2M3DT4H5M6S").
-type DurationISO8601 struct {
-	Raw string
-}
-
-// NewDuration creates a new DurationISO8601 from a string and panics if the string is not a valid ISO 8601 duration.
-func NewDuration(s string) DurationISO8601 {
-	if !Iso8601DurationPattern.MatchString(s) {
-		panic(fmt.Errorf("invalid ISO 8601 duration: %q", s))
-	}
-	return DurationISO8601{Raw: s}
-}
-
-func (d DurationISO8601) String() string {
-	return d.Raw
-}
-
-func (d *DurationISO8601) UnmarshalJSON(b []byte) error {
-	s := strings.Trim(string(b), `"`)
-	if !Iso8601DurationPattern.MatchString(s) {
-		return fmt.Errorf("invalid ISO 8601 duration: %q", s)
-	}
-	d.Raw = s
-	return nil
-}
-
-func (d DurationISO8601) MarshalJSON() ([]byte, error) {
-	return []byte(`"` + d.Raw + `"`), nil
 }

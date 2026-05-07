@@ -13,10 +13,9 @@
 package v1alpha1
 
 import (
-	"encoding/json"
 	"time"
 
-	common "github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/model"
 )
 
 type Entity struct {
@@ -105,7 +104,7 @@ type ParticipantProfile struct {
 
 type VirtualParticipantAgent struct {
 	DeployableEntity
-	Type       common.VPAType `json:"type" required:"true"`
+	Type       model.VPAType  `json:"type" required:"true"`
 	CellID     string         `json:"cellId" required:"true"`
 	Properties map[string]any `json:"properties,omitempty"`
 }
@@ -119,25 +118,4 @@ type DeployableEntity struct {
 type TenantPropertiesDiff struct {
 	Properties map[string]any `json:"properties"`
 	Removed    []string       `json:"removed"`
-}
-
-// KeyRotationRequest represents a request to rotate a key, with optional parameters for algorithm (default: eddsa), curve (default: ed25519), and
-// grace period (default: P3M, 3 months).
-type KeyRotationRequest struct {
-	KeyPairID   string                  `json:"keyPairId" required:"true"`
-	Algorithm   string                  `json:"algorithm,omitempty"`
-	Curve       string                  `json:"curve,omitempty"`
-	GracePeriod *common.DurationISO8601 `json:"gracePeriod,omitempty"`
-}
-
-// UnmarshalJSON implements the json.Unmarshaler interface to provide default values
-func (r *KeyRotationRequest) UnmarshalJSON(b []byte) error {
-	r.Algorithm = "eddsa"
-	r.Curve = "ed25519"
-	d := common.NewDuration("P3M")
-	r.GracePeriod = &d
-
-	// use a type alias to break infinite recursion
-	type Alias KeyRotationRequest
-	return json.Unmarshal(b, (*Alias)(r))
 }

@@ -19,7 +19,6 @@ import (
 	"github.com/eclipse-cfm/cfm/common/query"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
-	"github.com/eclipse-cfm/cfm/common/types"
 	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/eclipse-cfm/cfm/tmanager/model/v1alpha1"
 	"go.opentelemetry.io/otel"
@@ -390,25 +389,4 @@ func (h *TMHandler) deployDataspaceProfile(w http.ResponseWriter, req *http.Requ
 
 func (h *TMHandler) health(w http.ResponseWriter, _ *http.Request) {
 	h.ResponseOK(w, response{Message: "OK"})
-}
-
-func (h *TMHandler) rotateParticipantProfileKeys(w http.ResponseWriter, req *http.Request, tenantID string, participantProfileID string) {
-	if h.InvalidMethod(w, req, http.MethodPost) {
-		return
-	}
-
-	//todo: implement orchestration creation
-	var input v1alpha1.KeyRotationRequest
-	if !h.ReadPayload(w, req, &input) {
-		h.HandleError(w, types.ErrInvalidInput)
-		return
-	}
-	transformed := v1alpha1.ToKeyRotationRequest(&input)
-	err := h.participantService.RotateKeys(req.Context(), tenantID, participantProfileID, &transformed)
-	if err != nil {
-		h.HandleError(w, err)
-		return
-	}
-
-	h.Accepted(w)
 }
