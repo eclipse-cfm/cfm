@@ -18,7 +18,7 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/hashicorp/vault-client-go v0.4.3
 	github.com/lib/pq v1.12.3
-	github.com/nats-io/nats.go v1.51.0
+	github.com/nats-io/nats.go v1.52.0
 	github.com/oaswrap/spec v0.4.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
