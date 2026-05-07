@@ -171,7 +171,7 @@ func TestHttpIdentityAPIClient_DeleteParticipantContext(t *testing.T) {
 
 func TestHttpIdentityAPIClient_RotateKey(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/participants/test-participant/keypairs/test-keypair-id/rotate" && r.Method == http.MethodPost {
+		if r.URL.Path == "/v1alpha/participants/test-participant/keypairs/test-keypair-id/rotate" && r.Method == http.MethodPost {
 			require.Equal(t, "Bearer token", r.Header.Get("Authorization"))
 			require.Equal(t, "application/json", r.Header.Get("Content-Type"))
 

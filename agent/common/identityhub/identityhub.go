@@ -72,7 +72,7 @@ func (a HttpIdentityAPIClient) RotateKey(ctx context.Context, participantContext
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/participants/%s/keypairs/%s/rotate", a.BaseURL, participantContextID, keyRotationParams.KeyPairID)
+	url := fmt.Sprintf("%s/v1alpha/participants/%s/keypairs/%s/rotate", a.BaseURL, participantContextID, keyRotationParams.KeyPairID)
 	body := keyDescriptor{
 		KeyID:           keyId,
 		PrivateKeyAlias: keyId,
