@@ -26,6 +26,7 @@ import (
 	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/google/uuid"
+	"github.com/moby/moby/api/types/container"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/network"
@@ -66,6 +67,9 @@ func StartVaultContainer(ctx context.Context, networkName string) (*ContainerRes
 		ExposedPorts: []string{vaultPort},
 		Networks:     []string{networkName},
 		Name:         name,
+		HostConfigModifier: func(hc *container.HostConfig) {
+			hc.CapAdd = append(hc.CapAdd, "IPC_LOCK")
+		},
 		Env: map[string]string{
 			"VAULT_DEV_ROOT_TOKEN_ID": vaultRootToken,
 			"SKIP_SETCAP":             "true", // this is required to run as non-root user in some environments, such as M1 macs

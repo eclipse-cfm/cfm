@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	commonvault "github.com/eclipse-cfm/cfm/agent/common/vault"
+	"github.com/google/uuid"
 )
 
 const (
@@ -85,7 +86,7 @@ func NewParticipantManifest(
 		IsActive:             true,
 		KeyGeneratorParameters: KeyGeneratorParameters{
 			KeyID:           DefaultKeyID,
-			PrivateKeyAlias: DefaultKeyID,
+			PrivateKeyAlias: uuid.NewString(),
 			KeyAlgorithm:    DefaultAlgorithm,
 			Curve:           DefaultCurve,
 		},
@@ -103,9 +104,7 @@ func NewParticipantManifest(
 		if !strings.HasPrefix(sanitizedKeyID, "#") {
 			sanitizedKeyID = "#" + sanitizedKeyID
 		}
-		sanitizedKeyID = did + sanitizedKeyID
-		manifest.KeyGeneratorParameters.KeyID = sanitizedKeyID
-		manifest.KeyGeneratorParameters.PrivateKeyAlias = sanitizedKeyID
+		manifest.KeyGeneratorParameters.KeyID = did + sanitizedKeyID
 	}
 
 	return manifest
