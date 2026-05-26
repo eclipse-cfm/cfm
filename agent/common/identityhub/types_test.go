@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,7 +29,8 @@ func TestNewParticipantManifest_WithDefaults(t *testing.T) {
 	require.Equal(t, manifest.ProtocolServiceID, "test-id-dsp")
 	require.Equal(t, manifest.IsActive, true)
 	require.Equal(t, manifest.KeyGeneratorParameters.KeyID, "did:web:foo#"+DefaultKeyID)
-	require.Equal(t, manifest.KeyGeneratorParameters.PrivateKeyAlias, "did:web:foo#"+DefaultKeyID)
+	_, err := uuid.Parse(manifest.KeyGeneratorParameters.PrivateKeyAlias)
+	require.NoError(t, err)
 	require.Equal(t, manifest.VaultConfig.SecretPath, "v1/participants")
 	require.Equal(t, manifest.VaultConfig.FolderPath, "test-id/identityhub")
 }
