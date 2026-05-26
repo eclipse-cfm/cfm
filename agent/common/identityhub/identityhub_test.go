@@ -31,7 +31,7 @@ import (
 func TestIdentityAPIClient_CreateParticipantContext(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/v1alpha/participants" && r.Method == http.MethodPost {
+		if r.URL.Path == "/v1beta/participants" && r.Method == http.MethodPost {
 			body, err := io.ReadAll(r.Body)
 			require.NoError(t, err)
 
@@ -147,7 +147,7 @@ func TestIdentityAPIClient_BadRequest(t *testing.T) {
 func TestHttpIdentityAPIClient_DeleteParticipantContext(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		participantContextID := "test-id"
-		if r.URL.Path == "/v1alpha/participants/"+participantContextID && r.Method == http.MethodDelete {
+		if r.URL.Path == "/v1beta/participants/"+participantContextID && r.Method == http.MethodDelete {
 			require.Equal(t, "Bearer token", r.Header.Get("Authorization"))
 			w.WriteHeader(http.StatusOK)
 		} else {
