@@ -32,7 +32,7 @@ import (
 )
 
 func TestHttpApiClient_CreateHolder(t *testing.T) {
-	template := "/v1alpha/participants/.*/holders"
+	template := "/v1beta/participants/.*/holders"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		matched, _ := regexp.MatchString(template, r.URL.Path)
 		if r.Method == http.MethodPost && matched {
@@ -81,7 +81,7 @@ func TestHttpApiClient_CreateHolder_AuthError(t *testing.T) {
 }
 
 func TestHttpApiClient_CreateHolder_ApiReturnsError(t *testing.T) {
-	template := "/v1alpha/participants/.*/holders"
+	template := "/v1beta/participants/.*/holders"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		matched, _ := regexp.MatchString(template, r.URL.Path)
 		if r.Method == http.MethodPost && matched {
@@ -107,7 +107,7 @@ func TestHttpApiClient_CreateHolder_ApiReturnsError(t *testing.T) {
 }
 
 func TestHttpApiClient_RevokeCredential(t *testing.T) {
-	template := "/v1alpha/participants/.*/credentials/.*/revoke"
+	template := "/v1beta/participants/.*/credentials/.*/revoke"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		matched, _ := regexp.MatchString(template, r.URL.Path)
 		if matched && r.Method == http.MethodPost {
@@ -132,7 +132,7 @@ func TestHttpApiClient_RevokeCredential(t *testing.T) {
 }
 
 func TestHttpApiClient_RevokeCredential_ClientError(t *testing.T) {
-	template := "/v1alpha/participants/.*/credentials/.*/revoke"
+	template := "/v1beta/participants/.*/credentials/.*/revoke"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		matched, _ := regexp.MatchString(template, r.URL.Path)
 		if matched && r.Method == http.MethodPost {
@@ -157,7 +157,7 @@ func TestHttpApiClient_RevokeCredential_ClientError(t *testing.T) {
 }
 
 func TestHttpApiClient_RevokeCredential_NotFound(t *testing.T) {
-	template := "/v1alpha/participants/.*/credentials/.*/revoke"
+	template := "/v1beta/participants/.*/credentials/.*/revoke"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		matched, _ := regexp.MatchString(template, r.URL.Path)
 		if matched && r.Method == http.MethodPost {
@@ -182,7 +182,7 @@ func TestHttpApiClient_RevokeCredential_NotFound(t *testing.T) {
 }
 
 func TestHttpApiClient_DeleteHolder(t *testing.T) {
-	template := "/v1alpha/participants/.*/holders/.*"
+	template := "/v1beta/participants/.*/holders/.*"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		matched, _ := regexp.MatchString(template, r.URL.Path)
 		if r.Method == http.MethodDelete && matched {
@@ -207,7 +207,7 @@ func TestHttpApiClient_DeleteHolder(t *testing.T) {
 }
 
 func TestHttpApiClient_DeleteHolder_NotFound(t *testing.T) {
-	template := "/v1alpha/participants/.*/holders/.*"
+	template := "/v1beta/participants/.*/holders/.*"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		matched, _ := regexp.MatchString(template, r.URL.Path)
 		if r.Method == http.MethodDelete && matched {
@@ -232,7 +232,7 @@ func TestHttpApiClient_DeleteHolder_NotFound(t *testing.T) {
 }
 
 func TestHttpApiClient_DeleteHolder_AuthError(t *testing.T) {
-	template := "/v1alpha/participants/.*/holders/.*"
+	template := "/v1beta/participants/.*/holders/.*"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		matched, _ := regexp.MatchString(template, r.URL.Path)
 		if r.Method == http.MethodDelete && matched {
@@ -257,7 +257,7 @@ func TestHttpApiClient_DeleteHolder_AuthError(t *testing.T) {
 }
 
 func TestHttpApiClient_QueryCredentialsByType(t *testing.T) {
-	template := "/v1alpha/participants/.*/credentials/query"
+	template := "/v1beta/participants/.*/credentials/query"
 	credentials := []IssuerCredentialResourceDto{
 		{
 			ID:                   "cred-1",
@@ -327,7 +327,7 @@ func TestHttpApiClient_QueryCredentialsByType_AuthError(t *testing.T) {
 }
 
 func TestHttpApiClient_QueryCredentialsByType_ApiReturnsError(t *testing.T) {
-	template := "/v1alpha/participants/.*/credentials/query"
+	template := "/v1beta/participants/.*/credentials/query"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		matched, _ := regexp.MatchString(template, r.URL.Path)
 		if r.Method == http.MethodPost && matched {
@@ -353,7 +353,7 @@ func TestHttpApiClient_QueryCredentialsByType_ApiReturnsError(t *testing.T) {
 }
 
 func TestHttpApiClient_QueryCredentialsByType_InvalidJson(t *testing.T) {
-	template := "/v1alpha/participants/.*/credentials/query"
+	template := "/v1beta/participants/.*/credentials/query"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		matched, _ := regexp.MatchString(template, r.URL.Path)
 		if r.Method == http.MethodPost && matched {
