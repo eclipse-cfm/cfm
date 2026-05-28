@@ -151,7 +151,7 @@ func (h *HandlerServiceAssembly) registerActivityDefinitionRoutes(router chi.Rou
 func (h *HandlerServiceAssembly) registerOrchestrationDefinitionRoutes(router chi.Router, handler *PMHandler) {
 	router.Route("/orchestration-definitions", func(r chi.Router) {
 		r.Get("/", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopePmRead), cfmhandler.RequireRole("admin")) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopePmRead)) {
 				return
 			}
 			handler.getOrchestrationDefinitions(w, req)

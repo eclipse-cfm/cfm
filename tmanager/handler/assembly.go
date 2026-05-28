@@ -127,7 +127,7 @@ func (h *HandlerServiceAssembly) registerCellRoutes(router chi.Router, handler *
 func (h *HandlerServiceAssembly) registerDataspaceProfileRoutes(router chi.Router, handler *TMHandler) {
 	router.Route("/dataspace-profiles", func(r chi.Router) {
 		r.Get("/", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmRead), cfmhandler.RequireRole("admin")) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmRead)) {
 				return
 			}
 			handler.getDataspaceProfiles(w, req)
