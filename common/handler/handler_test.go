@@ -14,11 +14,13 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"testing"
 
+	cfmauth "github.com/eclipse-cfm/cfm/common/auth"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/common/types"
 	"github.com/stretchr/testify/assert"
@@ -325,5 +327,99 @@ func TestResponseOK(t *testing.T) {
 		err := json.Unmarshal(w.body.Bytes(), &result)
 		require.NoError(t, err)
 		assert.Equal(t, "ok", result["status"])
+	})
+}
+
+func requestWithClaims(claims *cfmauth.Claims) *http.Request {
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	ctx := context.WithValue(req.Context(), cfmauth.ContextKey{}, claims)
+	return req.WithContext(ctx)
+}
+
+func TestIsAuthorized(t *testing.T) {
+	handler := HttpHandler{Monitor: system.NoopMonitor{}}
+
+	t.Run("returns true when no claims in context (auth disabled)", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/", nil)
+		w := newMockResponseWriter()
+
+		result := handler.IsAuthorized(w, req, RequireScope("read"))
+
+		assert.True(t, result)
+		assert.Equal(t, 0, w.statusCode)
+	})
+
+	t.Run("returns true when all rules pass", func(t *testing.T) {
+		claims := &cfmauth.Claims{Scopes: []string{"read", "write"}, Roles: []string{"admin"}}
+		w := newMockResponseWriter()
+
+		result := handler.IsAuthorized(w, requestWithClaims(claims), RequireScope("read"), RequireRole("admin"))
+
+		assert.True(t, result)
+		assert.Equal(t, 0, w.statusCode)
+	})
+
+	t.Run("returns false and writes 403 when scope rule fails", func(t *testing.T) {
+		claims := &cfmauth.Claims{Scopes: []string{"read"}}
+		w := newMockResponseWriter()
+
+		result := handler.IsAuthorized(w, requestWithClaims(claims), RequireScope("write"))
+
+		assert.False(t, result)
+		assert.Equal(t, http.StatusForbidden, w.statusCode)
+	})
+
+	t.Run("returns false and writes 403 when role rule fails", func(t *testing.T) {
+		claims := &cfmauth.Claims{Scopes: []string{"read"}, Roles: []string{"viewer"}}
+		w := newMockResponseWriter()
+
+		result := handler.IsAuthorized(w, requestWithClaims(claims), RequireScope("read"), RequireRole("admin"))
+
+		assert.False(t, result)
+		assert.Equal(t, http.StatusForbidden, w.statusCode)
+	})
+
+	t.Run("returns true with no rules", func(t *testing.T) {
+		claims := &cfmauth.Claims{}
+		w := newMockResponseWriter()
+
+		result := handler.IsAuthorized(w, requestWithClaims(claims))
+
+		assert.True(t, result)
+		assert.Equal(t, 0, w.statusCode)
+	})
+}
+
+func TestRequireScope(t *testing.T) {
+	t.Run("passes when scope is present", func(t *testing.T) {
+		rule := RequireScope("read")
+		claims := &cfmauth.Claims{Scopes: []string{"read"}}
+		assert.True(t, rule.check(claims))
+	})
+
+	t.Run("fails when scope is absent", func(t *testing.T) {
+		rule := RequireScope("write")
+		claims := &cfmauth.Claims{Scopes: []string{"read"}}
+		assert.False(t, rule.check(claims))
+	})
+}
+
+func TestRequireRole(t *testing.T) {
+	t.Run("passes when any of the required roles is present", func(t *testing.T) {
+		rule := RequireRole("admin", "superuser")
+		claims := &cfmauth.Claims{Roles: []string{"superuser"}}
+		assert.True(t, rule.check(claims))
+	})
+
+	t.Run("fails when none of the required roles is present", func(t *testing.T) {
+		rule := RequireRole("admin", "superuser")
+		claims := &cfmauth.Claims{Roles: []string{"viewer"}}
+		assert.False(t, rule.check(claims))
+	})
+
+	t.Run("fails for empty roles", func(t *testing.T) {
+		rule := RequireRole("admin")
+		claims := &cfmauth.Claims{}
+		assert.False(t, rule.check(claims))
 	})
 }
