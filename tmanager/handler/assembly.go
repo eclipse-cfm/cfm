@@ -17,6 +17,7 @@ import (
 
 	cfmauth "github.com/eclipse-cfm/cfm/assembly/auth"
 	"github.com/eclipse-cfm/cfm/assembly/routing"
+	cfmhandler "github.com/eclipse-cfm/cfm/common/handler"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/tmanager/api"
@@ -86,7 +87,7 @@ func (h *HandlerServiceAssembly) registerV1Alpha1(router chi.Router, handler *TM
 func (h *HandlerServiceAssembly) registerProfileQueryRoutes(router chi.Router, handler *TMHandler) {
 	router.Route("/participant-profiles", func(r chi.Router) {
 		r.Post("/query", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.HasRequiredScope(w, req, scopeTmRead) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmRead)) {
 				return
 			}
 			handler.queryParticipantProfiles(w, req, "/participant-profiles/query")
@@ -97,20 +98,20 @@ func (h *HandlerServiceAssembly) registerProfileQueryRoutes(router chi.Router, h
 func (h *HandlerServiceAssembly) registerCellRoutes(router chi.Router, handler *TMHandler) {
 	router.Route("/cells", func(r chi.Router) {
 		r.Get("/", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.HasRequiredScope(w, req, scopeTmRead) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmRead)) {
 				return
 			}
 			handler.getCells(w, req)
 		})
 		r.Post("/", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.HasRequiredScope(w, req, scopeTmWrite) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmWrite)) {
 				return
 			}
 			handler.createCell(w, req)
 		})
 		r.Route("/{cellID}", func(r chi.Router) {
 			r.Delete("/", func(w http.ResponseWriter, req *http.Request) {
-				if !handler.HasRequiredScope(w, req, scopeTmWrite) {
+				if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmWrite)) {
 					return
 				}
 				cellID, found := handler.ExtractPathVariable(w, req, "cellID")
@@ -126,19 +127,19 @@ func (h *HandlerServiceAssembly) registerCellRoutes(router chi.Router, handler *
 func (h *HandlerServiceAssembly) registerDataspaceProfileRoutes(router chi.Router, handler *TMHandler) {
 	router.Route("/dataspace-profiles", func(r chi.Router) {
 		r.Get("/", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.HasRequiredScope(w, req, scopeTmRead) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmRead), cfmhandler.RequireRole("admin")) {
 				return
 			}
 			handler.getDataspaceProfiles(w, req)
 		})
 		r.Post("/", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.HasRequiredScope(w, req, scopeTmWrite) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmWrite)) {
 				return
 			}
 			handler.createDataspaceProfile(w, req)
 		})
 		r.Get("/{id}", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.HasRequiredScope(w, req, scopeTmRead) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmRead)) {
 				return
 			}
 			id, found := handler.ExtractPathVariable(w, req, "id")
@@ -148,7 +149,7 @@ func (h *HandlerServiceAssembly) registerDataspaceProfileRoutes(router chi.Route
 			handler.getDataspaceProfile(w, req, id)
 		})
 		r.Delete("/{profileID}", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.HasRequiredScope(w, req, scopeTmWrite) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmWrite)) {
 				return
 			}
 			profileID, found := handler.ExtractPathVariable(w, req, "profileID")
@@ -159,7 +160,7 @@ func (h *HandlerServiceAssembly) registerDataspaceProfileRoutes(router chi.Route
 		})
 		r.Route("/{id}/deployments", func(r chi.Router) {
 			r.Post("/", func(w http.ResponseWriter, req *http.Request) {
-				if !handler.HasRequiredScope(w, req, scopeTmWrite) {
+				if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmWrite)) {
 					return
 				}
 				handler.deployDataspaceProfile(w, req)
@@ -171,19 +172,19 @@ func (h *HandlerServiceAssembly) registerDataspaceProfileRoutes(router chi.Route
 func (h *HandlerServiceAssembly) registerTenantRoutes(router chi.Router, handler *TMHandler) {
 	router.Route("/tenants", func(r chi.Router) {
 		r.Get("/", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.HasRequiredScope(w, req, scopeTmRead) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmRead)) {
 				return
 			}
 			handler.getTenants(w, req, "/tenants")
 		})
 		r.Post("/", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.HasRequiredScope(w, req, scopeTmWrite) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmWrite)) {
 				return
 			}
 			handler.createTenant(w, req)
 		})
 		r.Post("/query", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.HasRequiredScope(w, req, scopeTmRead) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmRead)) {
 				return
 			}
 			handler.queryTenants(w, req, "/tenants/query")
@@ -191,7 +192,7 @@ func (h *HandlerServiceAssembly) registerTenantRoutes(router chi.Router, handler
 
 		r.Route("/{tenantID}", func(r chi.Router) {
 			r.Get("/", func(w http.ResponseWriter, req *http.Request) {
-				if !handler.HasRequiredScope(w, req, scopeTmRead) {
+				if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmRead)) {
 					return
 				}
 				tenantID, found := handler.ExtractPathVariable(w, req, "tenantID")
@@ -201,7 +202,7 @@ func (h *HandlerServiceAssembly) registerTenantRoutes(router chi.Router, handler
 				handler.getTenant(w, req, tenantID)
 			})
 			r.Delete("/", func(w http.ResponseWriter, req *http.Request) {
-				if !handler.HasRequiredScope(w, req, scopeTmWrite) {
+				if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmWrite)) {
 					return
 				}
 				tenantID, found := handler.ExtractPathVariable(w, req, "tenantID")
@@ -211,7 +212,7 @@ func (h *HandlerServiceAssembly) registerTenantRoutes(router chi.Router, handler
 				handler.deleteTenant(w, req, tenantID)
 			})
 			r.Patch("/", func(w http.ResponseWriter, req *http.Request) {
-				if !handler.HasRequiredScope(w, req, scopeTmWrite) {
+				if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmWrite)) {
 					return
 				}
 				tenantID, found := handler.ExtractPathVariable(w, req, "tenantID")
@@ -228,7 +229,7 @@ func (h *HandlerServiceAssembly) registerTenantRoutes(router chi.Router, handler
 func (h *HandlerServiceAssembly) registerParticipantRoutes(r chi.Router, handler *TMHandler) {
 	r.Route("/participant-profiles", func(r chi.Router) {
 		r.Get("/", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.HasRequiredScope(w, req, scopeTmRead) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmRead)) {
 				return
 			}
 			tenantID, found := handler.ExtractPathVariable(w, req, "tenantID")
@@ -238,7 +239,7 @@ func (h *HandlerServiceAssembly) registerParticipantRoutes(r chi.Router, handler
 			handler.getProfilesForTenant(w, req, tenantID)
 		})
 		r.Post("/", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.HasRequiredScope(w, req, scopeTmWrite) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmWrite)) {
 				return
 			}
 			tenantID, found := handler.ExtractPathVariable(w, req, "tenantID")
@@ -250,7 +251,7 @@ func (h *HandlerServiceAssembly) registerParticipantRoutes(r chi.Router, handler
 
 		r.Route("/{participantID}", func(r chi.Router) {
 			r.Get("/", func(w http.ResponseWriter, req *http.Request) {
-				if !handler.HasRequiredScope(w, req, scopeTmRead) {
+				if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmRead)) {
 					return
 				}
 				tenantID, found := handler.ExtractPathVariable(w, req, "tenantID")
@@ -264,7 +265,7 @@ func (h *HandlerServiceAssembly) registerParticipantRoutes(r chi.Router, handler
 				handler.getParticipantProfile(w, req, tenantID, participantID)
 			})
 			r.Delete("/", func(w http.ResponseWriter, req *http.Request) {
-				if !handler.HasRequiredScope(w, req, scopeTmWrite) {
+				if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmWrite)) {
 					return
 				}
 				tenantID, found := handler.ExtractPathVariable(w, req, "tenantID")

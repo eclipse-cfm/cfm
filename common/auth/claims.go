@@ -32,6 +32,11 @@ func (c *Claims) HasScope(requiredScope string) bool {
 	return slices.Contains(c.Scopes, requiredScope)
 }
 
+// HasRole returns true when the claims contain the given role.
+func (c *Claims) HasRole(role string) bool {
+	return slices.Contains(c.Roles, role)
+}
+
 // ClaimsFromContext retrieves Claims stored in the context by the auth middleware.
 // Returns false when auth is disabled and no claims were stored.
 func ClaimsFromContext(ctx context.Context) (*Claims, bool) {

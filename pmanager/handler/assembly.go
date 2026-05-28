@@ -17,6 +17,7 @@ import (
 
 	cfmauth "github.com/eclipse-cfm/cfm/assembly/auth"
 	"github.com/eclipse-cfm/cfm/assembly/routing"
+	cfmhandler "github.com/eclipse-cfm/cfm/common/handler"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
@@ -80,13 +81,13 @@ func (h *HandlerServiceAssembly) registerV1Alpha1(router chi.Router, handler *PM
 func (h *HandlerServiceAssembly) registerOrchestrationRoutes(router chi.Router, handler *PMHandler) {
 	router.Route("/orchestrations", func(r chi.Router) {
 		r.Post("/", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.HasRequiredScope(w, req, scopePmWrite) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopePmWrite)) {
 				return
 			}
 			handler.createOrchestration(w, req)
 		})
 		r.Post("/query", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.HasRequiredScope(w, req, scopePmRead) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopePmRead)) {
 				return
 			}
 			handler.queryOrchestrations(w, req, "/orchestrations/query")
@@ -94,7 +95,7 @@ func (h *HandlerServiceAssembly) registerOrchestrationRoutes(router chi.Router, 
 
 		r.Route("/{orchestrationID}", func(r chi.Router) {
 			r.Post("/", func(w http.ResponseWriter, req *http.Request) {
-				if !handler.HasRequiredScope(w, req, scopePmWrite) {
+				if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopePmWrite)) {
 					return
 				}
 				id, found := handler.ExtractPathVariable(w, req, "orchestrationID")
@@ -105,7 +106,7 @@ func (h *HandlerServiceAssembly) registerOrchestrationRoutes(router chi.Router, 
 				handler.deleteOrchestrationDefinition(w, req, id)
 			})
 			r.Get("/", func(w http.ResponseWriter, req *http.Request) {
-				if !handler.HasRequiredScope(w, req, scopePmRead) {
+				if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopePmRead)) {
 					return
 				}
 				orchestrationID, found := handler.ExtractPathVariable(w, req, "orchestrationID")
@@ -121,20 +122,20 @@ func (h *HandlerServiceAssembly) registerOrchestrationRoutes(router chi.Router, 
 func (h *HandlerServiceAssembly) registerActivityDefinitionRoutes(router chi.Router, handler *PMHandler) {
 	router.Route("/activity-definitions", func(r chi.Router) {
 		r.Get("/", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.HasRequiredScope(w, req, scopePmRead) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopePmRead)) {
 				return
 			}
 			handler.getActivityDefinitions(w, req)
 		})
 		r.Post("/", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.HasRequiredScope(w, req, scopePmWrite) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopePmWrite)) {
 				return
 			}
 			handler.createActivityDefinition(w, req)
 		})
 		r.Route("/{activityType}", func(r chi.Router) {
 			r.Delete("/", func(w http.ResponseWriter, req *http.Request) {
-				if !handler.HasRequiredScope(w, req, scopePmWrite) {
+				if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopePmWrite)) {
 					return
 				}
 				definitionType, found := handler.ExtractPathVariable(w, req, "activityType")
@@ -150,20 +151,20 @@ func (h *HandlerServiceAssembly) registerActivityDefinitionRoutes(router chi.Rou
 func (h *HandlerServiceAssembly) registerOrchestrationDefinitionRoutes(router chi.Router, handler *PMHandler) {
 	router.Route("/orchestration-definitions", func(r chi.Router) {
 		r.Get("/", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.HasRequiredScope(w, req, scopePmRead) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopePmRead), cfmhandler.RequireRole("admin")) {
 				return
 			}
 			handler.getOrchestrationDefinitions(w, req)
 		})
 		r.Post("/", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.HasRequiredScope(w, req, scopePmWrite) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopePmWrite)) {
 				return
 			}
 			handler.createOrchestrationDefinition(w, req)
 		})
 		r.Route("/{templateRef}", func(r chi.Router) {
 			r.Delete("/", func(w http.ResponseWriter, req *http.Request) {
-				if !handler.HasRequiredScope(w, req, scopePmWrite) {
+				if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopePmWrite)) {
 					return
 				}
 				templateRef, found := handler.ExtractPathVariable(w, req, "templateRef")
@@ -173,7 +174,7 @@ func (h *HandlerServiceAssembly) registerOrchestrationDefinitionRoutes(router ch
 				handler.deleteOrchestrationDefinition(w, req, templateRef)
 			})
 			r.Get("/", func(w http.ResponseWriter, request *http.Request) {
-				if !handler.HasRequiredScope(w, request, scopePmRead) {
+				if !handler.IsAuthorized(w, request, cfmhandler.RequireScope(scopePmRead)) {
 					return
 				}
 				templateRef, found := handler.ExtractPathVariable(w, request, "templateRef")

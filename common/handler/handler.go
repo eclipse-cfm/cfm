@@ -162,17 +162,48 @@ func (h HttpHandler) write(w http.ResponseWriter, response any) {
 	}
 }
 
-// HasRequiredScope checks whether the caller's token contains the given permission as a scope or role.
-// Returns true and continues when access is granted or when auth is disabled (no claims in context).
-// Returns false and writes a 403 when the permission is missing.
-func (h HttpHandler) HasRequiredScope(w http.ResponseWriter, r *http.Request, requiredScope string) bool {
+// ClaimsRule is applied to the caller's claims and returns true when the requirement is satisfied.
+type ClaimsRule struct {
+	description string
+	check       func(*cfmauth.Claims) bool
+}
+
+// RequireScope returns a ClaimsRule that checks for the given scope.
+func RequireScope(scope string) ClaimsRule {
+	return ClaimsRule{
+		description: "required scope '" + scope + "' not present",
+		check:       func(c *cfmauth.Claims) bool { return c.HasScope(scope) },
+	}
+}
+
+// RequireRole returns a ClaimsRule that checks for any of the given roles.
+func RequireRole(role ...string) ClaimsRule {
+	return ClaimsRule{
+		description: "none of the required roles " + fmt.Sprintf("%v", role) + " present",
+		check: func(c *cfmauth.Claims) bool {
+			for _, r := range role {
+				if c.HasRole(r) {
+					return true
+				}
+			}
+			return false
+		},
+	}
+}
+
+// IsAuthorized checks whether the caller's token satisfies all given rules.
+// Returns true when all rules pass or when auth is disabled (no claims in context).
+// Returns false and writes a 403 naming the first failing rule.
+func (h HttpHandler) IsAuthorized(w http.ResponseWriter, r *http.Request, rules ...ClaimsRule) bool {
 	claims, ok := cfmauth.ClaimsFromContext(r.Context())
 	if !ok {
 		return true
 	}
-	if !claims.HasScope(requiredScope) {
-		h.WriteError(w, "Required scope '"+requiredScope+"' not satisfied", http.StatusForbidden)
-		return false
+	for _, rule := range rules {
+		if !rule.check(claims) {
+			h.WriteError(w, "Access not granted: "+rule.description, http.StatusForbidden)
+			return false
+		}
 	}
 	return true
 }
