@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 
+	cfmauth "github.com/eclipse-cfm/cfm/common/auth"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/query"
 	"github.com/eclipse-cfm/cfm/common/store"
@@ -159,6 +160,30 @@ func (h HttpHandler) write(w http.ResponseWriter, response any) {
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		h.Monitor.Infow("Error encoding response: %v", err)
 	}
+}
+
+// HasRequiredScope checks whether the caller's token contains the given permission as a scope or role.
+// Returns true and continues when access is granted or when auth is disabled (no claims in context).
+// Returns false and writes a 403 when the permission is missing.
+func (h HttpHandler) HasRequiredScope(w http.ResponseWriter, r *http.Request, requiredScope string) bool {
+	claims, ok := cfmauth.ClaimsFromContext(r.Context())
+	if !ok {
+		return true
+	}
+	if !claims.HasScope(requiredScope) {
+		h.WriteError(w, "Required scope '"+requiredScope+"' not satisfied", http.StatusForbidden)
+		return false
+	}
+	return true
+}
+
+// Principal returns the subject claim of the authenticated caller, or an empty string when auth is disabled.
+func (h HttpHandler) Principal(r *http.Request) string {
+	claims, ok := cfmauth.ClaimsFromContext(r.Context())
+	if !ok {
+		return ""
+	}
+	return claims.Subject
 }
 
 func (h HttpHandler) ExtractPathVariable(w http.ResponseWriter, req *http.Request, key string) (string, bool) {

@@ -15,12 +15,18 @@ package handler
 import (
 	"net/http"
 
+	cfmauth "github.com/eclipse-cfm/cfm/assembly/auth"
 	"github.com/eclipse-cfm/cfm/assembly/routing"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+)
+
+const (
+	scopeTmRead  = "tenant-manager-api:read"
+	scopeTmWrite = "tenant-manager-api:write"
 )
 
 type response struct {
@@ -44,7 +50,9 @@ func (h *HandlerServiceAssembly) Requires() []system.ServiceType {
 		api.ParticipantProfileServiceKey,
 		api.CellServiceKey,
 		api.DataspaceProfileServiceKey,
-		routing.RouterKey}
+		routing.RouterKey,
+		cfmauth.ValidatorKey,
+	}
 }
 
 func (h *HandlerServiceAssembly) Init(context *system.InitContext) error {
@@ -56,10 +64,12 @@ func (h *HandlerServiceAssembly) Init(context *system.InitContext) error {
 	cellService := context.Registry.Resolve(api.CellServiceKey).(api.CellService)
 	dataspaceService := context.Registry.Resolve(api.DataspaceProfileServiceKey).(api.DataspaceProfileService)
 	txContext := context.Registry.Resolve(store.TransactionContextKey).(store.TransactionContext)
+	validator := context.Registry.Resolve(cfmauth.ValidatorKey).(cfmauth.AuthValidator)
 
 	handler := NewHandler(tenantService, participantService, cellService, dataspaceService, txContext, context.LogMonitor)
 
 	router.Route("/api/v1alpha1", func(r chi.Router) {
+		r.Use(validator.Middleware())
 		h.registerV1Alpha1(r, handler)
 	})
 
@@ -68,17 +78,17 @@ func (h *HandlerServiceAssembly) Init(context *system.InitContext) error {
 
 func (h *HandlerServiceAssembly) registerV1Alpha1(router chi.Router, handler *TMHandler) {
 	h.registerTenantRoutes(router, handler)
-
 	h.registerProfileQueryRoutes(router, handler)
-
 	h.registerCellRoutes(router, handler)
-
 	h.registerDataspaceProfileRoutes(router, handler)
 }
 
 func (h *HandlerServiceAssembly) registerProfileQueryRoutes(router chi.Router, handler *TMHandler) {
 	router.Route("/participant-profiles", func(r chi.Router) {
 		r.Post("/query", func(w http.ResponseWriter, req *http.Request) {
+			if !handler.HasRequiredScope(w, req, scopeTmRead) {
+				return
+			}
 			handler.queryParticipantProfiles(w, req, "/participant-profiles/query")
 		})
 	})
@@ -86,10 +96,23 @@ func (h *HandlerServiceAssembly) registerProfileQueryRoutes(router chi.Router, h
 
 func (h *HandlerServiceAssembly) registerCellRoutes(router chi.Router, handler *TMHandler) {
 	router.Route("/cells", func(r chi.Router) {
-		r.Get("/", handler.getCells)
-		r.Post("/", handler.createCell)
+		r.Get("/", func(w http.ResponseWriter, req *http.Request) {
+			if !handler.HasRequiredScope(w, req, scopeTmRead) {
+				return
+			}
+			handler.getCells(w, req)
+		})
+		r.Post("/", func(w http.ResponseWriter, req *http.Request) {
+			if !handler.HasRequiredScope(w, req, scopeTmWrite) {
+				return
+			}
+			handler.createCell(w, req)
+		})
 		r.Route("/{cellID}", func(r chi.Router) {
 			r.Delete("/", func(w http.ResponseWriter, req *http.Request) {
+				if !handler.HasRequiredScope(w, req, scopeTmWrite) {
+					return
+				}
 				cellID, found := handler.ExtractPathVariable(w, req, "cellID")
 				if !found {
 					return
@@ -102,9 +125,22 @@ func (h *HandlerServiceAssembly) registerCellRoutes(router chi.Router, handler *
 
 func (h *HandlerServiceAssembly) registerDataspaceProfileRoutes(router chi.Router, handler *TMHandler) {
 	router.Route("/dataspace-profiles", func(r chi.Router) {
-		r.Get("/", handler.getDataspaceProfiles)
-		r.Post("/", handler.createDataspaceProfile)
+		r.Get("/", func(w http.ResponseWriter, req *http.Request) {
+			if !handler.HasRequiredScope(w, req, scopeTmRead) {
+				return
+			}
+			handler.getDataspaceProfiles(w, req)
+		})
+		r.Post("/", func(w http.ResponseWriter, req *http.Request) {
+			if !handler.HasRequiredScope(w, req, scopeTmWrite) {
+				return
+			}
+			handler.createDataspaceProfile(w, req)
+		})
 		r.Get("/{id}", func(w http.ResponseWriter, req *http.Request) {
+			if !handler.HasRequiredScope(w, req, scopeTmRead) {
+				return
+			}
 			id, found := handler.ExtractPathVariable(w, req, "id")
 			if !found {
 				return
@@ -112,6 +148,9 @@ func (h *HandlerServiceAssembly) registerDataspaceProfileRoutes(router chi.Route
 			handler.getDataspaceProfile(w, req, id)
 		})
 		r.Delete("/{profileID}", func(w http.ResponseWriter, req *http.Request) {
+			if !handler.HasRequiredScope(w, req, scopeTmWrite) {
+				return
+			}
 			profileID, found := handler.ExtractPathVariable(w, req, "profileID")
 			if !found {
 				return
@@ -119,7 +158,12 @@ func (h *HandlerServiceAssembly) registerDataspaceProfileRoutes(router chi.Route
 			handler.deleteDataspaceProfile(w, req, profileID)
 		})
 		r.Route("/{id}/deployments", func(r chi.Router) {
-			r.Post("/", handler.deployDataspaceProfile)
+			r.Post("/", func(w http.ResponseWriter, req *http.Request) {
+				if !handler.HasRequiredScope(w, req, scopeTmWrite) {
+					return
+				}
+				handler.deployDataspaceProfile(w, req)
+			})
 		})
 	})
 }
@@ -127,15 +171,29 @@ func (h *HandlerServiceAssembly) registerDataspaceProfileRoutes(router chi.Route
 func (h *HandlerServiceAssembly) registerTenantRoutes(router chi.Router, handler *TMHandler) {
 	router.Route("/tenants", func(r chi.Router) {
 		r.Get("/", func(w http.ResponseWriter, req *http.Request) {
+			if !handler.HasRequiredScope(w, req, scopeTmRead) {
+				return
+			}
 			handler.getTenants(w, req, "/tenants")
 		})
-		r.Post("/", handler.createTenant)
+		r.Post("/", func(w http.ResponseWriter, req *http.Request) {
+			if !handler.HasRequiredScope(w, req, scopeTmWrite) {
+				return
+			}
+			handler.createTenant(w, req)
+		})
 		r.Post("/query", func(w http.ResponseWriter, req *http.Request) {
+			if !handler.HasRequiredScope(w, req, scopeTmRead) {
+				return
+			}
 			handler.queryTenants(w, req, "/tenants/query")
 		})
 
 		r.Route("/{tenantID}", func(r chi.Router) {
 			r.Get("/", func(w http.ResponseWriter, req *http.Request) {
+				if !handler.HasRequiredScope(w, req, scopeTmRead) {
+					return
+				}
 				tenantID, found := handler.ExtractPathVariable(w, req, "tenantID")
 				if !found {
 					return
@@ -143,6 +201,9 @@ func (h *HandlerServiceAssembly) registerTenantRoutes(router chi.Router, handler
 				handler.getTenant(w, req, tenantID)
 			})
 			r.Delete("/", func(w http.ResponseWriter, req *http.Request) {
+				if !handler.HasRequiredScope(w, req, scopeTmWrite) {
+					return
+				}
 				tenantID, found := handler.ExtractPathVariable(w, req, "tenantID")
 				if !found {
 					return
@@ -150,6 +211,9 @@ func (h *HandlerServiceAssembly) registerTenantRoutes(router chi.Router, handler
 				handler.deleteTenant(w, req, tenantID)
 			})
 			r.Patch("/", func(w http.ResponseWriter, req *http.Request) {
+				if !handler.HasRequiredScope(w, req, scopeTmWrite) {
+					return
+				}
 				tenantID, found := handler.ExtractPathVariable(w, req, "tenantID")
 				if !found {
 					return
@@ -164,6 +228,9 @@ func (h *HandlerServiceAssembly) registerTenantRoutes(router chi.Router, handler
 func (h *HandlerServiceAssembly) registerParticipantRoutes(r chi.Router, handler *TMHandler) {
 	r.Route("/participant-profiles", func(r chi.Router) {
 		r.Get("/", func(w http.ResponseWriter, req *http.Request) {
+			if !handler.HasRequiredScope(w, req, scopeTmRead) {
+				return
+			}
 			tenantID, found := handler.ExtractPathVariable(w, req, "tenantID")
 			if !found {
 				return
@@ -171,6 +238,9 @@ func (h *HandlerServiceAssembly) registerParticipantRoutes(r chi.Router, handler
 			handler.getProfilesForTenant(w, req, tenantID)
 		})
 		r.Post("/", func(w http.ResponseWriter, req *http.Request) {
+			if !handler.HasRequiredScope(w, req, scopeTmWrite) {
+				return
+			}
 			tenantID, found := handler.ExtractPathVariable(w, req, "tenantID")
 			if !found {
 				return
@@ -180,6 +250,9 @@ func (h *HandlerServiceAssembly) registerParticipantRoutes(r chi.Router, handler
 
 		r.Route("/{participantID}", func(r chi.Router) {
 			r.Get("/", func(w http.ResponseWriter, req *http.Request) {
+				if !handler.HasRequiredScope(w, req, scopeTmRead) {
+					return
+				}
 				tenantID, found := handler.ExtractPathVariable(w, req, "tenantID")
 				if !found {
 					return
@@ -191,6 +264,9 @@ func (h *HandlerServiceAssembly) registerParticipantRoutes(r chi.Router, handler
 				handler.getParticipantProfile(w, req, tenantID, participantID)
 			})
 			r.Delete("/", func(w http.ResponseWriter, req *http.Request) {
+				if !handler.HasRequiredScope(w, req, scopeTmWrite) {
+					return
+				}
 				tenantID, found := handler.ExtractPathVariable(w, req, "tenantID")
 				if !found {
 					return

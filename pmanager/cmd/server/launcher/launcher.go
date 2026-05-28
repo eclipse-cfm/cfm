@@ -15,6 +15,7 @@ package launcher
 import (
 	"fmt"
 
+	cfmauth "github.com/eclipse-cfm/cfm/assembly/auth"
 	"github.com/eclipse-cfm/cfm/assembly/routing"
 	"github.com/eclipse-cfm/cfm/common/runtime"
 	"github.com/eclipse-cfm/cfm/common/store"
@@ -67,6 +68,7 @@ func Launch(shutdown <-chan struct{}) {
 	assembler := system.NewServiceAssembler(logMonitor, vConfig, mode)
 
 	assembler.Register(&routing.RouterServiceAssembly{})
+	assembler.Register(&cfmauth.AuthServiceAssembly{})
 	assembler.Register(&handler.HandlerServiceAssembly{})
 
 	if vConfig.IsSet(postgresKey) {
