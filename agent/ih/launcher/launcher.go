@@ -36,6 +36,7 @@ const (
 	identityHubURLKey                  = "identityhub.url"
 	identityHubCredentialServiceURLKey = "identityhub.cs.url"
 	controlPlaneProtocolURLKey         = "controlplane.protocol.url"
+	controlPlaneDataServiceURLKey      = "controlplane.dataservice.url"
 )
 
 func LaunchAndWaitSignal(shutdown <-chan struct{}) {
@@ -60,6 +61,7 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 			vaultURL := ctx.Config.GetString(urlKey)
 			ihCsURL := ctx.Config.GetString(identityHubCredentialServiceURLKey)
 			cpProtocolURL := ctx.Config.GetString(controlPlaneProtocolURLKey)
+			cpDataServiceURL := ctx.Config.GetString(controlPlaneDataServiceURLKey)
 
 			if err := runtime.CheckRequiredParams(clientIDKey, clientID, clientSecretKey, clientSecret, tokenURLKey, tokenURL, identityHubURLKey, ihURL); err != nil {
 				panic(err)
@@ -86,6 +88,7 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 				VaultURL:             vaultURL,
 				CredentialServiceURL: ihCsURL,
 				ProtocolServiceURL:   cpProtocolURL,
+				DataServiceURL:       cpDataServiceURL,
 			})
 		},
 	}

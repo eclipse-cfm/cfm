@@ -49,6 +49,10 @@ type ParticipantManifest struct {
 	ProtocolServiceURL string
 	// ProtocolServiceID the ID of the protocol service. Defaults to "<PARTICIPANT_CONTEXT_ID>-dsp"
 	ProtocolServiceID string
+	// DataServiceURL the URL of the data service
+	DataServiceURL string
+	// DataServiceID the ID of the data service. Defaults to "<PARTICIPANT_CONTEXT_ID>-dataservice"
+	DataServiceID string
 	// IsActive indicates whether the participant is set to "active" after creation. Defaults to true
 	IsActive bool
 	// ParticipantContextID the unique identifier of the participant context. This is NOT the "participant ID"
@@ -74,6 +78,7 @@ func NewParticipantManifest(
 	did string,
 	credentialServiceURL string,
 	protocolServiceURL string,
+	dataServiceURL string,
 	opts ...ParticipantManifestOptions,
 ) ParticipantManifest {
 	manifest := ParticipantManifest{
@@ -83,6 +88,8 @@ func NewParticipantManifest(
 		CredentialServiceID:  participantContextID + "-credentialservice",
 		ProtocolServiceURL:   protocolServiceURL,
 		ProtocolServiceID:    participantContextID + "-dsp",
+		DataServiceURL:       dataServiceURL,
+		DataServiceID:        participantContextID + "-dataservice",
 		IsActive:             true,
 		KeyGeneratorParameters: KeyGeneratorParameters{
 			KeyID:           DefaultKeyID,

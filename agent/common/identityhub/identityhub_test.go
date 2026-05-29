@@ -44,7 +44,7 @@ func TestIdentityAPIClient_CreateParticipantContext(t *testing.T) {
 			require.True(t, data["active"].(bool))
 
 			serviceEndpoints := data["serviceEndpoints"].([]any)
-			require.Len(t, serviceEndpoints, 2)
+			require.Len(t, serviceEndpoints, 3)
 
 			credentialService := serviceEndpoints[0].(map[string]any)
 			require.Equal(t, "CredentialService", credentialService["type"])
@@ -53,6 +53,10 @@ func TestIdentityAPIClient_CreateParticipantContext(t *testing.T) {
 			protocolService := serviceEndpoints[1].(map[string]any)
 			require.Equal(t, "ProtocolEndpoint", protocolService["type"])
 			require.Equal(t, "https://example.com/dsp", protocolService["serviceEndpoint"])
+
+			dataService := serviceEndpoints[2].(map[string]any)
+			require.Equal(t, "DataService", dataService["type"])
+			require.Equal(t, "https://example.com/data", dataService["serviceEndpoint"])
 
 			additionalProps := data["additionalProperties"].(map[string]any)
 			vaultConfig := additionalProps["edc.vault.hashicorp.config"].(map[string]any)
@@ -80,7 +84,7 @@ func TestIdentityAPIClient_CreateParticipantContext(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	manifest := NewParticipantManifest("test", "did:web:test", "https://example.com/credentials", "https://example.com/dsp",
+	manifest := NewParticipantManifest("test", "did:web:test", "https://example.com/credentials", "https://example.com/dsp", "https://example.com/data",
 		func(manifest *ParticipantManifest) {
 			manifest.VaultConfig = edcv.VaultConfig{
 				VaultURL: "https://example.com/vault",
@@ -103,7 +107,7 @@ func TestIdentityAPIClient_AuthError(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	manifest := NewParticipantManifest("test", "did:web:test", "https://example.com/credentials", "https://example.com/dsp",
+	manifest := NewParticipantManifest("test", "did:web:test", "https://example.com/credentials", "https://example.com/dsp", "https://example.com/data",
 		func(manifest *ParticipantManifest) {
 			manifest.VaultConfig = edcv.VaultConfig{
 				VaultURL: "https://example.com/vault",
@@ -131,7 +135,7 @@ func TestIdentityAPIClient_BadRequest(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	manifest := NewParticipantManifest("test", "did:web:test", "https://example.com/credentials", "https://example.com/dsp",
+	manifest := NewParticipantManifest("test", "did:web:test", "https://example.com/credentials", "https://example.com/dsp", "https://example.com/data",
 		func(manifest *ParticipantManifest) {
 			manifest.VaultConfig = edcv.VaultConfig{
 				VaultURL: "https://example.com/vault",

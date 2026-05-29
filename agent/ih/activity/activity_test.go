@@ -57,6 +57,7 @@ var processingData = map[string]any{
 	"clientID.apiAccess":                "client-456",
 	"cfm.participant.credentialservice": "https://example.com/credentialservice",
 	"cfm.participant.protocolservice":   "https://example.com/protocolservice",
+	"cfm.participant.dataservice":       "https://example.com/dataservice",
 }
 
 func TestIHActivityProcessor_ProcessDeploy_WithValidData(t *testing.T) {
@@ -127,6 +128,23 @@ func TestIHActivityProcessor_ProcessDeploy_MissingProtocolServiceURL(t *testing.
 
 	require.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	assert.Contains(t, result.Error.Error(), "ProtocolServiceURL is empty")
+}
+
+func TestIHActivityProcessor_ProcessDeploy_MissingDataServiceURL(t *testing.T) {
+	processor := NewProcessor(validConfig())
+	pd := copyOf(processingData)
+	delete(pd, "cfm.participant.dataservice")
+
+	activityContext := api.NewActivityContext(context.Background(), "orch-4b", api.Activity{
+		ID:            "activity-3b",
+		Type:          "ih",
+		Discriminator: api.DeployDiscriminator,
+	}, pd, make(map[string]any))
+
+	result := processor.ProcessDeploy(activityContext)
+
+	require.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
+	assert.Contains(t, result.Error.Error(), "DataServiceURL is empty")
 }
 
 func TestIHActivityProcessor_ProcessDeploy_VaultSecretMissing(t *testing.T) {

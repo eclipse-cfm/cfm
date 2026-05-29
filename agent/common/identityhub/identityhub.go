@@ -208,6 +208,11 @@ func (a HttpIdentityAPIClient) CreateParticipantContext(ctx context.Context, man
 				"id":              manifest.ProtocolServiceID,
 				"serviceEndpoint": manifest.ProtocolServiceURL,
 			},
+			{
+				"type":            "DataService",
+				"id":              manifest.DataServiceID,
+				"serviceEndpoint": manifest.DataServiceURL,
+			},
 		},
 		"active":               manifest.IsActive,
 		"participantContextId": manifest.ParticipantContextID,
