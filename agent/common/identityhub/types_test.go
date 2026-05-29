@@ -23,10 +23,11 @@ import (
 )
 
 func TestNewParticipantManifest_WithDefaults(t *testing.T) {
-	manifest := NewParticipantManifest("test-id", "did:web:foo", "http://example.com/credentialservice", "http://example.com/protocol")
+	manifest := NewParticipantManifest("test-id", "did:web:foo", "http://example.com/credentialservice", "http://example.com/protocol", "http://example.com/dataservice")
 
 	require.Equal(t, manifest.CredentialServiceID, "test-id-credentialservice")
 	require.Equal(t, manifest.ProtocolServiceID, "test-id-dsp")
+	require.Equal(t, manifest.DataServiceID, "test-id-dataservice")
 	require.Equal(t, manifest.IsActive, true)
 	require.Equal(t, manifest.KeyGeneratorParameters.KeyID, "did:web:foo#"+DefaultKeyID)
 	_, err := uuid.Parse(manifest.KeyGeneratorParameters.PrivateKeyAlias)
@@ -36,7 +37,7 @@ func TestNewParticipantManifest_WithDefaults(t *testing.T) {
 }
 
 func TestParticipantManifest_Serialization(t *testing.T) {
-	orig := NewParticipantManifest("test-id", "did:web:foo", "http://example.com/credentialservice", "http://example.com/protocol")
+	orig := NewParticipantManifest("test-id", "did:web:foo", "http://example.com/credentialservice", "http://example.com/protocol", "http://example.com/dataservice")
 
 	data, err := json.Marshal(orig)
 	require.NoError(t, err)

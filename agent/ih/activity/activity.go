@@ -45,7 +45,9 @@ type IdentityHubActivityProcessor struct {
 	CredentialServiceURL string
 	// ProtocolServiceURL optional template for the protocol service URL; use %s as placeholder for participantContextID
 	ProtocolServiceURL string
-	tracer             trace.Tracer
+	// DataServiceURL optional template for the data service URL; use %s as placeholder for participantContextID
+	DataServiceURL string
+	tracer         trace.Tracer
 }
 
 type ihData struct {
@@ -54,6 +56,7 @@ type ihData struct {
 	ApiAccessClientID    string `json:"clientID.apiAccess" validate:"required"`
 	CredentialServiceURL string `json:"cfm.participant.credentialservice"`
 	ProtocolServiceURL   string `json:"cfm.participant.protocolservice"`
+	DataServiceURL       string `json:"cfm.participant.dataservice"`
 }
 
 func NewProcessor(config *Config) *IdentityHubActivityProcessor {
@@ -66,6 +69,7 @@ func NewProcessor(config *Config) *IdentityHubActivityProcessor {
 		VaultURL:             config.VaultURL,
 		CredentialServiceURL: config.CredentialServiceURL,
 		ProtocolServiceURL:   config.ProtocolServiceURL,
+		DataServiceURL:       config.DataServiceURL,
 		tracer:               otel.GetTracerProvider().Tracer("cfm.agent.identityhub"),
 	}
 }
@@ -79,6 +83,7 @@ type Config struct {
 	VaultURL             string
 	CredentialServiceURL string
 	ProtocolServiceURL   string
+	DataServiceURL       string
 }
 
 func (p IdentityHubActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
@@ -115,12 +120,18 @@ func (p IdentityHubActivityProcessor) handleDeployAction(ctx api.ActivityContext
 	if p.ProtocolServiceURL != "" {
 		data.ProtocolServiceURL = fmt.Sprintf(p.ProtocolServiceURL, participantContextId)
 	}
+	if p.DataServiceURL != "" {
+		data.DataServiceURL = fmt.Sprintf(p.DataServiceURL, participantContextId)
+	}
 
 	if data.CredentialServiceURL == "" {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("CredentialServiceURL is empty")}
 	}
 	if data.ProtocolServiceURL == "" {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("ProtocolServiceURL is empty")}
+	}
+	if data.DataServiceURL == "" {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("DataServiceURL is empty")}
 	}
 
 	did := data.ParticipantID
@@ -142,7 +153,7 @@ func (p IdentityHubActivityProcessor) handleDeployAction(ctx api.ActivityContext
 
 	_, ihSpan := p.tracer.Start(ctx.Context(), "cfm.agent.identityhub.deploy", trace.WithSpanKind(trace.SpanKindClient))
 
-	manifest := identityhub.NewParticipantManifest(participantContextId, did, data.CredentialServiceURL, data.ProtocolServiceURL, func(m *identityhub.ParticipantManifest) {
+	manifest := identityhub.NewParticipantManifest(participantContextId, did, data.CredentialServiceURL, data.ProtocolServiceURL, data.DataServiceURL, func(m *identityhub.ParticipantManifest) {
 		m.VaultCredentials = vaultCreds
 		m.VaultConfig.VaultURL = p.VaultURL
 		m.VaultConfig.FolderPath = participantContextId + "/identityhub"
