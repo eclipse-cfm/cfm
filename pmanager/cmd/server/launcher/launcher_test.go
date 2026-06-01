@@ -47,6 +47,7 @@ func TestTestAgent_Integration(t *testing.T) {
 	_ = os.Setenv("PM_BUCKET", "cfm-bucket")
 	_ = os.Setenv("PM_STREAM", streamName)
 	_ = os.Setenv("PM_HTTPPORT", strconv.Itoa(fixtures.GetRandomPort(t)))
+	_ = os.Setenv("PM_AUTH_ENABLED", "false")
 
 	// Create and start the test agent
 	shutdownChannel := make(chan struct{})

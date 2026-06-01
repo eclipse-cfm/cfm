@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 
+	cfmauth "github.com/eclipse-cfm/cfm/common/auth"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/query"
 	"github.com/eclipse-cfm/cfm/common/store"
@@ -159,6 +160,61 @@ func (h HttpHandler) write(w http.ResponseWriter, response any) {
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		h.Monitor.Infow("Error encoding response: %v", err)
 	}
+}
+
+// ClaimsRule is applied to the caller's claims and returns true when the requirement is satisfied.
+type ClaimsRule struct {
+	description string
+	check       func(*cfmauth.Claims) bool
+}
+
+// RequireScope returns a ClaimsRule that checks for the given scope.
+func RequireScope(scope string) ClaimsRule {
+	return ClaimsRule{
+		description: "required scope '" + scope + "' not present",
+		check:       func(c *cfmauth.Claims) bool { return c.HasScope(scope) },
+	}
+}
+
+// RequireRole returns a ClaimsRule that checks for any of the given roles.
+func RequireRole(role ...string) ClaimsRule {
+	return ClaimsRule{
+		description: "none of the required roles " + fmt.Sprintf("%v", role) + " present",
+		check: func(c *cfmauth.Claims) bool {
+			for _, r := range role {
+				if c.HasRole(r) {
+					return true
+				}
+			}
+			return false
+		},
+	}
+}
+
+// IsAuthorized checks whether the caller's token satisfies all given rules.
+// Returns true when all rules pass or when auth is disabled (no claims in context).
+// Returns false and writes a 403 naming the first failing rule.
+func (h HttpHandler) IsAuthorized(w http.ResponseWriter, r *http.Request, rules ...ClaimsRule) bool {
+	claims, ok := cfmauth.ClaimsFromContext(r.Context())
+	if !ok {
+		return true
+	}
+	for _, rule := range rules {
+		if !rule.check(claims) {
+			h.WriteError(w, "Access not granted: "+rule.description, http.StatusForbidden)
+			return false
+		}
+	}
+	return true
+}
+
+// Principal returns the subject claim of the authenticated caller, or an empty string when auth is disabled.
+func (h HttpHandler) Principal(r *http.Request) string {
+	claims, ok := cfmauth.ClaimsFromContext(r.Context())
+	if !ok {
+		return ""
+	}
+	return claims.Subject
 }
 
 func (h HttpHandler) ExtractPathVariable(w http.ResponseWriter, req *http.Request, key string) (string, bool) {
