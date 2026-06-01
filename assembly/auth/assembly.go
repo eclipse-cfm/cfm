@@ -60,7 +60,12 @@ func (a *AuthServiceAssembly) Provides() []system.ServiceType {
 }
 
 func (a *AuthServiceAssembly) Init(ctx *system.InitContext) error {
-	if !ctx.Config.GetBool(configEnabled) {
+	isAuthEnabled := true // auth is enabled by default
+	if ctx.Config.IsSet(configEnabled) {
+		isAuthEnabled = ctx.Config.GetBool(configEnabled)
+	}
+	
+	if !isAuthEnabled {
 		ctx.LogMonitor.Infof("Auth is disabled — all requests will be allowed")
 		ctx.Registry.Register(ValidatorKey, &noopValidator{})
 		return nil
