@@ -28,14 +28,14 @@ import (
 const (
 	ValidatorKey system.ServiceType = "auth:Validator"
 
-	configEnabled         = "auth.enabled"
-	configDiscoveryUrl    = "auth.discoveryUrl"
-	configAudience        = "auth.audience"
-	configAudienceClaim   = "auth.audienceClaim"
-	configRolesClaim      = "auth.rolesClaim"
-	configExpectedIssuer  = "auth.expectedIssuer"
-	configJwksUrl         = "auth.jwksUrl"
-	configSkipIssuerCheck = "auth.skipIssuerCheck"
+	authEnabledKey     = "auth.enabled"
+	discoveryUrlKey    = "auth.discoveryUrl"
+	authAudienceKey    = "auth.audience"
+	audienceClaimKey   = "auth.audienceClaim"
+	rolesClaimKey      = "auth.rolesClaim"
+	expectedIssuerKet  = "auth.expectedIssuer"
+	jwksUrlKey         = "auth.jwksUrl"
+	skipIssuerCheckKey = "auth.skipIssuerCheck"
 
 	discoveryTimeout = 30 * time.Second
 )
@@ -61,26 +61,26 @@ func (a *AuthServiceAssembly) Provides() []system.ServiceType {
 
 func (a *AuthServiceAssembly) Init(ctx *system.InitContext) error {
 	isAuthEnabled := true // auth is enabled by default
-	if ctx.Config.IsSet(configEnabled) {
-		isAuthEnabled = ctx.Config.GetBool(configEnabled)
+	if ctx.Config.IsSet(authEnabledKey) {
+		isAuthEnabled = ctx.Config.GetBool(authEnabledKey)
 	}
-	
+
 	if !isAuthEnabled {
 		ctx.LogMonitor.Infof("Auth is disabled — all requests will be allowed")
 		ctx.Registry.Register(ValidatorKey, &noopValidator{})
 		return nil
 	}
 
-	discoveryURL := ctx.Config.GetString(configDiscoveryUrl)
+	discoveryURL := ctx.Config.GetString(discoveryUrlKey)
 	if discoveryURL == "" {
 		return fmt.Errorf("auth.issuerUrl must be configured when auth.enabled is true")
 	}
-	audience := ctx.Config.GetString(configAudience)
-	audienceClaim := ctx.GetConfigStrOrDefault(configAudienceClaim, "aud")
-	rolesClaim := ctx.GetConfigStrOrDefault(configRolesClaim, "roles")
-	expectedIssuer := ctx.Config.GetString(configExpectedIssuer)
-	jwksURL := ctx.Config.GetString(configJwksUrl)
-	skipIssuerCheck := ctx.Config.GetBool(configSkipIssuerCheck)
+	audience := ctx.Config.GetString(authAudienceKey)
+	audienceClaim := ctx.GetConfigStrOrDefault(audienceClaimKey, "aud")
+	rolesClaim := ctx.GetConfigStrOrDefault(rolesClaimKey, "roles")
+	expectedIssuer := ctx.Config.GetString(expectedIssuerKet)
+	jwksURL := ctx.Config.GetString(jwksUrlKey)
+	skipIssuerCheck := ctx.Config.GetBool(skipIssuerCheckKey)
 
 	// When the IdP uses a non-standard claim for the audience (e.g. Keycloak uses azp
 	// instead of aud), disable the built-in aud check and validate the claim manually
@@ -142,7 +142,7 @@ func (a *AuthServiceAssembly) Init(ctx *system.InitContext) error {
 
 // discoverWithPublicIssuer fetches the OIDC discovery document from discoveryURL without
 // validating that its issuer field matches. It then constructs a Provider that fetches keys
-// from the JWKS endpoint in the discovery document but validates iss claims against expectedIssuer.
+// from the JWKS endpoint in the discovery document but validates iss claims against expectedIssuerKet.
 //
 // This is needed when the internal service URL used for discovery (e.g. an in-cluster Keycloak
 // address) differs from the public URL that the IdP embeds in tokens.

@@ -49,12 +49,14 @@ func launchPlatform(t *testing.T, natsURI string, pgDsn string) (chan struct{}, 
 	_ = os.Setenv("TM_URI", natsURI)
 	_ = os.Setenv("TM_BUCKET", cfmBucket)
 	_ = os.Setenv("TM_STREAM", streamName)
+	_ = os.Setenv("TM_AUTH_ENABLED", "false")
 
 	_ = os.Setenv("PM_POSTGRES", "true")
 	_ = os.Setenv("PM_DSN", pgDsn)
 	_ = os.Setenv("PM_URI", natsURI)
 	_ = os.Setenv("PM_BUCKET", cfmBucket)
 	_ = os.Setenv("PM_STREAM", streamName)
+	_ = os.Setenv("PM_AUTH_ENABLED", "false")
 
 	_ = os.Setenv("TESTAGENT_URI", natsURI)
 	_ = os.Setenv("TESTAGENT_BUCKET", cfmBucket)
