@@ -25,3 +25,5 @@ the following sections:
 | 2025-07-13  | [Error Handling](2025-07-13-errors/README.md)                          | Raising and handling errors                                                       |
 | 2025-10-20  | [Model, Type, and API Packages](2025-10-20-model-type-api/README.md)   | Model, Type, and API Packages                                                     |
 | 2025-12-216 | [Single Go Module](2025-12-16-single-go-module/README.md)              | Adoption of a single Go module                                                    |
+| 2025-12-216 | [Compensation Datamodel](2026-02-13-compensation-datamodel/README.md)  | Datamodel for compensation mechanisms                                             |
+| 2025-12-216 | [Mandatory authn/authz](2026-06-01-mandatory-authn_authz/README.md)    | Mandatory API authn/authz using OAuth2                                            |
