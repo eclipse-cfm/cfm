@@ -31,8 +31,8 @@ const (
 	CredentialRequestStateCreated = "CREATED"
 	CredentialRequestStateIssued  = "ISSUED"
 	CredentialRequestStateError   = "ERROR"
-	ScopeApiRead                  = "identity-api:read"
-	ScopeApiWrite                 = "identity-api:write"
+	ScopeApiRead                  = "read"
+	ScopeApiWrite                 = "write"
 )
 
 type IdentityAPIClient interface {
@@ -189,7 +189,7 @@ func (a HttpIdentityAPIClient) GetCredentialRequestState(ctx context.Context, pa
 }
 
 func (a HttpIdentityAPIClient) CreateParticipantContext(ctx context.Context, manifest ParticipantManifest) (*CreateParticipantContextResponse, error) {
-	accessToken, err := a.TokenProvider.GetToken(ctx, ScopeApiWrite, manifest.DID)
+	accessToken, err := a.TokenProvider.GetToken(ctx, ScopeApiWrite, manifest.ParticipantContextID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get API access token: %w", err)
 	}

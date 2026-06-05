@@ -187,15 +187,23 @@ func NewProcessor(config *Config) *KeyCloakActivityProcessor {
 
 func (p KeyCloakActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
 
+	type input struct {
+		ParticipantContextID string `json:"participantContextId"`
+	}
+	var inputData input
+	if err := ctx.ReadValues(&inputData); err != nil {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Keycloak activity for orchestration %s: %w", ctx.OID(), err)}
+	}
+
 	_, span := otel.GetTracerProvider().Tracer(tracerName).Start(ctx.Context(), "agent.kcagent.deploy")
 	defer span.End()
 
-	pcId, ok := ctx.Value(participantContextIDKey)
-	if !ok {
-		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("participant context ID not found in activity context")}
+	var participantContextID string
+	if inputData.ParticipantContextID == "" {
+		participantContextID = inputData.ParticipantContextID
+	} else {
+		participantContextID = generateClientID()
 	}
-
-	participantContextID := pcId.(string)
 
 	// create a Vault access client in Keycloak
 	vaultAccessClientID := participantContextID + "-vault"

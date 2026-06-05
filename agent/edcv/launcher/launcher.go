@@ -66,14 +66,6 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 				panic(err)
 			}
 
-			//provider := oauth2.NewTokenProvider(
-			//	oauth2.Oauth2Params{
-			//		ClientID:     clientID,
-			//		ClientSecret: clientSecret,
-			//		TokenURL:     tokenURL,
-			//		GrantType:    oauth2.ClientCredentials,
-			//	}, &httpClient)
-
 			provider := tokenexchange.NewTokenExchangeProvider(ctx.Config.GetString(tokenFilePathKey),
 				tokenexchange.WithTokenExchangeUrl(ctx.Config.GetString(tokenExchangeURLKey)),
 				tokenexchange.WithTokenExchangeAudience(ctx.Config.GetString(audienceKey)),

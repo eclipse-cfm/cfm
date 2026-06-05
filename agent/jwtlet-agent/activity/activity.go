@@ -149,6 +149,8 @@ func (p TokenExchangeActivityProcessor) ProcessDeploy(ctx api.ActivityContext) a
 	}
 	p.Monitor.Debugf("token exchange successful. claims: %s", claims)
 
+	// set both - for further processing in other agents and for the output
+	ctx.SetValue(participantContextIDKey, participantContextID)
 	ctx.SetOutputValue(participantContextIDKey, participantContextID)
 
 	return api.ActivityResult{Result: api.ActivityResultComplete}
