@@ -104,7 +104,7 @@ func (p TokenExchangeActivityProcessor) ProcessDeploy(ctx api.ActivityContext) a
 	rm := resourceMapping{
 		ClientIdentifier:   clientIdentifier,
 		ParticipantContext: participantContextID,
-		Scopes:             []string{"read", "write"},
+		Scopes:             []string{"read", "write", "provisioner", "admin", "participant"},
 		Audiences:          []string{p.Audience},
 	}
 	p.Monitor.Debugf("Creating resource mapping for participant context: %s", participantContextID)
@@ -113,31 +113,19 @@ func (p TokenExchangeActivityProcessor) ProcessDeploy(ctx api.ActivityContext) a
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating resource mapping: %w", err)}
 	}
 
-	// step 2: create "read" scope mapping
-	sm1 := scopeMapping{
-		Scope: "read",
+	// step 2: create "participant" scope mapping
+	sm4 := scopeMapping{
+		Scope: "participant",
 		Claims: map[string]string{
-			"scope": "identity-api:read management-api:read issuer-admin-api:read",
+			"role": "participant",
 		},
 	}
-	p.Monitor.Debugf("Creating read scope mapping for participant context: %s", participantContextID)
-	if err := p.post(ctx.Context(), "/api/v1/scopes", sm1); err != nil {
+	p.Monitor.Debugf("Creating participant scope mapping for participant context: %s", participantContextID)
+	if err := p.post(ctx.Context(), "/api/v1/scopes", sm4); err != nil {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating scope mapping: %w", err)}
 	}
 
-	// step 3: create "write" scope mapping
-	sm2 := scopeMapping{
-		Scope: "write",
-		Claims: map[string]string{
-			"scope": "identity-api:write management-api:write issuer-admin-api:write",
-		},
-	}
-	p.Monitor.Debugf("Creating write scope mapping for participant context: %s", participantContextID)
-	if err := p.post(ctx.Context(), "/api/v1/scopes", sm2); err != nil {
-		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating scope mapping: %w", err)}
-	}
-
-	// step 4: test token exchange
+	// step 3: test token exchange
 	p.Monitor.Debugf("testing token exchange for participant context: %s", participantContextID)
 	scopedToken, err := p.TokenProvider.GetToken(ctx.Context(), "read write", participantContextID)
 	if err != nil {

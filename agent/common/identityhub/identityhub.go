@@ -31,8 +31,8 @@ const (
 	CredentialRequestStateCreated = "CREATED"
 	CredentialRequestStateIssued  = "ISSUED"
 	CredentialRequestStateError   = "ERROR"
-	ScopeApiRead                  = "read"
-	ScopeApiWrite                 = "write"
+	ScopeApiRead                  = "read admin"  //todo: replace with participant scoped token
+	ScopeApiWrite                 = "write admin" // todo: replace with participant scoped token
 )
 
 type IdentityAPIClient interface {

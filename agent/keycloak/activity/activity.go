@@ -200,9 +200,10 @@ func (p KeyCloakActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.Ac
 
 	var participantContextID string
 	if inputData.ParticipantContextID == "" {
-		participantContextID = inputData.ParticipantContextID
-	} else {
+		p.monitor.Warnf("participantContextId not found on processing data, generating a random ID")
 		participantContextID = generateClientID()
+	} else {
+		participantContextID = inputData.ParticipantContextID
 	}
 
 	// create a Vault access client in Keycloak

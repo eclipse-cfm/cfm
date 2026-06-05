@@ -30,8 +30,9 @@ type RegistrationActivityProcessor struct {
 }
 
 type registrationData struct {
-	DID        string `json:"cfm.participant.id" validate:"required"`
-	HolderName string `json:"cfm.participant.holdername"`
+	DID                  string `json:"cfm.participant.id" validate:"required"`
+	HolderName           string `json:"cfm.participant.holdername"`
+	ParticipantContextId string `json:"participantContextId" validate:"required"`
 }
 
 func NewProcessor(config *Config) *RegistrationActivityProcessor {
@@ -65,7 +66,7 @@ func (p RegistrationActivityProcessor) ProcessDeploy(ctx api.ActivityContext) ap
 		span.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error reading vpa data: %w", err)}
 	}
-	if err := p.IssuerService.CreateHolder(ctx.Context(), regData.DID, holderID, regData.HolderName, properties); err != nil {
+	if err := p.IssuerService.CreateHolder(ctx.Context(), regData.ParticipantContextId, regData.DID, holderID, regData.HolderName, properties); err != nil {
 		span.RecordError(err)
 		// todo: inspect error if it is retryable
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating holder in ApiClient: %w", err)}
@@ -75,15 +76,15 @@ func (p RegistrationActivityProcessor) ProcessDeploy(ctx api.ActivityContext) ap
 }
 
 func (p RegistrationActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.ActivityResult {
-	var registrationData registrationData
-	if err := ctx.ReadValues(&registrationData); err != nil {
+	var regData registrationData
+	if err := ctx.ReadValues(&regData); err != nil {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Registration activity for orchestration %s: %w", ctx.OID(), err)}
 	}
-	holderID := registrationData.DID
-	if err := p.IssuerService.DeleteHolder(ctx.Context(), holderID); err != nil {
+	holderID := regData.DID
+	if err := p.IssuerService.DeleteHolder(ctx.Context(), regData.ParticipantContextId, holderID); err != nil {
 		// todo: inspect error if it is retryable
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("registration rollback: error deleting holder in IssuerService: %w", err)}
 	}
-	p.Monitor.Debugf("Registration rollback: activity for participant '%s' completed successfully", registrationData.DID)
+	p.Monitor.Debugf("Registration rollback: activity for participant '%s' completed successfully", regData.DID)
 	return api.ActivityResult{Result: api.ActivityResultComplete}
 }

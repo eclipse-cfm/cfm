@@ -27,8 +27,8 @@ import (
 )
 
 const (
-	ScopeApiRead  = "issuer-admin-api:read"
-	ScopeApiWrite = "issuer-admin-api:write"
+	ScopeApiRead  = "read admin"
+	ScopeApiWrite = "write admin"
 )
 
 // IssuerCredentialResourceDto represents a DTO for verifiable credentials that the IssuerService has issued to holders.
@@ -42,8 +42,8 @@ type IssuerCredentialResourceDto struct {
 }
 
 type ApiClient interface {
-	CreateHolder(ctx context.Context, did string, holderID string, name string, properties map[string]any) error
-	DeleteHolder(ctx context.Context, holderID string) error
+	CreateHolder(ctx context.Context, participantContextID string, did string, holderID string, name string, properties map[string]any) error
+	DeleteHolder(ctx context.Context, participantContextID string, holderID string) error
 	RevokeCredential(ctx context.Context, participantContextID string, credentialID string) error
 	QueryCredentialsByType(ctx context.Context, participantContextID string, credentialType string) ([]IssuerCredentialResourceDto, error)
 }
@@ -109,8 +109,8 @@ func (i HttpApiClient) QueryCredentialsByType(ctx context.Context, holderID stri
 	return credentials, nil
 }
 
-func (i HttpApiClient) DeleteHolder(ctx context.Context, holderID string) error {
-	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiWrite, holderID)
+func (i HttpApiClient) DeleteHolder(ctx context.Context, participantContextID string, holderID string) error {
+	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiWrite, participantContextID)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -138,8 +138,8 @@ func (i HttpApiClient) DeleteHolder(ctx context.Context, holderID string) error 
 	return nil
 }
 
-func (i HttpApiClient) CreateHolder(ctx context.Context, did string, holderID string, name string, properties map[string]any) error {
-	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiWrite, holderID)
+func (i HttpApiClient) CreateHolder(ctx context.Context, participantContextID string, did string, holderID string, name string, properties map[string]any) error {
+	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiWrite, participantContextID)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}

@@ -33,8 +33,8 @@ const (
 	ParticipantContextStateActivated   ParticipantContextState = "ACTIVATED"
 	ParticipantContextStateDeactivated ParticipantContextState = "DEACTIVATED"
 	contextConnector                                           = "https://w3id.org/edc/connector/management/v2"
-	ScopeApiWrite                                              = "management-api:write"
-	ScopeApiRead                                               = "management-api:read"
+	ScopeApiWrite                                              = "write provisioner"
+	ScopeApiRead                                               = "read provisioner"
 )
 
 type ParticipantContextConfig struct {

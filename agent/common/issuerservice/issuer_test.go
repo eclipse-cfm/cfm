@@ -61,7 +61,7 @@ func TestHttpApiClient_CreateHolder(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.CreateHolder(t.Context(), "did:web:test-participant", "did:web:test-participant", "test holder", nil)
+	err := client.CreateHolder(t.Context(), "test-context-id", "did:web:test-participant", "did:web:test-participant", "test holder", nil)
 	require.NoError(t, err)
 }
 
@@ -76,7 +76,7 @@ func TestHttpApiClient_CreateHolder_AuthError(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.CreateHolder(t.Context(), "did:web:test-participant", "did:web:test-participant", "test holder", nil)
+	err := client.CreateHolder(t.Context(), "test-context-id", "did:web:test-participant", "did:web:test-participant", "test holder", nil)
 	require.ErrorContains(t, err, "test error")
 }
 
@@ -102,7 +102,7 @@ func TestHttpApiClient_CreateHolder_ApiReturnsError(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.CreateHolder(t.Context(), "did:web:test-participant", "did:web:test-participant", "test holder", nil)
+	err := client.CreateHolder(t.Context(), "", "did:web:test-participant", "did:web:test-participant", "test holder", nil)
 	require.ErrorContains(t, err, "failed to create Holder")
 }
 
@@ -202,7 +202,7 @@ func TestHttpApiClient_DeleteHolder(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.DeleteHolder(t.Context(), "did:web:test-participant")
+	err := client.DeleteHolder(t.Context(), "", "did:web:test-participant")
 	require.NoError(t, err)
 }
 
@@ -227,7 +227,7 @@ func TestHttpApiClient_DeleteHolder_NotFound(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.DeleteHolder(t.Context(), "did:web:test-participant")
+	err := client.DeleteHolder(t.Context(), "", "did:web:test-participant")
 	require.ErrorContains(t, err, "received status code 404")
 }
 
@@ -252,7 +252,7 @@ func TestHttpApiClient_DeleteHolder_AuthError(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.DeleteHolder(t.Context(), "did:web:test-participant")
+	err := client.DeleteHolder(t.Context(), "", "did:web:test-participant")
 	require.ErrorContains(t, err, "received status code 401")
 }
 
