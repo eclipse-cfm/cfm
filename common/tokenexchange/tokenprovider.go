@@ -23,6 +23,8 @@ import (
 	"net/url"
 	"os"
 	"strings"
+
+	"github.com/eclipse-cfm/cfm/common/system"
 )
 
 type tokenExchangeResponse struct {
@@ -41,6 +43,7 @@ type TokenExchangeProvider struct {
 	tokenExchangeUrl      string
 	tokenExchangeAudience string
 	httpClient            *http.Client
+	monitor               system.LogMonitor
 }
 
 // ProviderOption is a functional option for configuring TokenExchangeProvider
@@ -67,11 +70,19 @@ func WithHttpClient(client *http.Client) ProviderOption {
 	}
 }
 
+// WithMonitor sets the log monitor
+func WithMonitor(monitor system.LogMonitor) ProviderOption {
+	return func(t *TokenExchangeProvider) {
+		t.monitor = monitor
+	}
+}
+
 // NewTokenExchangeProvider creates a new TokenExchangeProvider with the given token file path and options
 // tokenFilePath: the absolute path to the file that contains the token
 func NewTokenExchangeProvider(tokenFilePath string, opts ...ProviderOption) TokenExchangeProvider {
 	provider := TokenExchangeProvider{
 		filePath: tokenFilePath,
+		monitor:  system.NoopMonitor{},
 	}
 	for _, opt := range opts {
 		opt(&provider)
@@ -79,7 +90,8 @@ func NewTokenExchangeProvider(tokenFilePath string, opts ...ProviderOption) Toke
 	return provider
 }
 
-func (t TokenExchangeProvider) GetToken(ctx context.Context, scope string, participantIdentifier string) (string, error) {
+func (t TokenExchangeProvider) GetToken(ctx context.Context, scope string, participantContextID string) (string, error) {
+	t.monitor.Debugw("reading subject token from file", "path", t.filePath)
 	content, err := os.ReadFile(t.filePath)
 	if err != nil {
 		return "", err
@@ -88,10 +100,11 @@ func (t TokenExchangeProvider) GetToken(ctx context.Context, scope string, parti
 	formData := url.Values{}
 	formData.Set("grant_type", "urn:ietf:params:oauth:grant-type:token-exchange")
 	formData.Set("subject_token", string(content))
-	formData.Set("resource", participantIdentifier)
+	formData.Set("resource", participantContextID)
 	formData.Set("scope", scope)
 	formData.Set("audience", t.tokenExchangeAudience)
 
+	t.monitor.Debugw("sending token exchange request", "url", t.tokenExchangeUrl, "scope", scope, "resource", participantContextID, "audience", t.tokenExchangeAudience)
 	req, err := http.NewRequestWithContext(ctx, "POST", t.tokenExchangeUrl+"/token", strings.NewReader(formData.Encode()))
 	if err != nil {
 		return "", fmt.Errorf("error creating token exchange request: %w", err)
@@ -109,6 +122,7 @@ func (t TokenExchangeProvider) GetToken(ctx context.Context, scope string, parti
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		t.monitor.Debugw("token exchange failed", "status", resp.StatusCode, "body", string(bodyBytes))
 		return "", fmt.Errorf("token exchange failed with status %d", resp.StatusCode)
 	}
 	var tokenResponse tokenExchangeResponse
@@ -117,5 +131,6 @@ func (t TokenExchangeProvider) GetToken(ctx context.Context, scope string, parti
 		return "", fmt.Errorf("error decoding token exchange response: %w", err)
 	}
 
+	t.monitor.Debugw("token exchange successful", "scope", scope, "resource", participantContextID, "token_type", tokenResponse.TokenType, "expires_in", tokenResponse.ExpiresIn)
 	return tokenResponse.AccessToken, nil
 }
