@@ -14,6 +14,7 @@ IH_DIR=agent/ih
 KEYCLOAK_DIR=agent/keycloak
 REG_DIR=agent/registration
 ONBOARDING_DIR=agent/onboarding
+JWTLET_AGENT_DIR=agent/jwtlet-agent
 AGENT_COMMON=agent/common
 KIND_CLUSTER_NAME=edcv
 
@@ -71,6 +72,7 @@ build:
 	$(MAKE) -C $(KEYCLOAK_DIR) build
 	$(MAKE) -C $(REG_DIR) build
 	$(MAKE) -C $(ONBOARDING_DIR) build
+	$(MAKE) -C $(JWTLET_AGENT_DIR) build
 
 build-pmanager:
 	@echo "Building pmanager..."
@@ -89,6 +91,7 @@ build-all:
 	$(MAKE) -C $(KEYCLOAK_DIR) build-all
 	$(MAKE) -C $(REG_DIR) build-all
 	$(MAKE) -C $(ONBOARDING_DIR) build-all
+	$(MAKE) -C $(JWTLET_AGENT_DIR) build-all
 
 #==============================================================================
 # Test Commands - Delegate to Service Makefiles
@@ -105,6 +108,7 @@ test: install-gotestsum
 	$(MAKE) -C $(KEYCLOAK_DIR) test
 	$(MAKE) -C $(REG_DIR) test
 	$(MAKE) -C $(ONBOARDING_DIR) test
+	$(MAKE) -C $(JWTLET_AGENT_DIR) test
 	$(MAKE) -C $(ASSEMBLY_DIR) test
 	$(MAKE) -C $(AGENT_COMMON) test
 
@@ -157,6 +161,7 @@ clean:
 	$(MAKE) -C $(IH_DIR) clean
 	$(MAKE) -C $(REG_DIR) clean
 	$(MAKE) -C $(ONBOARDING_DIR) clean
+	$(MAKE) -C $(JWTLET_AGENT_DIR) clean
 
 #==============================================================================
 # Tool Commands - Delegate to Service Makefiles
@@ -187,7 +192,7 @@ generate-docs:
 # Docker Commands - Handled at Top Level
 #==============================================================================
 
-docker-build: docker-build-pmanager docker-build-tmanager docker-build-testagent docker-build-edcvagent docker-build-ihagent docker-build-kcagent docker-build-regagent docker-build-obagent
+docker-build: docker-build-pmanager docker-build-tmanager docker-build-jwtletagent docker-build-edcvagent docker-build-ihagent docker-build-kcagent docker-build-regagent docker-build-obagent
 
 docker-build-pmanager:
 	@echo "Building pmanager Docker image..."
@@ -197,9 +202,9 @@ docker-build-tmanager:
 	@echo "Building tmanager Docker image..."
 	docker buildx build -f docker/Dockerfile.tmanager.dockerfile -t $(DOCKER_REGISTRY)tmanager:$(DOCKER_TAG) .
 
-docker-build-testagent:
+docker-build-jwtletagent:
 	@echo "Building test agent Docker image..."
-	docker buildx build -f docker/Dockerfile.testagent.dockerfile -t $(DOCKER_REGISTRY)testagent:$(DOCKER_TAG) .
+	docker buildx build -f docker/Dockerfile.jwtletagent.dockerfile -t $(DOCKER_REGISTRY)jwtletagent:$(DOCKER_TAG) .
 
 docker-build-edcvagent:
 	@echo "Building EDC-V agent Docker image..."
@@ -221,7 +226,7 @@ docker-build-obagent:
 	@echo "Building Onboarding agent Docker image..."
 	docker buildx build -f docker/Dockerfile.obagent.dockerfile -t $(DOCKER_REGISTRY)obagent:$(DOCKER_TAG) .
 
-docker-clean: docker-clean-pmanager docker-clean-tmanager docker-clean-testagent docker-clean-edcvagent docker-clean-ihagent docker-clean-regagent docker-clean-obagent
+docker-clean: docker-clean-pmanager docker-clean-tmanager docker-clean-jwtletagent docker-clean-edcvagent docker-clean-ihagent docker-clean-regagent docker-clean-obagent
 
 docker-clean-pmanager:
 	docker rmi $(DOCKER_REGISTRY)pmanager:$(DOCKER_TAG) || true
@@ -229,8 +234,8 @@ docker-clean-pmanager:
 docker-clean-tmanager:
 	docker rmi $(DOCKER_REGISTRY)tmanager:$(DOCKER_TAG) || true
 
-docker-clean-testagent:
-	docker rmi $(DOCKER_REGISTRY)testagent:$(DOCKER_TAG) || true
+docker-clean-jwtletagent:
+	docker rmi $(DOCKER_REGISTRY)jwtletagent:$(DOCKER_TAG) || true
 
 docker-clean-edcvagent:
 	docker rmi $(DOCKER_REGISTRY)edcvagent:$(DOCKER_TAG) || true
@@ -268,6 +273,9 @@ load-into-kind-obagent: docker-build-obagent
 
 load-into-kind-regagent: docker-build-regagent
 	kind load docker-image -n $(KIND_CLUSTER_NAME) $(DOCKER_REGISTRY)regagent:$(DOCKER_TAG)
+
+load-into-kind-jwtletagent: docker-build-jwtletagent
+	kind load docker-image -n $(KIND_CLUSTER_NAME) $(DOCKER_REGISTRY)jwtletagent:$(DOCKER_TAG)
 
 # builds and loads all images into KinD cluster. Will require kind to be installed and a kind cluster named KIND_CLUSTER_NAME running.
 load-into-kind: docker-build

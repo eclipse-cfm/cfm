@@ -1,0 +1,200 @@
+/*
+ *  Copyright (c) 2026 Metaform Systems, Inc.
+ *
+ *  This program and the accompanying materials are made available under the
+ *  terms of the Apache License, Version 2.0 which is available at
+ *  https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  SPDX-License-Identifier: Apache-2.0
+ *
+ *  Contributors:
+ *       Metaform Systems, Inc. - initial API and implementation
+ *
+ */
+
+package activity
+
+import (
+	"bytes"
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"os"
+	"strings"
+
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/common/token"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
+	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
+)
+
+type TokenExchangeActivityProcessor struct {
+	api.BaseActivityProcessor
+	Monitor            system.LogMonitor
+	TokenProvider      token.TokenProvider
+	tracer             trace.Tracer
+	HttpClient         *http.Client
+	TokenFilePath      string
+	Audience           string
+	ManagementBasePath string
+}
+
+type tokenExchangeData struct {
+	ParticipantID string `json:"cfm.participant.id" validate:"required"`
+}
+
+type resourceMapping struct {
+	ClientIdentifier   string   `json:"clientIdentifier" validate:"required"`
+	ParticipantContext string   `json:"participantContext" validate:"required"`
+	Scopes             []string `json:"scopes" validate:"required"`
+	Audiences          []string `json:"audiences"`
+}
+
+type scopeMapping struct {
+	Scope  string            `json:"scope" validate:"required"`
+	Claims map[string]string `json:"claims"`
+}
+
+type Config struct {
+	system.LogMonitor
+	token.TokenProvider
+	HttpClient         *http.Client
+	ManagementBasePath string
+	TokenFilePath      string
+	Audience           string
+}
+
+func NewProcessor(config *Config) *TokenExchangeActivityProcessor {
+	return &TokenExchangeActivityProcessor{
+		Monitor:            config.LogMonitor,
+		TokenProvider:      config.TokenProvider,
+		HttpClient:         config.HttpClient,
+		tracer:             otel.GetTracerProvider().Tracer("cfm.agent.test"),
+		ManagementBasePath: config.ManagementBasePath,
+		TokenFilePath:      config.TokenFilePath,
+		Audience:           config.Audience,
+	}
+}
+
+func (p TokenExchangeActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
+
+	var data tokenExchangeData
+	if err := ctx.ReadValues(&data); err != nil {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing token exchange deploy for orchestration %s: %w", ctx.OID(), err)}
+	}
+
+	participantContextID := generateClientID()
+
+	_, span := p.tracer.Start(ctx.Context(), "cfm.agent.jwtlet.token-setup", trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
+
+	// step 1: create resource mapping
+	rm := resourceMapping{
+		ClientIdentifier:   "system:serviceaccount:edc-v:cfm-agents",
+		ParticipantContext: participantContextID,
+		Scopes:             []string{"read", "write"},
+		Audiences:          []string{p.Audience},
+	}
+	p.Monitor.Debugf("Creating resource mapping for participant context: %s", participantContextID)
+	err := p.post(ctx.Context(), "/api/v1/mappings", rm)
+	if err != nil {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating resource mapping: %w", err)}
+	}
+
+	// step 2: create "read" scope mapping
+	sm1 := scopeMapping{
+		Scope: "read",
+		Claims: map[string]string{
+			"scope": "identity-api:read management-api:read issuer-admin-api:read",
+		},
+	}
+	p.Monitor.Debugf("Creating read scope mapping for participant context: %s", participantContextID)
+	if err := p.post(ctx.Context(), "/api/v1/scopes", sm1); err != nil {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating scope mapping: %w", err)}
+	}
+
+	// step 3: create "write" scope mapping
+	sm2 := scopeMapping{
+		Scope: "write",
+		Claims: map[string]string{
+			"scope": "identity-api:write management-api:write issuer-admin-api:write",
+		},
+	}
+	p.Monitor.Debugf("Creating write scope mapping for participant context: %s", participantContextID)
+	if err := p.post(ctx.Context(), "/api/v1/scopes", sm2); err != nil {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating scope mapping: %w", err)}
+	}
+
+	// step 4: test token exchange
+	p.Monitor.Debugf("testing token exchange for participant context: %s", participantContextID)
+	scopedToken, err := p.TokenProvider.GetToken(ctx.Context(), "read write", participantContextID)
+	if err != nil {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("testing token exchange failed: error getting scoped token: %w", err)}
+	}
+	claims, err := decodeJWTClaims(scopedToken)
+	if err != nil {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("testing token exchange failed: error decoding JWT claims: %w", err)}
+	}
+	p.Monitor.Debugf("token exchange successful. claims: %s", claims)
+
+	return api.ActivityResult{Result: api.ActivityResultComplete}
+}
+
+func (p TokenExchangeActivityProcessor) post(ctx context.Context, url string, body any) error {
+	// read workload token
+	tokenBytes, err := os.ReadFile(p.TokenFilePath)
+	if err != nil {
+		return fmt.Errorf("error reading token file from %s: %w", p.TokenFilePath, err)
+	}
+
+	bodyJson, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("error marshalling body: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.ManagementBasePath+url, bytes.NewReader(bodyJson))
+	if err != nil {
+		return fmt.Errorf("error creating request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+string(tokenBytes))
+	resp, err := p.HttpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("error sending request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("request '%s %s' failed with status %d", req.Method, req.URL.String(), resp.StatusCode)
+	}
+
+	return nil
+}
+
+// decodeJWTClaims base64-decodes the payload section of a JWT and returns it as a raw JSON string.
+func decodeJWTClaims(jwtToken string) (string, error) {
+	parts := strings.SplitN(jwtToken, ".", 3)
+	if len(parts) != 3 {
+		return "", fmt.Errorf("invalid JWT format")
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return "", fmt.Errorf("error decoding JWT payload: %w", err)
+	}
+	return string(payload), nil
+}
+
+func (p TokenExchangeActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.ActivityResult {
+	var data tokenExchangeData
+	if err := ctx.ReadValues(&data); err != nil {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing token exchange dispose for orchestration %s: %w", ctx.OID(), err)}
+	}
+	p.Monitor.Debugf("Token exchange dispose for participant '%s' completed", data.ParticipantID)
+	return api.ActivityResult{Result: api.ActivityResultComplete}
+}
+func generateClientID() string {
+	return strings.ReplaceAll(uuid.New().String(), "-", "")
+}
