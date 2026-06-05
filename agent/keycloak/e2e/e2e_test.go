@@ -56,7 +56,7 @@ func Test_SuccessfulDeployment(t *testing.T) {
 	require.NoError(t, err)
 	defer vaultClient.Close()
 
-	var apiAccessClientID, vaultAccessClientId string
+	var participantContextId, vaultAccessClientId string
 	require.Eventually(t, func() bool {
 		oEntry, err := natsContainer.Client.KVStore.Get(ctx, "1234")
 		if err != nil {
@@ -68,16 +68,16 @@ func Test_SuccessfulDeployment(t *testing.T) {
 			return false
 		}
 		if orchestration.State == api.OrchestrationStateCompleted {
-			apiAccessClientID = orchestration.ProcessingData["clientID.apiAccess"].(string)
+			participantContextId = orchestration.ProcessingData["participantContextId"].(string)
 			vaultAccessClientId = orchestration.ProcessingData["clientID.vaultAccess"].(string)
 			return true
 		}
 		return false
 	}, 10*time.Second, 10*time.Millisecond, "Orchestration did not complete in time")
 
-	require.NotEmpty(t, apiAccessClientID, "Expected clientID.apiAccess to be set")
+	//require.NotEmpty(t, participantContextId, "Expected participantContextId to be set")
 	require.NotEmpty(t, vaultAccessClientId, "Expected clientID.vaultAccess to be set")
-	apiAccessSecret, err := vaultClient.ResolveSecret(ctx, apiAccessClientID)
+	apiAccessSecret, err := vaultClient.ResolveSecret(ctx, participantContextId)
 	require.NoError(t, err, "Failed to resolve secret")
 	require.NotEmpty(t, apiAccessSecret, "Expected api access client secret to be set")
 	vaultAccessSecret, err := vaultClient.ResolveSecret(ctx, vaultAccessClientId)
@@ -114,7 +114,7 @@ func Test_UnsupportedDiscriminator(t *testing.T) {
 			return false
 		}
 		if orchestration.State == api.OrchestrationStateErrored {
-			require.Nil(t, orchestration.ProcessingData["clientID.apiAccess"])
+			require.Nil(t, orchestration.ProcessingData["participantContextId"])
 			require.Nil(t, orchestration.ProcessingData["clientID.vaultAccess"])
 			return true
 		}

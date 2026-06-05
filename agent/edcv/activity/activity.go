@@ -45,9 +45,9 @@ type EDCVActivityProcessor struct {
 }
 
 type edcData struct {
-	ParticipantID       string `json:"cfm.participant.id" validate:"required"`
-	VaultAccessClientID string `json:"clientID.vaultAccess" validate:"required"`
-	ApiAccessClientID   string `json:"clientID.apiAccess" validate:"required"`
+	ParticipantID        string `json:"cfm.participant.id" validate:"required"`
+	VaultAccessClientID  string `json:"clientID.vaultAccess" validate:"required"`
+	ParticipantContextId string `json:"participantContextId" validate:"required"`
 	// CredentialServiceURL the URL of the credential service, i.e., the query and storage endpoints of IdentityHub
 	CredentialServiceURL string `json:"cfm.participant.credentialservice"`
 	// ProtocolServiceURL the URL of the protocol service, i.e., the DSP protocol endpoint of the control plane
@@ -87,7 +87,7 @@ func (p EDCVActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.Activi
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing EDC-V activity for orchestration %s: %w", ctx.OID(), err)}
 	}
 
-	participantContextId := data.ApiAccessClientID
+	participantContextId := data.ParticipantContextId
 	span.SetAttributes(attribute.String("cfm.participantContextId", participantContextId))
 	return p.handleDeployAction(ctx, data, participantContextId)
 }
@@ -98,7 +98,7 @@ func (p EDCVActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.Activ
 	if err != nil {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing EDC-V activity for orchestration %s: %w", ctx.OID(), err)}
 	}
-	return p.handleDisposeAction(ctx.Context(), data.ApiAccessClientID)
+	return p.handleDisposeAction(ctx.Context(), data.ParticipantContextId)
 }
 
 // handleDeployAction creates the participant context and config in the EDC control plane.
@@ -159,7 +159,7 @@ func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data 
 	}
 	ctrl.AddEvent("Created ParticipantContextConfig in Control Plane")
 	ctrl.End()
-	p.Monitor.Infof("EDCV activity for participant '%s' (client ID = %s) completed successfully", data.ParticipantID, data.ApiAccessClientID)
+	p.Monitor.Infof("EDCV activity for participant '%s' (client ID = %s) completed successfully", data.ParticipantID, data.ParticipantContextId)
 
 	// delete the vault access secret, since it's no longer needed'
 	if err := p.VaultClient.DeleteSecret(ctx.Context(), data.VaultAccessClientID); err != nil {

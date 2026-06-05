@@ -51,7 +51,7 @@ func validConfig(opts ...ConfigOptions) *Config {
 var processingData = map[string]any{
 	model.ParticipantIdentifier:         "participant-abc",
 	"clientID.vaultAccess":              "client-123",
-	"clientID.apiAccess":                "client-456",
+	"participantContextId":              "client-456",
 	"cfm.participant.credentialservice": "https://example.com/credentialservice",
 	"cfm.participant.protocolservice":   "https://example.com/protocolservice",
 	"publicURL":                         "http://test.example.com:1234/fizz/buzz",

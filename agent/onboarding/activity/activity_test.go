@@ -35,7 +35,7 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenNewRequest(t *testing.T) 
 	}
 
 	var processingData = map[string]any{
-		"clientID.apiAccess": "test-participant",
+		"participantContextId": "test-participant",
 		"cfm.vpa.credentials": []any{
 			map[string]string{
 				"id":     "id",
@@ -77,7 +77,7 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenNewRequestError(t *testin
 	}
 
 	var processingData = map[string]any{
-		"clientID.apiAccess": "test-participant",
+		"participantContextId": "test-participant",
 		"cfm.vpa.credentials": []any{
 			map[string]string{
 				"id":     "id",
@@ -116,7 +116,6 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenPendingRequestApiError(t 
 	}
 
 	var processingData = map[string]any{
-		"clientID.apiAccess":   "test-participant",
 		"participantContextId": "test-participant",
 		"holderPid":            "test-holder-pid",
 		"credentialRequest":    "https://example.com/credentialservice/request/123",
@@ -150,7 +149,6 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenPendingRequestIssued(t *t
 	}
 
 	var processingData = map[string]any{
-		"clientID.apiAccess":   "test-participant",
 		"participantContextId": "test-participant",
 		"holderPid":            "test-holder-pid",
 		"credentialRequest":    "https://example.com/credentialservice/request/123",
@@ -187,7 +185,6 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenPendingRequestCreated(t *
 	}
 
 	var processingData = map[string]any{
-		"clientID.apiAccess":   "test-participant",
 		"participantContextId": "test-participant",
 		"holderPid":            "test-holder-pid",
 		"credentialRequest":    "https://example.com/credentialservice/request/123",
@@ -222,7 +219,6 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenPendingRequestError(t *te
 	}
 
 	var processingData = map[string]any{
-		"clientID.apiAccess":   "test-participant",
 		"participantContextId": "test-participant",
 		"holderPid":            "test-holder-pid",
 		"credentialRequest":    "https://example.com/credentialservice/request/123",
@@ -283,7 +279,6 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenInvalidStateReceived(t *t
 	}
 
 	var processingData = map[string]any{
-		"clientID.apiAccess":   "test-participant",
 		"participantContextId": "test-participant",
 		"holderPid":            "test-holder-pid",
 		"credentialRequest":    "https://example.com/credentialservice/request/123",
@@ -325,7 +320,7 @@ func TestOnboardingActivityProcessor_ProcessDispose(t *testing.T) {
 	}
 
 	var processingData = map[string]any{
-		"clientID.apiAccess": "test-participant",
+		"participantContextId": "test-participant",
 		"cfm.vpa.credentials": []any{
 			map[string]string{
 				"id":     "id",
@@ -372,7 +367,7 @@ func TestOnboardingActivityProcessor_ProcessDispose_RevocationFails(t *testing.T
 	}
 
 	var processingData = map[string]any{
-		"clientID.apiAccess": "test-participant",
+		"participantContextId": "test-participant",
 		"cfm.vpa.credentials": []any{
 			map[string]string{
 				"id":     "id",
@@ -413,7 +408,7 @@ func TestOnboardingActivityProcessor_ProcessDispose_NoCredentials(t *testing.T) 
 	}
 
 	var processingData = map[string]any{
-		"clientID.apiAccess": "test-participant",
+		"participantContextId": "test-participant",
 		"cfm.vpa.credentials": []any{
 			map[string]string{
 				"id":     "id",

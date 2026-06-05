@@ -38,7 +38,6 @@ const (
 	authHeader              = "Authorization"
 	clientUrl               = "%s/admin/realms/%s/clients"
 	vaultAccessClientIDKey  = "clientID.vaultAccess"
-	apiAccessClientIDKey    = "clientID.apiAccess"
 	participantContextIDKey = "participantContextId"
 	tracerName              = "cfm.agent.keycloak"
 )
@@ -103,27 +102,9 @@ func WithEnabled(enabled bool) KeycloakClientDataOption {
 	}
 }
 
-func WithPublicClient(public bool) KeycloakClientDataOption {
-	return func(c *KeycloakClientData) {
-		c.PublicClient = public
-	}
-}
-
-func WithProtocolMappers(mappers []map[string]any) KeycloakClientDataOption {
-	return func(c *KeycloakClientData) {
-		c.ProtocolMappers = mappers
-	}
-}
-
 func WithClientID(clientID string) KeycloakClientDataOption {
 	return func(c *KeycloakClientData) {
 		c.ClientId = clientID
-	}
-}
-
-func WithClientSecret(secret string) KeycloakClientDataOption {
-	return func(c *KeycloakClientData) {
-		c.Secret = secret
 	}
 }
 
@@ -209,29 +190,15 @@ func (p KeyCloakActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.Ac
 	_, span := otel.GetTracerProvider().Tracer(tracerName).Start(ctx.Context(), "agent.kcagent.deploy")
 	defer span.End()
 
-	clientIDSlug := generateClientID()
-
-	// create Keycloak client for API access
-	participantContextID := clientIDSlug
-
-	apiClient, err := newKeycloakClientData(participantContextID, WithClientID(participantContextID), WithName("API Access Client"), WithDescription("Client for accessing the VPA's Administration APIs"), WithEnabled(true))
-	if err != nil {
-		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}
+	pcId, ok := ctx.Value(participantContextIDKey)
+	if !ok {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("participant context ID not found in activity context")}
 	}
-	apiClientResult := p.provisionConfidentialClient(apiClient, ctx)
-	span.AddEvent("API client created")
-	p.monitor.Debugf("created API Access client: %s", apiClient.ClientId)
-	ctx.SetValue(apiAccessClientIDKey, apiClient.ClientId)
-	ctx.SetOutputValue(participantContextIDKey, participantContextID)
-	span.SetAttributes(attribute.String("api.client.id", apiClient.ClientId), attribute.String(participantContextIDKey, participantContextID))
 
-	if apiClientResult.Result != api.ActivityResultComplete {
-		p.monitor.Warnw("Provisioning API Access client not complete. Result was %s, error: %s", apiClientResult.Result, apiClientResult.Error)
-		return apiClientResult
-	}
+	participantContextID := pcId.(string)
 
 	// create a Vault access client in Keycloak
-	vaultAccessClientID := clientIDSlug + "-vault"
+	vaultAccessClientID := participantContextID + "-vault"
 	vaultAccessClient, err := newKeycloakClientData(participantContextID, WithClientID(vaultAccessClientID), WithName("Vault Access Client"), WithDescription("Client for Vault to access Keycloak"), WithEnabled(true))
 	if err != nil {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}
@@ -251,30 +218,17 @@ func (p KeyCloakActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.Ac
 }
 
 func (p KeyCloakActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.ActivityResult {
-	apiAccessID := ctx.Values()[apiAccessClientIDKey].(string)
 	vaultAccessID := ctx.Values()[vaultAccessClientIDKey].(string)
-	if vaultAccessID != "" && apiAccessID != "" {
+	if vaultAccessID != "" {
 		vaultErr := p.deleteClient(ctx.Context(), vaultAccessID)
 		p.monitor.Debugf("deleted Vault Access client: %s", vaultAccessID)
-		apiErr := p.deleteClient(ctx.Context(), apiAccessID)
-		p.monitor.Debugf("deleted API Access client: %s", apiAccessID)
 
-		var errors []error
 		if vaultErr != nil {
-			errors = append(errors, vaultErr)
-		}
-		if apiErr != nil {
-			errors = append(errors, apiErr)
-		}
-		if len(errors) > 0 {
-			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("could not roll back Keycloak clients: %v", errors)}
+			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("could not roll back Keycloak clients: %v", vaultErr)}
 		}
 		return api.ActivityResult{Result: api.ActivityResultComplete}
 	}
 
-	if apiAccessID == "" {
-		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("could not roll back Keycloak API access client: the '%s' output value is not set", apiAccessClientIDKey)}
-	}
 	// implicitly, vaultAccessID is empty
 	return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("could not roll back Keycloak vault access client: the '%s' output value is not set", vaultAccessClientIDKey)}
 
