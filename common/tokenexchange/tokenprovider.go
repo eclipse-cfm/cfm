@@ -15,20 +15,15 @@
 package tokenexchange
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
 )
-
-type tokenExchangeRequest struct {
-	GrantType    string `json:"grant_type"`
-	SubjectToken string `json:"subject_token"`
-	Resource     string `json:"resource"`
-	Scope        string `json:"scope"`
-	Audience     string `json:"audience"`
-}
 
 type tokenExchangeResponse struct {
 	AccessToken     string `json:"access_token"`
@@ -48,43 +43,78 @@ type TokenExchangeProvider struct {
 	httpClient            *http.Client
 }
 
-func NewTokenExchangeProvider(filename string) TokenExchangeProvider {
-	return TokenExchangeProvider{
-		filePath: filename,
+// ProviderOption is a functional option for configuring TokenExchangeProvider
+type ProviderOption func(*TokenExchangeProvider)
+
+// WithTokenExchangeUrl sets the URL of the token exchange server (jwtlet)
+func WithTokenExchangeUrl(url string) ProviderOption {
+	return func(t *TokenExchangeProvider) {
+		t.tokenExchangeUrl = url
 	}
 }
 
-func (t TokenExchangeProvider) GetToken(ctx context.Context) (string, error) {
+// WithTokenExchangeAudience sets the token exchange audience (e.g. "edcv"). all downstream services must validate against this audience
+func WithTokenExchangeAudience(audience string) ProviderOption {
+	return func(t *TokenExchangeProvider) {
+		t.tokenExchangeAudience = audience
+	}
+}
+
+// WithHttpClient sets the HTTP client
+func WithHttpClient(client *http.Client) ProviderOption {
+	return func(t *TokenExchangeProvider) {
+		t.httpClient = client
+	}
+}
+
+// NewTokenExchangeProvider creates a new TokenExchangeProvider with the given token file path and options
+// tokenFilePath: the absolute path to the file that contains the token
+func NewTokenExchangeProvider(tokenFilePath string, opts ...ProviderOption) TokenExchangeProvider {
+	provider := TokenExchangeProvider{
+		filePath: tokenFilePath,
+	}
+	for _, opt := range opts {
+		opt(&provider)
+	}
+	return provider
+}
+
+func (t TokenExchangeProvider) GetToken(ctx context.Context, scope string, participantIdentifier string) (string, error) {
 	content, err := os.ReadFile(t.filePath)
 	if err != nil {
 		return "", err
 	}
 
-	body := tokenExchangeRequest{
-		GrantType:    "urn:ietf:params:oauth:grant-type:token-exchange",
-		SubjectToken: string(content),
-		Resource:     "did:web:foobar",
-		Scope:        "read write",
-		Audience:     t.tokenExchangeAudience,
-	}
+	formData := url.Values{}
+	formData.Set("grant_type", "urn:ietf:params:oauth:grant-type:token-exchange")
+	formData.Set("subject_token", string(content))
+	formData.Set("resource", participantIdentifier)
+	formData.Set("scope", scope)
+	formData.Set("audience", t.tokenExchangeAudience)
 
-	jsonBody, err := json.Marshal(body)
+	req, err := http.NewRequestWithContext(ctx, "POST", t.tokenExchangeUrl+"/token", strings.NewReader(formData.Encode()))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error creating token exchange request: %w", err)
 	}
-	req, _ := http.NewRequestWithContext(ctx, "POST", t.tokenExchangeUrl, bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := t.httpClient.Do(req)
-
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error sending token exchange request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	var tokenResponse tokenExchangeResponse
-	err = json.NewDecoder(resp.Body).Decode(&tokenResponse)
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("token exchange failed with status %d", resp.StatusCode)
+	}
+	var tokenResponse tokenExchangeResponse
+	err = json.Unmarshal(bodyBytes, &tokenResponse)
+	if err != nil {
+		return "", fmt.Errorf("error decoding token exchange response: %w", err)
 	}
 
 	return tokenResponse.AccessToken, nil

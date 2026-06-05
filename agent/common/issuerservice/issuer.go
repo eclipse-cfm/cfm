@@ -26,6 +26,11 @@ import (
 	"github.com/eclipse-cfm/cfm/common/token"
 )
 
+const (
+	ScopeApiRead  = "issuer-admin-api:read"
+	ScopeApiWrite = "issuer-admin-api:write"
+)
+
 // IssuerCredentialResourceDto represents a DTO for verifiable credentials that the IssuerService has issued to holders.
 // note that these DTOs are simplified representations of the actual verifiable credentials and NEVER include the actual
 // signed credential
@@ -51,7 +56,7 @@ type HttpApiClient struct {
 }
 
 func (i HttpApiClient) QueryCredentialsByType(ctx context.Context, holderID string, credentialType string) ([]IssuerCredentialResourceDto, error) {
-	accessToken, err := i.TokenProvider.GetToken(ctx)
+	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiRead, holderID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -105,7 +110,7 @@ func (i HttpApiClient) QueryCredentialsByType(ctx context.Context, holderID stri
 }
 
 func (i HttpApiClient) DeleteHolder(ctx context.Context, holderID string) error {
-	accessToken, err := i.TokenProvider.GetToken(ctx)
+	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiWrite, holderID)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -134,7 +139,7 @@ func (i HttpApiClient) DeleteHolder(ctx context.Context, holderID string) error 
 }
 
 func (i HttpApiClient) CreateHolder(ctx context.Context, did string, holderID string, name string, properties map[string]any) error {
-	accessToken, err := i.TokenProvider.GetToken(ctx)
+	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiWrite, holderID)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -180,7 +185,7 @@ func (i HttpApiClient) CreateHolder(ctx context.Context, did string, holderID st
 }
 
 func (i HttpApiClient) RevokeCredential(ctx context.Context, participantContextID string, credentialID string) error {
-	accessToken, err := i.TokenProvider.GetToken(ctx)
+	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiWrite, participantContextID)
 	if err != nil {
 		return err
 	}

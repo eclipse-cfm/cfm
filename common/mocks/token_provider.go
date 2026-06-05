@@ -22,7 +22,7 @@ func (_m *MockTokenProvider) EXPECT() *MockTokenProvider_Expecter {
 }
 
 // GetToken provides a mock function with given fields: ctx
-func (_m *MockTokenProvider) GetToken(ctx context.Context) (string, error) {
+func (_m *MockTokenProvider) GetToken(ctx context.Context, scope string, participantContextId string) (string, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
