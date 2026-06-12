@@ -17,7 +17,9 @@ package token
 import "context"
 
 // TokenProvider gets tokens, most likely access tokens, API Keys, OAuth2 tokens, etc.
+// scope is a string that describes the intended use of the token, for example, "identity-api:read"
+// participantId is a string that identifies the participant for which the token is intended. Most likely, this is the participant's DID
 type TokenProvider interface {
-	GetToken(ctx context.Context) (string, error)
+	GetToken(ctx context.Context, scope string, participantId string) (string, error)
 	// todo: implement refresh
 }

@@ -27,13 +27,13 @@ import (
 )
 
 const (
-	CreateParticipantURL = "/v1beta/participants"
-)
-
-const (
+	CreateParticipantURL          = "/v1beta/participants"
 	CredentialRequestStateCreated = "CREATED"
 	CredentialRequestStateIssued  = "ISSUED"
 	CredentialRequestStateError   = "ERROR"
+	ScopeApiRead                  = "read"
+	ScopeApiWrite                 = "write"
+	ScopeApiAdmin                 = "admin"
 )
 
 type IdentityAPIClient interface {
@@ -51,7 +51,7 @@ type HttpIdentityAPIClient struct {
 }
 
 func (a HttpIdentityAPIClient) DeleteParticipantContext(ctx context.Context, participantContextID string) error {
-	accessToken, err := a.TokenProvider.GetToken(ctx)
+	accessToken, err := a.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -80,7 +80,7 @@ func (a HttpIdentityAPIClient) DeleteParticipantContext(ctx context.Context, par
 
 func (a HttpIdentityAPIClient) QueryCredentialByType(ctx context.Context, participantContextID string, credentialType string) ([]common.VerifiableCredentialResource, error) {
 
-	accessToken, err := a.TokenProvider.GetToken(ctx)
+	accessToken, err := a.TokenProvider.GetToken(ctx, ScopeApiRead, participantContextID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -114,7 +114,7 @@ func (a HttpIdentityAPIClient) QueryCredentialByType(ctx context.Context, partic
 }
 
 func (a HttpIdentityAPIClient) RequestCredentials(ctx context.Context, participantContextID string, credentialRequest CredentialRequest) (string, error) {
-	accessToken, err := a.TokenProvider.GetToken(ctx) // this should be the participant context's access token!
+	accessToken, err := a.TokenProvider.GetToken(ctx, ScopeApiWrite, participantContextID) // this should be the participant context's access token!
 	if err != nil {
 		return "", fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -151,7 +151,7 @@ func (a HttpIdentityAPIClient) RequestCredentials(ctx context.Context, participa
 }
 
 func (a HttpIdentityAPIClient) GetCredentialRequestState(ctx context.Context, participantContextID string, credentialRequestID string) (string, error) {
-	accessToken, err := a.TokenProvider.GetToken(ctx)
+	accessToken, err := a.TokenProvider.GetToken(ctx, ScopeApiRead, participantContextID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -190,7 +190,7 @@ func (a HttpIdentityAPIClient) GetCredentialRequestState(ctx context.Context, pa
 }
 
 func (a HttpIdentityAPIClient) CreateParticipantContext(ctx context.Context, manifest ParticipantManifest) (*CreateParticipantContextResponse, error) {
-	accessToken, err := a.TokenProvider.GetToken(ctx)
+	accessToken, err := a.TokenProvider.GetToken(ctx, ScopeApiAdmin, manifest.ParticipantContextID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get API access token: %w", err)
 	}

@@ -20,9 +20,9 @@ import (
 	"github.com/eclipse-cfm/cfm/assembly/httpclient"
 	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
 	"github.com/eclipse-cfm/cfm/assembly/vault"
-	"github.com/eclipse-cfm/cfm/common/oauth2"
 	"github.com/eclipse-cfm/cfm/common/runtime"
 	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/common/tokenexchange"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/eclipse-cfm/cfm/pmanager/natsagent"
 )
@@ -37,6 +37,9 @@ const (
 	identityHubCredentialServiceURLKey = "identityhub.cs.url"
 	controlPlaneProtocolURLKey         = "controlplane.protocol.url"
 	controlPlaneDataServiceURLKey      = "controlplane.dataservice.url"
+	tokenExchangeURLKey                = "tokenexchange.url"
+	tokenFilePathKey                   = "tokenexchange.tokenFilePath"
+	audienceKey                        = "tokenexchange.audience"
 )
 
 func LaunchAndWaitSignal(shutdown <-chan struct{}) {
@@ -67,13 +70,10 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 				panic(err)
 			}
 
-			provider := oauth2.NewTokenProvider(
-				oauth2.Oauth2Params{
-					ClientID:     clientID,
-					ClientSecret: clientSecret,
-					TokenURL:     tokenURL,
-					GrantType:    oauth2.ClientCredentials,
-				}, &httpClient)
+			provider := tokenexchange.NewTokenExchangeProvider(ctx.Config.GetString(tokenFilePathKey),
+				tokenexchange.WithTokenExchangeUrl(ctx.Config.GetString(tokenExchangeURLKey)),
+				tokenexchange.WithTokenExchangeAudience(ctx.Config.GetString(audienceKey)),
+				tokenexchange.WithHttpClient(&httpClient))
 
 			return activity.NewProcessor(&activity.Config{
 				VaultClient: vaultClient,

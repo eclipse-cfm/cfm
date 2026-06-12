@@ -41,6 +41,7 @@ func TestRegistrationActivityProcessor_MinimalValidData(t *testing.T) {
 	}
 
 	processingData := map[string]any{
+		"participantContextId":      "some-context-id",
 		model.ParticipantIdentifier: "did:web:someparticipant",
 		model.VPAData:               validVpaData(nil),
 	}
@@ -72,6 +73,7 @@ func TestRegistrationActivityProcessor_FullValidData(t *testing.T) {
 	}
 
 	processingData := map[string]any{
+		"participantContextId":       "some-context-id",
 		model.ParticipantIdentifier:  "did:web:someparticipant",
 		"cfm.participant.holdername": "some holder",
 		model.VPAData:                validVpaData(nil),
@@ -130,6 +132,7 @@ func TestRegistrationActivityProcessor_IssuerServiceFails(t *testing.T) {
 	}
 
 	processingData := map[string]any{
+		"participantContextId":      "some-context-id",
 		model.ParticipantIdentifier: "did:web:someparticipant",
 		model.VPAData:               validVpaData(nil),
 	}
@@ -150,6 +153,7 @@ func TestRegistrationActivityProcessor_VpaDataMissing(t *testing.T) {
 	})
 
 	processingData := map[string]any{
+		"participantContextId":      "some-context-id",
 		model.ParticipantIdentifier: "did:web:someparticipant",
 	}
 
@@ -165,6 +169,29 @@ func TestRegistrationActivityProcessor_VpaDataMissing(t *testing.T) {
 	assert.NoError(t, result.Error)
 }
 
+func TestRegistrationActivityProcessor_ParticipantContextIDMissing(t *testing.T) {
+	issuerService := MockIssuerService{}
+	processor := NewProcessor(&Config{
+		LogMonitor:    system.NoopMonitor{},
+		IssuerService: &issuerService,
+	})
+
+	processingData := map[string]any{
+		model.ParticipantIdentifier: "did:web:someparticipant",
+	}
+
+	activityContext := api.NewActivityContext(context.Background(), "orch-123", api.Activity{
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DeployDiscriminator,
+	}, processingData, make(map[string]any))
+
+	result := processor.ProcessDeploy(activityContext)
+
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
+	assert.Error(t, result.Error)
+}
+
 func TestRegistrationActivityProcessor_VpaDataEmptySlice(t *testing.T) {
 	issuerService := MockIssuerService{}
 	processor := NewProcessor(&Config{
@@ -173,6 +200,7 @@ func TestRegistrationActivityProcessor_VpaDataEmptySlice(t *testing.T) {
 	})
 
 	processingData := map[string]any{
+		"participantContextId":      "some-context-id",
 		model.ParticipantIdentifier: "did:web:someparticipant",
 		model.VPAData:               []any{},
 	}
@@ -197,6 +225,7 @@ func TestRegistrationActivityProcessor_VpaDataTypeMismatch(t *testing.T) {
 	})
 
 	processingData := map[string]any{
+		"participantContextId":      "some-context-id",
 		model.ParticipantIdentifier: "did:web:someparticipant",
 		model.VPAData: []any{
 			map[string]any{
@@ -226,6 +255,7 @@ func TestRegistrationActivityProcessor_VpaDataPropertiesPassedToIssuerService(t 
 
 	props := map[string]any{"region": "eu-west", "tier": "standard"}
 	processingData := map[string]any{
+		"participantContextId":      "some-context-id",
 		model.ParticipantIdentifier: "did:web:someparticipant",
 		model.VPAData:               validVpaData(props),
 	}
@@ -252,6 +282,7 @@ func TestRegistrationActivityProcessor_VpaDataNoProperties(t *testing.T) {
 	})
 
 	processingData := map[string]any{
+		"participantContextId":      "some-context-id",
 		model.ParticipantIdentifier: "did:web:someparticipant",
 		model.VPAData: []any{
 			map[string]any{
@@ -290,6 +321,7 @@ func TestRegistrationActivityProcessor_ProcessDispose(t *testing.T) {
 	}
 
 	processingData := map[string]any{
+		"participantContextId":      "some-context-id",
 		model.ParticipantIdentifier: "did:web:someparticipant",
 	}
 
@@ -318,6 +350,7 @@ func TestRegistrationActivityProcessor_ProcessDispose_IssuerServiceFails(t *test
 	}
 
 	processingData := map[string]any{
+		"participantContextId":      "some-context-id",
 		model.ParticipantIdentifier: "did:web:someparticipant",
 	}
 
@@ -357,7 +390,7 @@ func (m *MockIssuerService) QueryCredentialsByType(ctx context.Context, particip
 	return nil, nil
 }
 
-func (m *MockIssuerService) DeleteHolder(ctx context.Context, holderID string) error {
+func (m *MockIssuerService) DeleteHolder(ctx context.Context, participantContextID string, holderID string) error {
 	return m.expectedError
 }
 
@@ -365,7 +398,7 @@ func (m *MockIssuerService) RevokeCredential(ctx context.Context, participantCon
 	return nil
 }
 
-func (m *MockIssuerService) CreateHolder(ctx context.Context, did string, holderID string, name string, properties map[string]any) error {
+func (m *MockIssuerService) CreateHolder(ctx context.Context, participantContextID string, did string, holderID string, name string, properties map[string]any) error {
 	m.recorded.did = did
 	m.recorded.holderID = holderID
 	m.recorded.name = name
