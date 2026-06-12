@@ -26,6 +26,12 @@ import (
 	"github.com/eclipse-cfm/cfm/common/token"
 )
 
+const (
+	ScopeApiRead  = "read"
+	ScopeApiWrite = "write"
+	ScopeApiAdmin = "admin"
+)
+
 // IssuerCredentialResourceDto represents a DTO for verifiable credentials that the IssuerService has issued to holders.
 // note that these DTOs are simplified representations of the actual verifiable credentials and NEVER include the actual
 // signed credential
@@ -37,8 +43,8 @@ type IssuerCredentialResourceDto struct {
 }
 
 type ApiClient interface {
-	CreateHolder(ctx context.Context, did string, holderID string, name string, properties map[string]any) error
-	DeleteHolder(ctx context.Context, holderID string) error
+	CreateHolder(ctx context.Context, participantContextID string, did string, holderID string, name string, properties map[string]any) error
+	DeleteHolder(ctx context.Context, participantContextID string, holderID string) error
 	RevokeCredential(ctx context.Context, participantContextID string, credentialID string) error
 	QueryCredentialsByType(ctx context.Context, participantContextID string, credentialType string) ([]IssuerCredentialResourceDto, error)
 }
@@ -51,7 +57,7 @@ type HttpApiClient struct {
 }
 
 func (i HttpApiClient) QueryCredentialsByType(ctx context.Context, holderID string, credentialType string) ([]IssuerCredentialResourceDto, error) {
-	accessToken, err := i.TokenProvider.GetToken(ctx)
+	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiRead, holderID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -104,8 +110,8 @@ func (i HttpApiClient) QueryCredentialsByType(ctx context.Context, holderID stri
 	return credentials, nil
 }
 
-func (i HttpApiClient) DeleteHolder(ctx context.Context, holderID string) error {
-	accessToken, err := i.TokenProvider.GetToken(ctx)
+func (i HttpApiClient) DeleteHolder(ctx context.Context, participantContextID string, holderID string) error {
+	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -133,8 +139,8 @@ func (i HttpApiClient) DeleteHolder(ctx context.Context, holderID string) error 
 	return nil
 }
 
-func (i HttpApiClient) CreateHolder(ctx context.Context, did string, holderID string, name string, properties map[string]any) error {
-	accessToken, err := i.TokenProvider.GetToken(ctx)
+func (i HttpApiClient) CreateHolder(ctx context.Context, participantContextID string, did string, holderID string, name string, properties map[string]any) error {
+	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -180,7 +186,7 @@ func (i HttpApiClient) CreateHolder(ctx context.Context, did string, holderID st
 }
 
 func (i HttpApiClient) RevokeCredential(ctx context.Context, participantContextID string, credentialID string) error {
-	accessToken, err := i.TokenProvider.GetToken(ctx)
+	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiWrite, participantContextID)
 	if err != nil {
 		return err
 	}

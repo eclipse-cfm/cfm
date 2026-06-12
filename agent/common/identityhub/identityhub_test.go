@@ -77,7 +77,7 @@ func TestIdentityAPIClient_CreateParticipantContext(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
 	client := HttpIdentityAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -100,7 +100,7 @@ func TestIdentityAPIClient_CreateParticipantContext(t *testing.T) {
 
 func TestIdentityAPIClient_AuthError(t *testing.T) {
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("", fmt.Errorf("test error"))
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("", fmt.Errorf("test error"))
 	client := HttpIdentityAPIClient{
 		BaseURL:       "http://foo.bar",
 		TokenProvider: tp,
@@ -128,7 +128,7 @@ func TestIdentityAPIClient_BadRequest(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
 	client := HttpIdentityAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -161,7 +161,7 @@ func TestHttpIdentityAPIClient_DeleteParticipantContext(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
 	client := HttpIdentityAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -180,7 +180,7 @@ func TestHttpIdentityAPIClient_DeleteParticipantContext_NotFound(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
 	client := HttpIdentityAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,

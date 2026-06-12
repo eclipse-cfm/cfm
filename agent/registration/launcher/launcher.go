@@ -19,9 +19,9 @@ import (
 	"github.com/eclipse-cfm/cfm/agent/registration/activity"
 	"github.com/eclipse-cfm/cfm/assembly/httpclient"
 	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
-	"github.com/eclipse-cfm/cfm/common/oauth2"
 	"github.com/eclipse-cfm/cfm/common/runtime"
 	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/common/tokenexchange"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/eclipse-cfm/cfm/pmanager/natsagent"
 )
@@ -30,9 +30,11 @@ const (
 	ActivityType            = "registration-activity"
 	clientIDKey             = "keycloak.clientID"
 	clientSecretKey         = "keycloak.clientSecret"
-	tokenURLKey             = "keycloak.tokenUrl"
 	issuerServiceBaseUrlKey = "issuerservice.url"
 	issuerIDKey             = "issuer.id"
+	tokenExchangeURLKey     = "tokenexchange.url"
+	tokenFilePathKey        = "tokenexchange.tokenFilePath"
+	audienceKey             = "tokenexchange.audience"
 )
 
 func LaunchAndWaitSignal(shutdown <-chan struct{}) {
@@ -50,7 +52,6 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 			httpClient := ctx.Registry.Resolve(serviceapi.HttpClientKey).(http.Client)
 			clientID := ctx.Config.GetString(clientIDKey)
 			clientSecret := ctx.Config.GetString(clientSecretKey)
-			tokenURL := ctx.Config.GetString(tokenURLKey) // this may be nil or "" if the in-mem vault is used
 			issuerServiceBaseUrl := ctx.Config.GetString(issuerServiceBaseUrlKey)
 			issuerID := ctx.Config.GetString(issuerIDKey)
 
@@ -58,13 +59,10 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 				panic(err)
 			}
 
-			provider := oauth2.NewTokenProvider(
-				oauth2.Oauth2Params{
-					ClientID:     clientID,
-					ClientSecret: clientSecret,
-					TokenURL:     tokenURL,
-					GrantType:    oauth2.ClientCredentials,
-				}, &httpClient)
+			provider := tokenexchange.NewTokenExchangeProvider(ctx.Config.GetString(tokenFilePathKey),
+				tokenexchange.WithTokenExchangeUrl(ctx.Config.GetString(tokenExchangeURLKey)),
+				tokenexchange.WithTokenExchangeAudience(ctx.Config.GetString(audienceKey)),
+				tokenexchange.WithHttpClient(&httpClient))
 			return activity.NewProcessor(&activity.Config{
 				LogMonitor: ctx.Monitor,
 				IssuerService: issuerservice.HttpApiClient{

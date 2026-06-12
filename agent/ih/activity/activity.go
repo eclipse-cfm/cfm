@@ -53,7 +53,7 @@ type IdentityHubActivityProcessor struct {
 type ihData struct {
 	ParticipantID        string `json:"cfm.participant.id" validate:"required"`
 	VaultAccessClientID  string `json:"clientID.vaultAccess" validate:"required"`
-	ApiAccessClientID    string `json:"clientID.apiAccess" validate:"required"`
+	ParticipantContextId string `json:"participantContextId" validate:"required"`
 	CredentialServiceURL string `json:"cfm.participant.credentialservice"`
 	ProtocolServiceURL   string `json:"cfm.participant.protocolservice"`
 	DataServiceURL       string `json:"cfm.participant.dataservice"`
@@ -96,7 +96,7 @@ func (p IdentityHubActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing IH activity for orchestration %s: %w", ctx.OID(), err)}
 	}
 
-	participantContextId := data.ApiAccessClientID
+	participantContextId := data.ParticipantContextId
 	span.SetAttributes(attribute.String("cfm.participantContextId", participantContextId))
 	return p.handleDeployAction(ctx, data, participantContextId)
 }
@@ -106,7 +106,7 @@ func (p IdentityHubActivityProcessor) ProcessDispose(ctx api.ActivityContext) ap
 	if err := ctx.ReadValues(&data); err != nil {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing IH activity for orchestration %s: %w", ctx.OID(), err)}
 	}
-	return p.handleDisposeAction(ctx.Context(), data.ApiAccessClientID)
+	return p.handleDisposeAction(ctx.Context(), data.ParticipantContextId)
 }
 
 // handleDeployAction creates the participant context in IdentityHub and stores the returned STSClientID

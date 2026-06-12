@@ -58,10 +58,10 @@ func NewTokenProvider(params Oauth2Params, client *http.Client) *TokenProvider {
 }
 
 // GetToken gets an OAuth2 token using the grant type specified in the Oauth2Params
-func (t *TokenProvider) GetToken(ctx context.Context) (string, error) {
+func (t *TokenProvider) GetToken(ctx context.Context, scope string, participantContextId string) (string, error) {
 	switch t.tokenParams.GrantType {
 	case "client_credentials":
-		return t.getClientCredentialsToken(ctx)
+		return t.getClientCredentialsToken(ctx, scope)
 	case "password":
 		return t.getPasswordCredentialsToken(ctx)
 	default:
@@ -69,7 +69,7 @@ func (t *TokenProvider) GetToken(ctx context.Context) (string, error) {
 	}
 }
 
-func (t *TokenProvider) getClientCredentialsToken(ctx context.Context) (string, error) {
+func (t *TokenProvider) getClientCredentialsToken(ctx context.Context, scope string) (string, error) {
 	tokenURL := t.tokenParams.TokenURL
 	clientID := t.tokenParams.ClientID
 	clientSecret := t.tokenParams.ClientSecret
@@ -79,7 +79,7 @@ func (t *TokenProvider) getClientCredentialsToken(ctx context.Context) (string, 
 		return "", err
 	}
 
-	formData := fmt.Sprintf("client_id=%s&client_secret=%s&grant_type=%s", clientID, clientSecret, ClientCredentials)
+	formData := fmt.Sprintf("client_id=%s&client_secret=%s&grant_type=%s&scope=%s", clientID, clientSecret, ClientCredentials, scope)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, strings.NewReader(formData))
 	if err != nil {

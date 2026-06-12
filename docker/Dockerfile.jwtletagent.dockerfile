@@ -21,13 +21,13 @@ RUN go mod download
 
 COPY . .
 
-# Build the server binary
+# Build the agent binary
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    go build -ldflags="-s -w" -o bin/testagent ./e2e/testagent/main.go
+    go build -ldflags="-s -w" -o bin/jwtletagent ./agent/jwtlet-agent/cmd/server/main.go
 
 # Production stage
 FROM gcr.io/distroless/static-debian12:nonroot
 
-COPY --from=builder /app/bin/testagent /testagent
+COPY --from=builder /app/bin/jwtletagent /jwtletagent
 
-ENTRYPOINT ["/testagent"]
+ENTRYPOINT ["/jwtletagent"]

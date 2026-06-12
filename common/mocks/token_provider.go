@@ -21,9 +21,9 @@ func (_m *MockTokenProvider) EXPECT() *MockTokenProvider_Expecter {
 	return &MockTokenProvider_Expecter{mock: &_m.Mock}
 }
 
-// GetToken provides a mock function with given fields: ctx
-func (_m *MockTokenProvider) GetToken(ctx context.Context) (string, error) {
-	ret := _m.Called(ctx)
+// GetToken provides a mock function with given fields: ctx, scope, participantId
+func (_m *MockTokenProvider) GetToken(ctx context.Context, scope string, participantId string) (string, error) {
+	ret := _m.Called(ctx, scope, participantId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetToken")
@@ -31,17 +31,17 @@ func (_m *MockTokenProvider) GetToken(ctx context.Context) (string, error) {
 
 	var r0 string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (string, error)); ok {
-		return rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (string, error)); ok {
+		return rf(ctx, scope, participantId)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) string); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) string); ok {
+		r0 = rf(ctx, scope, participantId)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, scope, participantId)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -56,13 +56,15 @@ type MockTokenProvider_GetToken_Call struct {
 
 // GetToken is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockTokenProvider_Expecter) GetToken(ctx interface{}) *MockTokenProvider_GetToken_Call {
-	return &MockTokenProvider_GetToken_Call{Call: _e.mock.On("GetToken", ctx)}
+//   - scope string
+//   - participantId string
+func (_e *MockTokenProvider_Expecter) GetToken(ctx interface{}, scope interface{}, participantId interface{}) *MockTokenProvider_GetToken_Call {
+	return &MockTokenProvider_GetToken_Call{Call: _e.mock.On("GetToken", ctx, scope, participantId)}
 }
 
-func (_c *MockTokenProvider_GetToken_Call) Run(run func(ctx context.Context)) *MockTokenProvider_GetToken_Call {
+func (_c *MockTokenProvider_GetToken_Call) Run(run func(ctx context.Context, scope string, participantId string)) *MockTokenProvider_GetToken_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -72,7 +74,7 @@ func (_c *MockTokenProvider_GetToken_Call) Return(_a0 string, _a1 error) *MockTo
 	return _c
 }
 
-func (_c *MockTokenProvider_GetToken_Call) RunAndReturn(run func(context.Context) (string, error)) *MockTokenProvider_GetToken_Call {
+func (_c *MockTokenProvider_GetToken_Call) RunAndReturn(run func(context.Context, string, string) (string, error)) *MockTokenProvider_GetToken_Call {
 	_c.Call.Return(run)
 	return _c
 }

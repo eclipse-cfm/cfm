@@ -53,7 +53,7 @@ func TestHttpApiClient_CreateHolder(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("test token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
 	client := HttpApiClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -61,14 +61,14 @@ func TestHttpApiClient_CreateHolder(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.CreateHolder(t.Context(), "did:web:test-participant", "did:web:test-participant", "test holder", nil)
+	err := client.CreateHolder(t.Context(), "test-context-id", "did:web:test-participant", "did:web:test-participant", "test holder", nil)
 	require.NoError(t, err)
 }
 
 func TestHttpApiClient_CreateHolder_AuthError(t *testing.T) {
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("", fmt.Errorf("test error"))
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("", fmt.Errorf("test error"))
 	client := HttpApiClient{
 		BaseURL:       "http://foo.bar",
 		TokenProvider: tp,
@@ -76,7 +76,7 @@ func TestHttpApiClient_CreateHolder_AuthError(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.CreateHolder(t.Context(), "did:web:test-participant", "did:web:test-participant", "test holder", nil)
+	err := client.CreateHolder(t.Context(), "test-context-id", "did:web:test-participant", "did:web:test-participant", "test holder", nil)
 	require.ErrorContains(t, err, "test error")
 }
 
@@ -94,7 +94,7 @@ func TestHttpApiClient_CreateHolder_ApiReturnsError(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("test token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
 	client := HttpApiClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -102,7 +102,7 @@ func TestHttpApiClient_CreateHolder_ApiReturnsError(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.CreateHolder(t.Context(), "did:web:test-participant", "did:web:test-participant", "test holder", nil)
+	err := client.CreateHolder(t.Context(), "", "did:web:test-participant", "did:web:test-participant", "test holder", nil)
 	require.ErrorContains(t, err, "failed to create Holder")
 }
 
@@ -119,7 +119,7 @@ func TestHttpApiClient_RevokeCredential(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("test token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
 	client := HttpApiClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -144,7 +144,7 @@ func TestHttpApiClient_RevokeCredential_ClientError(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("test token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
 	client := HttpApiClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -169,7 +169,7 @@ func TestHttpApiClient_RevokeCredential_NotFound(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("test token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
 	client := HttpApiClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -194,7 +194,7 @@ func TestHttpApiClient_DeleteHolder(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("test token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
 	client := HttpApiClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -202,7 +202,7 @@ func TestHttpApiClient_DeleteHolder(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.DeleteHolder(t.Context(), "did:web:test-participant")
+	err := client.DeleteHolder(t.Context(), "", "did:web:test-participant")
 	require.NoError(t, err)
 }
 
@@ -219,7 +219,7 @@ func TestHttpApiClient_DeleteHolder_NotFound(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("test token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
 	client := HttpApiClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -227,7 +227,7 @@ func TestHttpApiClient_DeleteHolder_NotFound(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.DeleteHolder(t.Context(), "did:web:test-participant")
+	err := client.DeleteHolder(t.Context(), "", "did:web:test-participant")
 	require.ErrorContains(t, err, "received status code 404")
 }
 
@@ -244,7 +244,7 @@ func TestHttpApiClient_DeleteHolder_AuthError(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("test token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
 	client := HttpApiClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -252,7 +252,7 @@ func TestHttpApiClient_DeleteHolder_AuthError(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.DeleteHolder(t.Context(), "did:web:test-participant")
+	err := client.DeleteHolder(t.Context(), "", "did:web:test-participant")
 	require.ErrorContains(t, err, "received status code 401")
 }
 
@@ -296,7 +296,7 @@ func TestHttpApiClient_QueryCredentialsByType(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("test token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
 	client := HttpApiClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -313,7 +313,7 @@ func TestHttpApiClient_QueryCredentialsByType(t *testing.T) {
 
 func TestHttpApiClient_QueryCredentialsByType_AuthError(t *testing.T) {
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("", fmt.Errorf("auth error"))
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("", fmt.Errorf("auth error"))
 	client := HttpApiClient{
 		BaseURL:       "http://foo.bar",
 		TokenProvider: tp,
@@ -339,7 +339,7 @@ func TestHttpApiClient_QueryCredentialsByType_ApiReturnsError(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("test token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
 	client := HttpApiClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -367,7 +367,7 @@ func TestHttpApiClient_QueryCredentialsByType_InvalidJson(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("test token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
 	client := HttpApiClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
