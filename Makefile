@@ -103,6 +103,7 @@ test: install-gotestsum
 	$(MAKE) -C $(PMANAGER_DIR) test
 	$(MAKE) -C $(TMANAGER_DIR) test
 	$(MAKE) -C $(EDCV_DIR) test
+	$(MAKE) -C $(JWTLET_AGENT_DIR) test
 	$(MAKE) -C $(IH_DIR) test
 	$(MAKE) -C $(E2E_DIR) test
 	$(MAKE) -C $(KEYCLOAK_DIR) test

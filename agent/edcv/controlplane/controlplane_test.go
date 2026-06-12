@@ -145,7 +145,7 @@ func TestCreateParticipant(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
 	client := HttpManagementAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -165,7 +165,7 @@ func TestCreateParticipant(t *testing.T) {
 
 func TestCreateParticipant_AuthError(t *testing.T) {
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("", fmt.Errorf("test error"))
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("", fmt.Errorf("test error"))
 	client := HttpManagementAPIClient{
 		BaseURL:       "http://foo.bar",
 		TokenProvider: tp,
@@ -189,7 +189,7 @@ func TestCreateParticipant_BadRequest(t *testing.T) {
 	}))
 	defer server.Close()
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("test token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
 	client := HttpManagementAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -213,7 +213,7 @@ func TestCreateParticipant_Conflict(t *testing.T) {
 	}))
 	defer server.Close()
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("test token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
 	client := HttpManagementAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -250,7 +250,7 @@ func TestCreateParticipantConfig(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
 	client := HttpManagementAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -269,7 +269,7 @@ func TestCreateParticipantConfig(t *testing.T) {
 
 func TestCreateParticipantConfig_AuthError(t *testing.T) {
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("", fmt.Errorf("test error"))
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("", fmt.Errorf("test error"))
 	client := HttpManagementAPIClient{
 		BaseURL:       "http://foo.bar",
 		TokenProvider: tp,
@@ -292,7 +292,7 @@ func TestCreateParticipantConfig_BadRequest(t *testing.T) {
 	}))
 	defer server.Close()
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("test token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
 	client := HttpManagementAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -315,7 +315,7 @@ func TestCreateParticipantConfig_Conflict(t *testing.T) {
 	}))
 	defer server.Close()
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("test token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
 	client := HttpManagementAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -342,7 +342,7 @@ func TestDeleteParticipant(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
 	client := HttpManagementAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -355,7 +355,7 @@ func TestDeleteParticipant(t *testing.T) {
 
 func TestDeleteParticipant_AuthError(t *testing.T) {
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("", fmt.Errorf("test error"))
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("", fmt.Errorf("test error"))
 	client := HttpManagementAPIClient{
 		BaseURL:       "http://foo.bar",
 		TokenProvider: tp,
@@ -372,7 +372,7 @@ func TestDeleteParticipant_NotFound(t *testing.T) {
 	}))
 	defer server.Close()
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("test token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
 	client := HttpManagementAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -389,7 +389,7 @@ func TestDeleteParticipant_ServerError(t *testing.T) {
 	}))
 	defer server.Close()
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything).Return("test token", nil)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
 	client := HttpManagementAPIClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
