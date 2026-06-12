@@ -17,7 +17,7 @@ package launcher
 import (
 	"net/http"
 
-	"github.com/eclipse-cfm/cfm/agent/jwtlet-agent/activity"
+	"github.com/eclipse-cfm/cfm/agent/jwtletagent/activity"
 	"github.com/eclipse-cfm/cfm/assembly/httpclient"
 	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
 	"github.com/eclipse-cfm/cfm/common/runtime"

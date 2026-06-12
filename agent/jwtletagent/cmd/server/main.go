@@ -15,7 +15,7 @@
 package main
 
 import (
-	"github.com/eclipse-cfm/cfm/agent/jwtlet-agent/launcher"
+	"github.com/eclipse-cfm/cfm/agent/jwtletagent/launcher"
 	"github.com/eclipse-cfm/cfm/common/runtime"
 )
 

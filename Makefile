@@ -14,7 +14,7 @@ IH_DIR=agent/ih
 KEYCLOAK_DIR=agent/keycloak
 REG_DIR=agent/registration
 ONBOARDING_DIR=agent/onboarding
-JWTLET_AGENT_DIR=agent/jwtlet-agent
+JWTLET_AGENT_DIR=agent/jwtletagent
 AGENT_COMMON=agent/common
 KIND_CLUSTER_NAME=edcv
 
