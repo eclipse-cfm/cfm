@@ -27,8 +27,9 @@ import (
 )
 
 const (
-	ScopeApiRead  = "read admin"
-	ScopeApiWrite = "write admin"
+	ScopeApiRead  = "read"
+	ScopeApiWrite = "write"
+	ScopeApiAdmin = "admin"
 )
 
 // IssuerCredentialResourceDto represents a DTO for verifiable credentials that the IssuerService has issued to holders.
@@ -110,7 +111,7 @@ func (i HttpApiClient) QueryCredentialsByType(ctx context.Context, holderID stri
 }
 
 func (i HttpApiClient) DeleteHolder(ctx context.Context, participantContextID string, holderID string) error {
-	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiWrite, participantContextID)
+	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -139,7 +140,7 @@ func (i HttpApiClient) DeleteHolder(ctx context.Context, participantContextID st
 }
 
 func (i HttpApiClient) CreateHolder(ctx context.Context, participantContextID string, did string, holderID string, name string, properties map[string]any) error {
-	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiWrite, participantContextID)
+	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}

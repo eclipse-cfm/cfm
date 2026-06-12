@@ -33,8 +33,9 @@ const (
 	ParticipantContextStateActivated   ParticipantContextState = "ACTIVATED"
 	ParticipantContextStateDeactivated ParticipantContextState = "DEACTIVATED"
 	contextConnector                                           = "https://w3id.org/edc/connector/management/v2"
-	ScopeApiWrite                                              = "write provisioner"
-	ScopeApiRead                                               = "read provisioner"
+	ScopeApiWrite                                              = "write"
+	ScopeApiRead                                               = "read"
+	ScopeApiAdmin                                              = "admin"
 )
 
 type ParticipantContextConfig struct {
@@ -96,7 +97,7 @@ func (h HttpManagementAPIClient) DeleteConfig(ctx context.Context, participantCo
 }
 
 func (h HttpManagementAPIClient) DeleteParticipantContext(ctx context.Context, participantContextID string) error {
-	accessToken, err := h.TokenProvider.GetToken(ctx, ScopeApiWrite, participantContextID)
+	accessToken, err := h.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -125,7 +126,7 @@ func (h HttpManagementAPIClient) DeleteParticipantContext(ctx context.Context, p
 }
 
 func (h HttpManagementAPIClient) CreateParticipantContext(ctx context.Context, manifest ParticipantContext) error {
-	accessToken, err := h.TokenProvider.GetToken(ctx, ScopeApiWrite, manifest.ParticipantContextID)
+	accessToken, err := h.TokenProvider.GetToken(ctx, ScopeApiAdmin, manifest.ParticipantContextID)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -168,7 +169,7 @@ func (h HttpManagementAPIClient) CreateParticipantContext(ctx context.Context, m
 
 func (h HttpManagementAPIClient) CreateConfig(ctx context.Context, participantContextID string, config ParticipantContextConfig) error {
 
-	accessToken, err := h.TokenProvider.GetToken(ctx, ScopeApiWrite, participantContextID)
+	accessToken, err := h.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
