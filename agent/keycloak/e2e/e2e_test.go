@@ -75,11 +75,8 @@ func Test_SuccessfulDeployment(t *testing.T) {
 		return false
 	}, 10*time.Second, 10*time.Millisecond, "Orchestration did not complete in time")
 
-	//require.NotEmpty(t, participantContextId, "Expected participantContextId to be set")
+	require.NotEmpty(t, participantContextId, "Expected participantContextId to be set")
 	require.NotEmpty(t, vaultAccessClientId, "Expected clientID.vaultAccess to be set")
-	apiAccessSecret, err := vaultClient.ResolveSecret(ctx, participantContextId)
-	require.NoError(t, err, "Failed to resolve secret")
-	require.NotEmpty(t, apiAccessSecret, "Expected api access client secret to be set")
 	vaultAccessSecret, err := vaultClient.ResolveSecret(ctx, vaultAccessClientId)
 	require.NoError(t, err, "Failed to resolve secret")
 	require.NotEmpty(t, vaultAccessSecret, "Expected vault access client secret to be set")

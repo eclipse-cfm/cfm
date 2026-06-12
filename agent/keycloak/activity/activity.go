@@ -202,6 +202,7 @@ func (p KeyCloakActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.Ac
 	if inputData.ParticipantContextID == "" {
 		p.monitor.Warnf("participantContextId not found on processing data, generating a random ID")
 		participantContextID = generateClientID()
+		ctx.SetValue(participantContextIDKey, participantContextID)
 	} else {
 		participantContextID = inputData.ParticipantContextID
 	}
