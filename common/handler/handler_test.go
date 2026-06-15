@@ -350,10 +350,10 @@ func TestIsAuthorized(t *testing.T) {
 	})
 
 	t.Run("returns true when all rules pass", func(t *testing.T) {
-		claims := &cfmauth.Claims{Scopes: []string{"read", "write"}, Roles: []string{"admin"}}
+		claims := &cfmauth.Claims{Scopes: []string{"read", "write"}}
 		w := newMockResponseWriter()
 
-		result := handler.IsAuthorized(w, requestWithClaims(claims), RequireScope("read"), RequireRole("admin"))
+		result := handler.IsAuthorized(w, requestWithClaims(claims), RequireScope("read"))
 
 		assert.True(t, result)
 		assert.Equal(t, 0, w.statusCode)
@@ -364,16 +364,6 @@ func TestIsAuthorized(t *testing.T) {
 		w := newMockResponseWriter()
 
 		result := handler.IsAuthorized(w, requestWithClaims(claims), RequireScope("write"))
-
-		assert.False(t, result)
-		assert.Equal(t, http.StatusForbidden, w.statusCode)
-	})
-
-	t.Run("returns false and writes 403 when role rule fails", func(t *testing.T) {
-		claims := &cfmauth.Claims{Scopes: []string{"read"}, Roles: []string{"viewer"}}
-		w := newMockResponseWriter()
-
-		result := handler.IsAuthorized(w, requestWithClaims(claims), RequireScope("read"), RequireRole("admin"))
 
 		assert.False(t, result)
 		assert.Equal(t, http.StatusForbidden, w.statusCode)
@@ -400,26 +390,6 @@ func TestRequireScope(t *testing.T) {
 	t.Run("fails when scope is absent", func(t *testing.T) {
 		rule := RequireScope("write")
 		claims := &cfmauth.Claims{Scopes: []string{"read"}}
-		assert.False(t, rule.check(claims))
-	})
-}
-
-func TestRequireRole(t *testing.T) {
-	t.Run("passes when any of the required roles is present", func(t *testing.T) {
-		rule := RequireRole("admin", "superuser")
-		claims := &cfmauth.Claims{Roles: []string{"superuser"}}
-		assert.True(t, rule.check(claims))
-	})
-
-	t.Run("fails when none of the required roles is present", func(t *testing.T) {
-		rule := RequireRole("admin", "superuser")
-		claims := &cfmauth.Claims{Roles: []string{"viewer"}}
-		assert.False(t, rule.check(claims))
-	})
-
-	t.Run("fails for empty roles", func(t *testing.T) {
-		rule := RequireRole("admin")
-		claims := &cfmauth.Claims{}
 		assert.False(t, rule.check(claims))
 	})
 }

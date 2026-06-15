@@ -37,24 +37,6 @@ func TestHasScope(t *testing.T) {
 	})
 }
 
-func TestHasRole(t *testing.T) {
-	t.Run("returns true when role is present", func(t *testing.T) {
-		c := &Claims{Roles: []string{"admin", "viewer"}}
-		assert.True(t, c.HasRole("admin"))
-		assert.True(t, c.HasRole("viewer"))
-	})
-
-	t.Run("returns false when role is absent", func(t *testing.T) {
-		c := &Claims{Roles: []string{"viewer"}}
-		assert.False(t, c.HasRole("admin"))
-	})
-
-	t.Run("returns false for empty roles", func(t *testing.T) {
-		c := &Claims{}
-		assert.False(t, c.HasRole("admin"))
-	})
-}
-
 func TestClaimsFromContext(t *testing.T) {
 	t.Run("returns claims when stored in context", func(t *testing.T) {
 		claims := &Claims{Subject: "user-1", Scopes: []string{"read"}}

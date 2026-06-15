@@ -24,17 +24,11 @@ type ContextKey struct{}
 type Claims struct {
 	Subject string
 	Scopes  []string // parsed from the standard space-separated "scope" claim
-	Roles   []string // parsed from the IdP-specific roles claim configured via auth.rolesClaim
 }
 
 // HasScope returns true when the claims contain the given scope.
 func (c *Claims) HasScope(requiredScope string) bool {
 	return slices.Contains(c.Scopes, requiredScope)
-}
-
-// HasRole returns true when the claims contain the given role.
-func (c *Claims) HasRole(role string) bool {
-	return slices.Contains(c.Roles, role)
 }
 
 // ClaimsFromContext retrieves Claims stored in the context by the auth middleware.
