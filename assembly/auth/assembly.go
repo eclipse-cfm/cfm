@@ -32,7 +32,6 @@ const (
 	discoveryUrlKey    = "auth.discoveryUrl"
 	authAudienceKey    = "auth.audience"
 	audienceClaimKey   = "auth.audienceClaim"
-	rolesClaimKey      = "auth.rolesClaim"
 	expectedIssuerKet  = "auth.expectedIssuer"
 	jwksUrlKey         = "auth.jwksUrl"
 	skipIssuerCheckKey = "auth.skipIssuerCheck"
@@ -71,23 +70,25 @@ func (a *AuthServiceAssembly) Init(ctx *system.InitContext) error {
 		return nil
 	}
 
+	jwksURL := ctx.Config.GetString(jwksUrlKey)
 	discoveryURL := ctx.Config.GetString(discoveryUrlKey)
-	if discoveryURL == "" {
-		return fmt.Errorf("auth.issuerUrl must be configured when auth.enabled is true")
+
+	if jwksURL == "" && discoveryURL == "" {
+		return fmt.Errorf("either auth.jwksUrl or auth.discoveryUrl must be configured when auth.enabled is true")
 	}
+
 	audience := ctx.Config.GetString(authAudienceKey)
 	audienceClaim := ctx.GetConfigStrOrDefault(audienceClaimKey, "aud")
-	rolesClaim := ctx.GetConfigStrOrDefault(rolesClaimKey, "roles")
 	expectedIssuer := ctx.Config.GetString(expectedIssuerKet)
-	jwksURL := ctx.Config.GetString(jwksUrlKey)
 	skipIssuerCheck := ctx.Config.GetBool(skipIssuerCheckKey)
 
 	// When the IdP uses a non-standard claim for the audience (e.g. Keycloak uses azp
 	// instead of aud), disable the built-in aud check and validate the claim manually
 	// in the middleware instead.
 	verifierCfg := &oidc.Config{
-		SkipIssuerCheck:   skipIssuerCheck,
-		SkipClientIDCheck: audienceClaim != "aud",
+		SkipIssuerCheck:      skipIssuerCheck,
+		SkipClientIDCheck:    audienceClaim != "aud",
+		SupportedSigningAlgs: []string{"RS256", "EdDSA"},
 	}
 	if audienceClaim == "aud" {
 		verifierCfg.ClientID = audience
@@ -97,10 +98,6 @@ func (a *AuthServiceAssembly) Init(ctx *system.InitContext) error {
 
 	if jwksURL != "" {
 		// Explicit JWKS URL — skip OIDC discovery entirely.
-		// Use this when the jwks_uri returned by Keycloak's discovery document is not
-		// reachable from the service (e.g. it contains an internal K8s hostname that is
-		// inaccessible from outside the cluster, or vice-versa).
-		// auth.expectedIssuer is required so the iss claim can still be validated.
 		if expectedIssuer == "" {
 			return fmt.Errorf("auth.expectedIssuer must be set when auth.jwksUrl is configured")
 		}
@@ -116,9 +113,9 @@ func (a *AuthServiceAssembly) Init(ctx *system.InitContext) error {
 			err      error
 		)
 		if expectedIssuer != "" {
-			// discoveryUrl is an internal endpoint whose discovery doc's issuer field contains
-			// the public URL. Fetch the doc manually so the issuer mismatch doesn't cause an
-			// error, then hand go-oidc a ProviderConfig with the correct public issuer.
+			// discoveryUrl may be an internal endpoint whose discovery doc's issuer field
+			// differs from the public URL embedded in tokens. Fetch the doc manually and
+			// override the issuer so go-oidc validates tokens against expectedIssuer instead.
 			provider, err = discoverWithPublicIssuer(discoveryCtx, discoveryURL, expectedIssuer)
 		} else {
 			provider, err = oidc.NewProvider(discoveryCtx, discoveryURL)
@@ -127,12 +124,11 @@ func (a *AuthServiceAssembly) Init(ctx *system.InitContext) error {
 			return fmt.Errorf("OIDC discovery failed for %q: %w", discoveryURL, err)
 		}
 		verifier = provider.Verifier(verifierCfg)
-		ctx.LogMonitor.Infof("Auth initialized — discoveryUrl: %s, audience: %s, rolesClaim: %s", discoveryURL, audience, rolesClaim)
+		ctx.LogMonitor.Infof("Auth initialized — discoveryUrl: %s, audience: %s", discoveryURL, audience)
 	}
 
 	ctx.Registry.Register(ValidatorKey, &oidcValidator{
 		verifier:      verifier,
-		rolesClaim:    rolesClaim,
 		audience:      audience,
 		audienceClaim: audienceClaim,
 		monitor:       ctx.LogMonitor,
@@ -182,7 +178,6 @@ func discoverWithPublicIssuer(ctx context.Context, discoveryURL, expectedIssuer 
 // oidcValidator validates JWT bearer tokens using JWKS fetched via OIDC discovery.
 type oidcValidator struct {
 	verifier      *oidc.IDTokenVerifier
-	rolesClaim    string
 	audience      string // expected audience value
 	audienceClaim string // claim name to check audience against (e.g. "aud" or "azp")
 	monitor       system.LogMonitor
@@ -223,7 +218,6 @@ func (v *oidcValidator) Middleware() func(http.Handler) http.Handler {
 			claims := &cfmauth.Claims{
 				Subject: token.Subject,
 				Scopes:  extractScopes(rawClaims),
-				Roles:   extractNestedStringSlice(rawClaims, v.rolesClaim),
 			}
 
 			ctx := context.WithValue(r.Context(), cfmauth.ContextKey{}, claims)
@@ -246,39 +240,6 @@ func extractScopes(raw map[string]interface{}) []string {
 		return nil
 	}
 	return strings.Fields(scopeStr)
-}
-
-// extractNestedStringSlice traverses a dot-notation path (e.g. "realm_access.roles") and returns
-// the string slice at the leaf, or nil if the path does not exist or the value is not a string slice.
-func extractNestedStringSlice(raw map[string]interface{}, path string) []string {
-	dot := strings.IndexByte(path, '.')
-	if dot < 0 {
-		return toStringSlice(raw[path])
-	}
-	nested, ok := raw[path[:dot]].(map[string]interface{})
-	if !ok {
-		return nil
-	}
-	return extractNestedStringSlice(nested, path[dot+1:])
-}
-
-func toStringSlice(v interface{}) []string {
-	arr, ok := v.([]interface{})
-	if !ok {
-		scalar, ok := v.(interface{})
-		arr = make([]interface{}, 1)
-		arr[0] = scalar
-		if !ok {
-			return nil
-		}
-	}
-	result := make([]string, 0, len(arr))
-	for _, item := range arr {
-		if s, ok := item.(string); ok {
-			result = append(result, s)
-		}
-	}
-	return result
 }
 
 func writeUnauthorized(w http.ResponseWriter, message string) {
