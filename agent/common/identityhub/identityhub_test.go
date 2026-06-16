@@ -61,10 +61,7 @@ func TestIdentityAPIClient_CreateParticipantContext(t *testing.T) {
 			additionalProps := data["additionalProperties"].(map[string]any)
 			vaultConfig := additionalProps["edc.vault.hashicorp.config"].(map[string]any)
 
-			credentials := vaultConfig["credentials"].(map[string]any)
-			require.Equal(t, "client-id", credentials["clientId"])
-			require.Equal(t, "secret", credentials["clientSecret"])
-			require.Equal(t, "https://example.com/idp/token", credentials["tokenUrl"])
+			require.NotContains(t, vaultConfig, "credentials")
 
 			config := vaultConfig["config"].(map[string]any)
 			require.Equal(t, "https://example.com/vault", config["vaultUrl"])
@@ -89,9 +86,6 @@ func TestIdentityAPIClient_CreateParticipantContext(t *testing.T) {
 			manifest.VaultConfig = edcv.VaultConfig{
 				VaultURL: "https://example.com/vault",
 			}
-			manifest.VaultCredentials.ClientSecret = "secret"
-			manifest.VaultCredentials.ClientID = "client-id"
-			manifest.VaultCredentials.TokenURL = "https://example.com/idp/token"
 		})
 	_, err := client.CreateParticipantContext(t.Context(), manifest)
 	require.NoError(t, err)
@@ -112,9 +106,6 @@ func TestIdentityAPIClient_AuthError(t *testing.T) {
 			manifest.VaultConfig = edcv.VaultConfig{
 				VaultURL: "https://example.com/vault",
 			}
-			manifest.VaultCredentials.ClientSecret = "secret"
-			manifest.VaultCredentials.ClientID = "client-id"
-			manifest.VaultCredentials.TokenURL = "https://example.com/idp/token"
 		})
 	_, err := client.CreateParticipantContext(t.Context(), manifest)
 	require.ErrorContains(t, err, "failed to get API access token: test error")
@@ -140,9 +131,6 @@ func TestIdentityAPIClient_BadRequest(t *testing.T) {
 			manifest.VaultConfig = edcv.VaultConfig{
 				VaultURL: "https://example.com/vault",
 			}
-			manifest.VaultCredentials.ClientSecret = "secret"
-			manifest.VaultCredentials.ClientID = "client-id"
-			manifest.VaultCredentials.TokenURL = "https://example.com/idp/token"
 		})
 	_, err := client.CreateParticipantContext(t.Context(), manifest)
 	require.ErrorContains(t, err, "foobar")

@@ -44,10 +44,9 @@ type ParticipantContextConfig struct {
 	SecretEntries        map[string]string `json:"privateEntries"`
 }
 
-func NewParticipantContextConfig(participantContextID string, stsClientID string, stsClientSecretAlias string, participantID string, vConfig edcv.VaultConfig, vCreds edcv.VaultCredentials, stsTokenURL string) ParticipantContextConfig {
+func NewParticipantContextConfig(participantContextID string, stsClientID string, stsClientSecretAlias string, participantID string, vConfig edcv.VaultConfig, stsTokenURL string) ParticipantContextConfig {
 	vaultConfig := map[string]any{
-		"credentials": vCreds,
-		"config":      vConfig,
+		"config": vConfig,
 	}
 	return ParticipantContextConfig{
 		ParticipantContextID: participantContextID,

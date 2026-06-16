@@ -18,8 +18,6 @@ import (
 	"net/http"
 	"strings"
 
-	commonvault "github.com/eclipse-cfm/cfm/agent/common/vault"
-	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 
@@ -35,11 +33,9 @@ const STSClientIDKey = "ih.sts.clientId"
 
 type IdentityHubActivityProcessor struct {
 	api.BaseActivityProcessor
-	VaultClient       serviceapi.VaultClient
 	HTTPClient        *http.Client
 	Monitor           system.LogMonitor
 	IdentityAPIClient identityhub.IdentityAPIClient
-	TokenURL          string
 	VaultURL          string
 	// CredentialServiceURL optional template for the credential service URL; use %s as placeholder for participantContextID
 	CredentialServiceURL string
@@ -52,7 +48,6 @@ type IdentityHubActivityProcessor struct {
 
 type ihData struct {
 	ParticipantID        string `json:"cfm.participant.id" validate:"required"`
-	VaultAccessClientID  string `json:"clientID.vaultAccess" validate:"required"`
 	ParticipantContextId string `json:"participantContextId" validate:"required"`
 	CredentialServiceURL string `json:"cfm.participant.credentialservice"`
 	ProtocolServiceURL   string `json:"cfm.participant.protocolservice"`
@@ -61,11 +56,9 @@ type ihData struct {
 
 func NewProcessor(config *Config) *IdentityHubActivityProcessor {
 	return &IdentityHubActivityProcessor{
-		VaultClient:          config.VaultClient,
 		HTTPClient:           config.Client,
 		Monitor:              config.LogMonitor,
 		IdentityAPIClient:    config.IdentityAPIClient,
-		TokenURL:             config.TokenURL,
 		VaultURL:             config.VaultURL,
 		CredentialServiceURL: config.CredentialServiceURL,
 		ProtocolServiceURL:   config.ProtocolServiceURL,
@@ -75,11 +68,9 @@ func NewProcessor(config *Config) *IdentityHubActivityProcessor {
 }
 
 type Config struct {
-	serviceapi.VaultClient
 	*http.Client
 	system.LogMonitor
 	identityhub.IdentityAPIClient
-	TokenURL             string
 	VaultURL             string
 	CredentialServiceURL string
 	ProtocolServiceURL   string
@@ -139,22 +130,11 @@ func (p IdentityHubActivityProcessor) handleDeployAction(ctx api.ActivityContext
 		p.Monitor.Warnf("Participant identifiers are expected to be Web-DIDs, but this one was not: '%s'. Subsequent communication may be severely impacted!", did)
 	}
 
-	// resolve vault access secret for the new participant
-	vaultAccessSecret, err := p.VaultClient.ResolveSecret(ctx.Context(), data.VaultAccessClientID)
-	if err != nil {
-		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error retrieving client secret for orchestration %s: %w", ctx.OID(), err)}
-	}
-
-	vaultCreds := commonvault.Credentials{
-		ClientID:     data.VaultAccessClientID,
-		ClientSecret: vaultAccessSecret,
-		TokenURL:     p.TokenURL,
-	}
-
 	_, ihSpan := p.tracer.Start(ctx.Context(), "cfm.agent.identityhub.deploy", trace.WithSpanKind(trace.SpanKindClient))
 
+	// IdentityHub authenticates to Vault via token exchange (jwtlet), so only the vault config
+	// (no credentials) is supplied; the participant context id is the token-exchange resource.
 	manifest := identityhub.NewParticipantManifest(participantContextId, did, data.CredentialServiceURL, data.ProtocolServiceURL, data.DataServiceURL, func(m *identityhub.ParticipantManifest) {
-		m.VaultCredentials = vaultCreds
 		m.VaultConfig.VaultURL = p.VaultURL
 		m.VaultConfig.FolderPath = participantContextId + "/identityhub"
 	})

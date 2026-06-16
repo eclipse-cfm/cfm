@@ -11,7 +11,6 @@ PMANAGER_DIR=pmanager
 TMANAGER_DIR=tmanager
 EDCV_DIR=agent/edcv
 IH_DIR=agent/ih
-KEYCLOAK_DIR=agent/keycloak
 REG_DIR=agent/registration
 ONBOARDING_DIR=agent/onboarding
 JWTLET_AGENT_DIR=agent/jwtletagent
@@ -69,7 +68,6 @@ build:
 	$(MAKE) -C $(TMANAGER_DIR) build
 	$(MAKE) -C $(EDCV_DIR) build
 	$(MAKE) -C $(IH_DIR) build
-	$(MAKE) -C $(KEYCLOAK_DIR) build
 	$(MAKE) -C $(REG_DIR) build
 	$(MAKE) -C $(ONBOARDING_DIR) build
 	$(MAKE) -C $(JWTLET_AGENT_DIR) build
@@ -88,7 +86,6 @@ build-all:
 	$(MAKE) -C $(TMANAGER_DIR) build-all
 	$(MAKE) -C $(EDCV_DIR) build-all
 	$(MAKE) -C $(IH_DIR) build-all
-	$(MAKE) -C $(KEYCLOAK_DIR) build-all
 	$(MAKE) -C $(REG_DIR) build-all
 	$(MAKE) -C $(ONBOARDING_DIR) build-all
 	$(MAKE) -C $(JWTLET_AGENT_DIR) build-all
@@ -106,7 +103,6 @@ test: install-gotestsum
 	$(MAKE) -C $(JWTLET_AGENT_DIR) test
 	$(MAKE) -C $(IH_DIR) test
 	$(MAKE) -C $(E2E_DIR) test
-	$(MAKE) -C $(KEYCLOAK_DIR) test
 	$(MAKE) -C $(REG_DIR) test
 	$(MAKE) -C $(ONBOARDING_DIR) test
 	$(MAKE) -C $(JWTLET_AGENT_DIR) test
@@ -193,7 +189,7 @@ generate-docs:
 # Docker Commands - Handled at Top Level
 #==============================================================================
 
-docker-build: docker-build-pmanager docker-build-tmanager docker-build-jwtletagent docker-build-edcvagent docker-build-ihagent docker-build-kcagent docker-build-regagent docker-build-obagent
+docker-build: docker-build-pmanager docker-build-tmanager docker-build-jwtletagent docker-build-edcvagent docker-build-ihagent docker-build-regagent docker-build-obagent
 
 docker-build-pmanager:
 	@echo "Building pmanager Docker image..."
@@ -214,10 +210,6 @@ docker-build-edcvagent:
 docker-build-ihagent:
 	@echo "Building IdentityHub agent Docker image..."
 	docker buildx build -f docker/Dockerfile.ihagent.dockerfile -t $(DOCKER_REGISTRY)ihagent:$(DOCKER_TAG) .
-
-docker-build-kcagent:
-	@echo "Building Keycloak agent Docker image..."
-	docker buildx build -f docker/Dockerfile.kcagent.dockerfile -t $(DOCKER_REGISTRY)kcagent:$(DOCKER_TAG) .
 
 docker-build-regagent:
 	@echo "Building Registration agent Docker image..."
@@ -265,9 +257,6 @@ load-into-kind-edcvagent: docker-build-edcvagent
 
 load-into-kind-ihagent: docker-build-ihagent
 	kind load docker-image -n $(KIND_CLUSTER_NAME) $(DOCKER_REGISTRY)ihagent:$(DOCKER_TAG)
-
-load-into-kind-kcagent: docker-build-kcagent
-	kind load docker-image -n $(KIND_CLUSTER_NAME) $(DOCKER_REGISTRY)kcagent:$(DOCKER_TAG)
 
 load-into-kind-obagent: docker-build-obagent
 	kind load docker-image -n $(KIND_CLUSTER_NAME) $(DOCKER_REGISTRY)obagent:$(DOCKER_TAG)

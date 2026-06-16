@@ -22,7 +22,6 @@ import (
 	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/system"
-	"github.com/eclipse-cfm/cfm/common/types"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -38,11 +37,9 @@ func WithIdentityHub(client identityhub.IdentityAPIClient) ConfigOption {
 
 func validConfig(opts ...ConfigOption) *Config {
 	c := Config{
-		VaultClient:       NewMockVaultClient("client-123", "secret-123"),
 		IdentityAPIClient: MockIdentityHubClient{},
 		Client:            &http.Client{},
 		LogMonitor:        system.NoopMonitor{},
-		TokenURL:          "http://auth.example.com/oauth2/token",
 		VaultURL:          "https://vault.example.com:8200",
 	}
 	for _, opt := range opts {
@@ -147,24 +144,6 @@ func TestIHActivityProcessor_ProcessDeploy_MissingDataServiceURL(t *testing.T) {
 	assert.Contains(t, result.Error.Error(), "DataServiceURL is empty")
 }
 
-func TestIHActivityProcessor_ProcessDeploy_VaultSecretMissing(t *testing.T) {
-	cfg := validConfig()
-	cfg.VaultClient = NewMockVaultClient() // empty vault
-
-	processor := NewProcessor(cfg)
-
-	activityContext := api.NewActivityContext(context.Background(), "orch-5", api.Activity{
-		ID:            "activity-4",
-		Type:          "ih",
-		Discriminator: api.DeployDiscriminator,
-	}, copyOf(processingData), make(map[string]any))
-
-	result := processor.ProcessDeploy(activityContext)
-
-	require.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
-	assert.Contains(t, result.Error.Error(), "error retrieving client secret")
-}
-
 func TestIHActivityProcessor_ProcessDeploy_IdentityHubFailure(t *testing.T) {
 	processor := NewProcessor(validConfig(WithIdentityHub(MockIdentityHubClient{expectedError: fmt.Errorf("ih unavailable")})))
 
@@ -211,39 +190,6 @@ func TestIHActivityProcessor_ProcessDispose_IdentityHubError(t *testing.T) {
 }
 
 // --- mocks ---
-
-type MockVaultClient struct {
-	cache map[string]string
-}
-
-func NewMockVaultClient(secrets ...string) MockVaultClient {
-	cache := make(map[string]string)
-	for i := 0; i+1 < len(secrets); i += 2 {
-		cache[secrets[i]] = secrets[i+1]
-	}
-	return MockVaultClient{cache: cache}
-}
-
-func (m MockVaultClient) ResolveSecret(_ context.Context, path string) (string, error) {
-	if v, ok := m.cache[path]; ok {
-		return v, nil
-	}
-	return "", types.ErrNotFound
-}
-
-func (m MockVaultClient) StoreSecret(_ context.Context, path string, value string) error {
-	m.cache[path] = value
-	return nil
-}
-
-func (m MockVaultClient) DeleteSecret(_ context.Context, path string) error {
-	delete(m.cache, path)
-	return nil
-}
-
-func (m MockVaultClient) Close() error { return nil }
-
-func (m MockVaultClient) Health(_ context.Context) error { return nil }
 
 type MockIdentityHubClient struct {
 	expectedError error

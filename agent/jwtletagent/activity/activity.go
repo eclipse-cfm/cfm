@@ -40,6 +40,14 @@ const (
 	clientIdentifier        = "system:serviceaccount:edc-v:cfm-agents"
 )
 
+// vaultClientIdentifiers are the workload ServiceAccounts that exchange their projected token for a
+// participant-scoped token used to authenticate against Vault. The resulting token's `sub` is the
+// participant context id, which scopes the workload to that participant's vault partition.
+var vaultClientIdentifiers = []string{
+	"system:serviceaccount:edc-v:controlplane",
+	"system:serviceaccount:edc-v:identityhub",
+}
+
 type TokenExchangeActivityProcessor struct {
 	api.BaseActivityProcessor
 	Monitor            system.LogMonitor
@@ -113,6 +121,21 @@ func (p TokenExchangeActivityProcessor) ProcessDeploy(ctx api.ActivityContext) a
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating resource mapping: %w", err)}
 	}
 
+	// step 1b: allow the control plane and identity hub workloads to exchange their token for a
+	// participant-scoped token used to authenticate against Vault (resource = participant context id).
+	for _, clientID := range vaultClientIdentifiers {
+		vm := resourceMapping{
+			ClientIdentifier:   clientID,
+			ParticipantContext: participantContextID,
+			Scopes:             []string{"read"},
+			Audiences:          []string{p.Audience},
+		}
+		p.Monitor.Debugf("Creating vault resource mapping for %s -> %s", clientID, participantContextID)
+		if err := p.post(ctx.Context(), "/api/v1/mappings", vm); err != nil {
+			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating vault resource mapping for %s: %w", clientID, err)}
+		}
+	}
+
 	// step 2: test token exchange
 	p.Monitor.Debugf("testing token exchange for participant context: %s", participantContextID)
 	scopedToken, err := p.TokenProvider.GetToken(ctx.Context(), "read write", participantContextID)
@@ -140,6 +163,12 @@ func (p TokenExchangeActivityProcessor) ProcessDispose(ctx api.ActivityContext) 
 	err := p.delete(ctx.Context(), fmt.Sprintf("/api/v1/mappings/%s/%s", clientIdentifier, participantContextID))
 	if err != nil {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error deleting resource mapping: %w", err)}
+	}
+
+	for _, clientID := range vaultClientIdentifiers {
+		if err := p.delete(ctx.Context(), fmt.Sprintf("/api/v1/mappings/%s/%s", clientID, participantContextID)); err != nil {
+			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error deleting vault resource mapping for %s: %w", clientID, err)}
+		}
 	}
 
 	// we do NOT delete the scope mappings, because they only exist once for all participants

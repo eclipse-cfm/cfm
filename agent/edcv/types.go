@@ -18,6 +18,3 @@ import commonvault "github.com/eclipse-cfm/cfm/agent/common/vault"
 
 // VaultConfig re-exports the common VaultConfig type.
 type VaultConfig = commonvault.Config
-
-// VaultCredentials re-exports the common VaultCredentials type.
-type VaultCredentials = commonvault.Credentials

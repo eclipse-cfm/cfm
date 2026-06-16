@@ -23,13 +23,3 @@ type Config struct {
 	// FolderPath the path of the folder within the secret engine where the participant's manifest will be stored.
 	FolderPath string `json:"folderPath"`
 }
-
-// Credentials defines the credentials which are needed to get a JWT which is used to access a vault
-type Credentials struct {
-	// ClientID client ID of the service account of the IdP which is configured in Vault
-	ClientID string `json:"clientId"`
-	// ClientSecret secret of the service account of the IdP, which is configured in Vault
-	ClientSecret string `json:"clientSecret"`
-	// TokenURL URL of the token endpoint of the IdP which is configured in Vault
-	TokenURL string `json:"tokenUrl"`
-}

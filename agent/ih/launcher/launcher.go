@@ -19,7 +19,6 @@ import (
 	"github.com/eclipse-cfm/cfm/agent/ih/activity"
 	"github.com/eclipse-cfm/cfm/assembly/httpclient"
 	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
-	"github.com/eclipse-cfm/cfm/assembly/vault"
 	"github.com/eclipse-cfm/cfm/common/runtime"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/common/tokenexchange"
@@ -30,9 +29,6 @@ import (
 const (
 	ActivityType                       = "identityhub-activity"
 	urlKey                             = "vault.url"
-	clientIDKey                        = "keycloak.clientID"
-	clientSecretKey                    = "keycloak.clientSecret"
-	tokenURLKey                        = "keycloak.tokenUrl"
 	identityHubURLKey                  = "identityhub.url"
 	identityHubCredentialServiceURLKey = "identityhub.cs.url"
 	controlPlaneProtocolURLKey         = "controlplane.protocol.url"
@@ -51,22 +47,17 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 		AssemblyProvider: func() []system.ServiceAssembly {
 			return []system.ServiceAssembly{
 				&httpclient.HttpClientServiceAssembly{},
-				&vault.VaultServiceAssembly{},
 			}
 		},
 		NewProcessor: func(ctx *natsagent.AgentContext) api.ActivityProcessor {
 			httpClient := ctx.Registry.Resolve(serviceapi.HttpClientKey).(http.Client)
-			vaultClient := ctx.Registry.Resolve(serviceapi.VaultKey).(serviceapi.VaultClient)
-			clientID := ctx.Config.GetString(clientIDKey)
-			clientSecret := ctx.Config.GetString(clientSecretKey)
-			tokenURL := ctx.Config.GetString(tokenURLKey)
 			ihURL := ctx.Config.GetString(identityHubURLKey)
 			vaultURL := ctx.Config.GetString(urlKey)
 			ihCsURL := ctx.Config.GetString(identityHubCredentialServiceURLKey)
 			cpProtocolURL := ctx.Config.GetString(controlPlaneProtocolURLKey)
 			cpDataServiceURL := ctx.Config.GetString(controlPlaneDataServiceURLKey)
 
-			if err := runtime.CheckRequiredParams(clientIDKey, clientID, clientSecretKey, clientSecret, tokenURLKey, tokenURL, identityHubURLKey, ihURL); err != nil {
+			if err := runtime.CheckRequiredParams(identityHubURLKey, ihURL); err != nil {
 				panic(err)
 			}
 
@@ -76,7 +67,6 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 				tokenexchange.WithHttpClient(&httpClient))
 
 			return activity.NewProcessor(&activity.Config{
-				VaultClient: vaultClient,
 				Client:      &httpClient,
 				LogMonitor:  ctx.Monitor,
 				IdentityAPIClient: identityhub.HttpIdentityAPIClient{
@@ -84,7 +74,6 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 					TokenProvider: provider,
 					HttpClient:    &httpClient,
 				},
-				TokenURL:             tokenURL,
 				VaultURL:             vaultURL,
 				CredentialServiceURL: ihCsURL,
 				ProtocolServiceURL:   cpProtocolURL,

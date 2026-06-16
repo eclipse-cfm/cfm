@@ -227,11 +227,6 @@ func (a HttpIdentityAPIClient) CreateParticipantContext(ctx context.Context, man
 		},
 		"additionalProperties": map[string]any{
 			"edc.vault.hashicorp.config": map[string]any{
-				"credentials": map[string]string{
-					"clientId":     manifest.VaultCredentials.ClientID,
-					"clientSecret": manifest.VaultCredentials.ClientSecret,
-					"tokenUrl":     manifest.VaultCredentials.TokenURL,
-				},
 				"config": map[string]string{
 					"secretPath": manifest.VaultConfig.SecretPath,
 					"folderPath": manifest.VaultConfig.FolderPath,
