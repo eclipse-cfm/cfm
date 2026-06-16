@@ -28,9 +28,6 @@ jobs:
           - name: ihagent
             dockerfile: docker/Dockerfile.ihagent.dockerfile
             context: .
-          - name: kcagent
-            dockerfile: docker/Dockerfile.kcagent.dockerfile
-            context: .
           - name: regagent
             dockerfile: docker/Dockerfile.regagent.dockerfile
             context: .

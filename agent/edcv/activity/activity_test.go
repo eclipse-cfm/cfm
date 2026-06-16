@@ -20,7 +20,6 @@ import (
 	"github.com/eclipse-cfm/cfm/agent/edcv/controlplane"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/system"
-	"github.com/eclipse-cfm/cfm/common/types"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,10 +35,8 @@ func WithControlPlane(client controlplane.ManagementAPIClient) ConfigOptions {
 
 func validConfig(opts ...ConfigOptions) *Config {
 	c := Config{
-		VaultClient:         NewMockVaultClient("client-123", "123"),
 		ManagementAPIClient: MockManagementApiClient{},
 		LogMonitor:          system.NoopMonitor{},
-		TokenURL:            "http://auth.example.com/oauth2/token",
 		VaultURL:            "https://vault.example.com:8200",
 	}
 	for _, opt := range opts {
@@ -93,29 +90,6 @@ func TestEDCVActivityProcessor_Process_MissingParticipantID(t *testing.T) {
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orchestration-1", activity, pd, outputData)
-
-	result := processor.ProcessDeploy(activityContext)
-
-	require.NotNil(t, result)
-	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
-	assert.NotNil(t, result.Error)
-	assert.Contains(t, result.Error.Error(), "error processing EDC-V activity")
-}
-
-func TestEDCVActivityProcessor_Process_MissingClientID(t *testing.T) {
-	processor := NewProcessor(validConfig())
-	ctx := context.Background()
-	pd := copyOf(processingData)
-	delete(pd, "clientID.vaultAccess")
-	outputData := make(map[string]any)
-
-	activity := api.Activity{
-		ID:            "activity-2",
-		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
-	}
-
-	activityContext := api.NewActivityContext(ctx, "orchestration-2", activity, pd, outputData)
 
 	result := processor.ProcessDeploy(activityContext)
 
@@ -244,48 +218,6 @@ func TestEDCVActivityProcessor_Process_MultipleUnknownFields(t *testing.T) {
 	assert.Nil(t, result.Error)
 }
 
-func TestEDCVActivityProcessor_Process_MissingVaultEntry(t *testing.T) {
-	invalidConfig := validConfig()
-	invalidConfig.VaultClient = NewMockVaultClient() // does not contain any secrets
-	processor := NewProcessor(invalidConfig)
-
-	ctx := context.Background()
-	outputData := make(map[string]any)
-
-	activity := api.Activity{
-		ID:   "activity-multi",
-		Type: "edcv",
-	}
-
-	activityContext := api.NewActivityContext(ctx, "orch-multi", activity, copyOf(processingData), outputData)
-
-	result := processor.ProcessDeploy(activityContext)
-
-	assert.NotNil(t, result.Error)
-	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
-}
-
-func TestEDCVActivityProcessor_Process_MissingStsClientId(t *testing.T) {
-	invalidConfig := validConfig()
-	invalidConfig.VaultClient = NewMockVaultClient() // does not contain any secrets
-	processor := NewProcessor(invalidConfig)
-
-	ctx := context.Background()
-	outputData := make(map[string]any)
-
-	activity := api.Activity{
-		ID:   "activity-multi",
-		Type: "edcv",
-	}
-
-	activityContext := api.NewActivityContext(ctx, "orch-multi", activity, copyOf(processingData), outputData)
-
-	result := processor.ProcessDeploy(activityContext)
-
-	assert.NotNil(t, result.Error)
-	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
-}
-
 func TestEDCVActivityProcessor_Process_ManagementAPIFailure(t *testing.T) {
 	processor := NewProcessor(validConfig(WithControlPlane(MockManagementApiClient{expectedParticipantError: fmt.Errorf("some error")})))
 
@@ -388,47 +320,6 @@ func TestEDCVActivityProcessor_ProcessDispose_CtrlPlaneConfigError(t *testing.T)
 
 	// expect to complete successfully, to unblock subsequent agents
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
-}
-
-type MockVaultClient struct {
-	cache map[string]string
-}
-
-func NewMockVaultClient(secrets ...string) MockVaultClient {
-	cache := make(map[string]string)
-	for i := 0; i < len(secrets); i += 2 {
-		if i+1 < len(secrets) {
-			cache[secrets[i]] = secrets[i+1]
-		}
-	}
-	return MockVaultClient{
-		cache: cache,
-	}
-}
-
-func (m MockVaultClient) ResolveSecret(ctx context.Context, path string) (string, error) {
-	if value, ok := m.cache[path]; ok {
-		return value, nil
-	}
-	return "", types.ErrNotFound
-}
-
-func (m MockVaultClient) StoreSecret(ctx context.Context, path string, value string) error {
-	m.cache[path] = value
-	return nil
-}
-
-func (m MockVaultClient) DeleteSecret(ctx context.Context, path string) error {
-	delete(m.cache, path)
-	return nil
-}
-
-func (m MockVaultClient) Close() error {
-	return nil
-}
-
-func (m MockVaultClient) Health(ctx context.Context) error {
-	return nil
 }
 
 func copyOf(m map[string]any) map[string]any {

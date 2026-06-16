@@ -19,7 +19,6 @@ import (
 
 	"github.com/eclipse-cfm/cfm/agent/edcv"
 	"github.com/eclipse-cfm/cfm/agent/edcv/controlplane"
-	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
 	. "github.com/eclipse-cfm/cfm/common/collection"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
@@ -35,10 +34,8 @@ const (
 
 type EDCVActivityProcessor struct {
 	api.BaseActivityProcessor
-	VaultClient         serviceapi.VaultClient
 	Monitor             system.LogMonitor
 	ManagementAPIClient controlplane.ManagementAPIClient
-	TokenURL            string
 	VaultURL            string
 	STSTokenURL         string
 	tracer              trace.Tracer
@@ -46,7 +43,6 @@ type EDCVActivityProcessor struct {
 
 type edcData struct {
 	ParticipantID        string `json:"cfm.participant.id" validate:"required"`
-	VaultAccessClientID  string `json:"clientID.vaultAccess" validate:"required"`
 	ParticipantContextId string `json:"participantContextId" validate:"required"`
 	// CredentialServiceURL the URL of the credential service, i.e., the query and storage endpoints of IdentityHub
 	CredentialServiceURL string `json:"cfm.participant.credentialservice"`
@@ -56,10 +52,8 @@ type edcData struct {
 
 func NewProcessor(config *Config) *EDCVActivityProcessor {
 	return &EDCVActivityProcessor{
-		VaultClient:         config.VaultClient,
 		Monitor:             config.LogMonitor,
 		ManagementAPIClient: config.ManagementAPIClient,
-		TokenURL:            config.TokenURL,
 		VaultURL:            config.VaultURL,
 		STSTokenURL:         config.STSTokenURL,
 		tracer:              otel.GetTracerProvider().Tracer("cfm.agent.edcv"),
@@ -67,10 +61,8 @@ func NewProcessor(config *Config) *EDCVActivityProcessor {
 }
 
 type Config struct {
-	serviceapi.VaultClient
 	system.LogMonitor
 	controlplane.ManagementAPIClient
-	TokenURL    string
 	VaultURL    string
 	STSTokenURL string
 }
@@ -119,17 +111,8 @@ func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data 
 		p.Monitor.Warnf("Participant identifiers are expected to be Web-DIDs, but this one was not: '%s'. Subsequent communication may be severely impacted!", did)
 	}
 
-	// resolve vault credentials for the control plane config
-	vaultAccessSecret, err := p.VaultClient.ResolveSecret(ctx.Context(), data.VaultAccessClientID)
-	if err != nil {
-		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error retrieving client secret for orchestration %s: %w", ctx.OID(), err)}
-	}
-
-	vaultCreds := edcv.VaultCredentials{
-		ClientID:     data.VaultAccessClientID,
-		ClientSecret: vaultAccessSecret,
-		TokenURL:     p.TokenURL,
-	}
+	// the control plane authenticates to Vault via token exchange (jwtlet), so only the vault
+	// config (no credentials) is needed; the participant context id is the token-exchange resource.
 	vaultConfig := edcv.VaultConfig{
 		VaultURL:   p.VaultURL,
 		SecretPath: "v1/participants",
@@ -152,7 +135,7 @@ func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data 
 
 	// create participant config in Control Plane
 	alias := participantContextId + "-sts-client-secret"
-	config := controlplane.NewParticipantContextConfig(participantContextId, stsClientID, alias, data.ParticipantID, vaultConfig, vaultCreds, p.STSTokenURL)
+	config := controlplane.NewParticipantContextConfig(participantContextId, stsClientID, alias, data.ParticipantID, vaultConfig, p.STSTokenURL)
 	if err := p.ManagementAPIClient.CreateConfig(ctx.Context(), participantContextId, config); err != nil {
 		ctrl.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("cannot create participant config in control plane: %w", err)}
@@ -160,11 +143,6 @@ func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data 
 	ctrl.AddEvent("Created ParticipantContextConfig in Control Plane")
 	ctrl.End()
 	p.Monitor.Infof("EDCV activity for participant '%s' (client ID = %s) completed successfully", data.ParticipantID, data.ParticipantContextId)
-
-	// delete the vault access secret, since it's no longer needed'
-	if err := p.VaultClient.DeleteSecret(ctx.Context(), data.VaultAccessClientID); err != nil {
-		p.Monitor.Warnf("failed to delete secret '%s': %v", data.VaultAccessClientID, err)
-	}
 
 	return api.ActivityResult{Result: api.ActivityResultComplete}
 }

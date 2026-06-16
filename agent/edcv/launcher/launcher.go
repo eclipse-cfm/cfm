@@ -19,7 +19,6 @@ import (
 	"github.com/eclipse-cfm/cfm/agent/edcv/controlplane"
 	"github.com/eclipse-cfm/cfm/assembly/httpclient"
 	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
-	"github.com/eclipse-cfm/cfm/assembly/vault"
 	"github.com/eclipse-cfm/cfm/common/runtime"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/common/tokenexchange"
@@ -28,11 +27,8 @@ import (
 )
 
 const (
-	urlKey               = "vault.url" // duplicate of common/vault/assembly.go
+	urlKey               = "vault.url"
 	ActivityType         = "edcv-activity"
-	clientIDKey          = "keycloak.clientID"
-	clientSecretKey      = "keycloak.clientSecret"
-	tokenURLKey          = "keycloak.tokenUrl"
 	identityHubStsURLKey = "identityhub.sts.url"
 	controlPlaneURLKey   = "controlplane.url"
 	tokenExchangeURLKey  = "tokenexchange.url"
@@ -49,20 +45,15 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 		AssemblyProvider: func() []system.ServiceAssembly {
 			return []system.ServiceAssembly{
 				&httpclient.HttpClientServiceAssembly{},
-				&vault.VaultServiceAssembly{},
 			}
 		},
 		NewProcessor: func(ctx *natsagent.AgentContext) api.ActivityProcessor {
 			httpClient := ctx.Registry.Resolve(serviceapi.HttpClientKey).(http.Client)
-			vaultClient := ctx.Registry.Resolve(serviceapi.VaultKey).(serviceapi.VaultClient)
-			clientID := ctx.Config.GetString(clientIDKey)
-			clientSecret := ctx.Config.GetString(clientSecretKey)
-			tokenURL := ctx.Config.GetString(tokenURLKey)
 			ihStsURL := ctx.Config.GetString(identityHubStsURLKey)
 			cpURL := ctx.Config.GetString(controlPlaneURLKey)
 			vaultURL := ctx.Config.GetString(urlKey)
 
-			if err := runtime.CheckRequiredParams(clientIDKey, clientID, clientSecretKey, clientSecret, controlPlaneURLKey, cpURL, tokenURLKey, tokenURL, identityHubStsURLKey, ihStsURL); err != nil {
+			if err := runtime.CheckRequiredParams(controlPlaneURLKey, cpURL, identityHubStsURLKey, ihStsURL); err != nil {
 				panic(err)
 			}
 
@@ -71,9 +62,7 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 				tokenexchange.WithTokenExchangeAudience(ctx.Config.GetString(audienceKey)),
 				tokenexchange.WithHttpClient(&httpClient))
 			return activity.NewProcessor(&activity.Config{
-				VaultClient: vaultClient,
 				LogMonitor:  ctx.Monitor,
-				TokenURL:    tokenURL,
 				VaultURL:    vaultURL,
 				STSTokenURL: ihStsURL,
 				ManagementAPIClient: controlplane.HttpManagementAPIClient{

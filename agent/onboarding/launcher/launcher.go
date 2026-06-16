@@ -30,9 +30,6 @@ import (
 const (
 	ActivityType            = "onboarding-activity"
 	identityHubURLKey       = "identityhub.url"
-	clientIDKey             = "keycloak.clientID"
-	clientSecretKey         = "keycloak.clientSecret"
-	tokenURLKey             = "keycloak.tokenUrl"
 	issuerServiceBaseUrlKey = "issuerservice.url"
 	issuerIDKey             = "issuer.id"
 	tokenExchangeURLKey     = "tokenexchange.url"
@@ -54,13 +51,10 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 		NewProcessor: func(ctx *natsagent.AgentContext) api.ActivityProcessor {
 			httpClient := ctx.Registry.Resolve(serviceapi.HttpClientKey).(http.Client)
 			ihURL := ctx.Config.GetString(identityHubURLKey)
-			clientID := ctx.Config.GetString(clientIDKey)
-			clientSecret := ctx.Config.GetString(clientSecretKey)
 			issuerServiceBaseUrl := ctx.Config.GetString(issuerServiceBaseUrlKey)
 			issuerID := ctx.Config.GetString(issuerIDKey)
 
-			tokenURL := ctx.Config.GetString(tokenURLKey) // this may be nil or "" if the in-mem vault is used
-			if err := runtime.CheckRequiredParams(identityHubURLKey, ihURL, clientIDKey, clientID, clientSecretKey, clientSecret, tokenURLKey, tokenURL); err != nil {
+			if err := runtime.CheckRequiredParams(identityHubURLKey, ihURL); err != nil {
 				panic(err)
 			}
 

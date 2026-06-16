@@ -63,8 +63,6 @@ type ParticipantManifest struct {
 	KeyGeneratorParameters KeyGeneratorParameters
 	// VaultConfig configuration for accessing a vault
 	VaultConfig commonvault.Config
-	// VaultCredentials credentials which are needed to get a JWT which is used to access a vault
-	VaultCredentials commonvault.Credentials
 }
 
 type CreateParticipantContextResponse struct {
