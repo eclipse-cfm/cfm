@@ -28,8 +28,6 @@ import (
 
 const (
 	ActivityType            = "registration-activity"
-	clientIDKey             = "keycloak.clientID"
-	clientSecretKey         = "keycloak.clientSecret"
 	issuerServiceBaseUrlKey = "issuerservice.url"
 	issuerIDKey             = "issuer.id"
 	tokenExchangeURLKey     = "tokenexchange.url"
@@ -50,12 +48,10 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 		},
 		NewProcessor: func(ctx *natsagent.AgentContext) api.ActivityProcessor {
 			httpClient := ctx.Registry.Resolve(serviceapi.HttpClientKey).(http.Client)
-			clientID := ctx.Config.GetString(clientIDKey)
-			clientSecret := ctx.Config.GetString(clientSecretKey)
 			issuerServiceBaseUrl := ctx.Config.GetString(issuerServiceBaseUrlKey)
 			issuerID := ctx.Config.GetString(issuerIDKey)
 
-			if err := runtime.CheckRequiredParams(clientIDKey, clientID, clientSecretKey, clientSecret, issuerServiceBaseUrlKey, issuerServiceBaseUrl, issuerIDKey, issuerID); err != nil {
+			if err := runtime.CheckRequiredParams(issuerServiceBaseUrlKey, issuerServiceBaseUrl, issuerIDKey, issuerID); err != nil {
 				panic(err)
 			}
 
