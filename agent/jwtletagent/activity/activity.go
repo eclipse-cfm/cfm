@@ -29,6 +29,7 @@ import (
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -89,7 +90,7 @@ func NewProcessor(config *Config) *TokenExchangeActivityProcessor {
 		Monitor:            config.LogMonitor,
 		TokenProvider:      config.TokenProvider,
 		HttpClient:         config.HttpClient,
-		tracer:             otel.GetTracerProvider().Tracer("cfm.agent.test"),
+		tracer:             otel.GetTracerProvider().Tracer("cfm.agent.jwtlet"),
 		ManagementBasePath: config.ManagementBasePath,
 		TokenFilePath:      config.TokenFilePath,
 		Audience:           config.Audience,
@@ -98,17 +99,22 @@ func NewProcessor(config *Config) *TokenExchangeActivityProcessor {
 
 func (p TokenExchangeActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
 
+	spanCtx, span := p.tracer.Start(ctx.Context(), "cfm.agent.jwtlet.deploy")
+	defer span.End()
+
 	var data tokenExchangeData
 	if err := ctx.ReadValues(&data); err != nil {
+		span.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing token exchange deploy for orchestration %s: %w", ctx.OID(), err)}
 	}
 
 	participantContextID := generateClientID()
+	span.SetAttributes(attribute.String("cfm.participantContextId", participantContextID))
 
-	_, span := p.tracer.Start(ctx.Context(), "cfm.agent.jwtlet.token-setup", trace.WithSpanKind(trace.SpanKindClient))
-	defer span.End()
+	// step 1: create the resource mappings via the jwtlet management API
+	mapCtx, mapSpan := p.tracer.Start(spanCtx, "cfm.agent.jwtlet.deploy.mappings", trace.WithSpanKind(trace.SpanKindClient))
 
-	// step 1: create resource mapping
+	// the CFM agents must be able to exchange their token for a participant-scoped EDC API token
 	rm := resourceMapping{
 		ClientIdentifier:   clientIdentifier,
 		ParticipantContext: participantContextID,
@@ -116,13 +122,15 @@ func (p TokenExchangeActivityProcessor) ProcessDeploy(ctx api.ActivityContext) a
 		Audiences:          []string{p.Audience},
 	}
 	p.Monitor.Debugf("Creating resource mapping for participant context: %s", participantContextID)
-	err := p.post(ctx.Context(), "/api/v1/mappings", rm)
-	if err != nil {
+	if err := p.post(mapCtx, "/api/v1/mappings", rm); err != nil {
+		mapSpan.RecordError(err)
+		mapSpan.End()
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating resource mapping: %w", err)}
 	}
+	mapSpan.AddEvent("Created CFM agents resource mapping")
 
-	// step 1b: allow the control plane and identity hub workloads to exchange their token for a
-	// participant-scoped token used to authenticate against Vault (resource = participant context id).
+	// the control plane and identity hub must be able to exchange their token for a participant-scoped
+	// token used to authenticate against Vault (resource = participant context id)
 	for _, clientID := range vaultClientIdentifiers {
 		vm := resourceMapping{
 			ClientIdentifier:   clientID,
@@ -131,21 +139,32 @@ func (p TokenExchangeActivityProcessor) ProcessDeploy(ctx api.ActivityContext) a
 			Audiences:          []string{p.Audience},
 		}
 		p.Monitor.Debugf("Creating vault resource mapping for %s -> %s", clientID, participantContextID)
-		if err := p.post(ctx.Context(), "/api/v1/mappings", vm); err != nil {
+		if err := p.post(mapCtx, "/api/v1/mappings", vm); err != nil {
+			mapSpan.RecordError(err)
+			mapSpan.End()
 			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating vault resource mapping for %s: %w", clientID, err)}
 		}
 	}
+	mapSpan.AddEvent("Created vault resource mappings")
+	mapSpan.End()
 
-	// step 2: test token exchange
+	// step 2: verify the token exchange works for the new participant context
+	exCtx, exSpan := p.tracer.Start(spanCtx, "cfm.agent.jwtlet.deploy.verify-token-exchange", trace.WithSpanKind(trace.SpanKindClient))
 	p.Monitor.Debugf("testing token exchange for participant context: %s", participantContextID)
-	scopedToken, err := p.TokenProvider.GetToken(ctx.Context(), "read write", participantContextID)
+	scopedToken, err := p.TokenProvider.GetToken(exCtx, "read write", participantContextID)
 	if err != nil {
+		exSpan.RecordError(err)
+		exSpan.End()
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("testing token exchange failed: error getting scoped token: %w", err)}
 	}
 	claims, err := decodeJWTClaims(scopedToken)
 	if err != nil {
+		exSpan.RecordError(err)
+		exSpan.End()
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("testing token exchange failed: error decoding JWT claims: %w", err)}
 	}
+	exSpan.AddEvent("Verified token exchange")
+	exSpan.End()
 	p.Monitor.Debugf("token exchange successful. claims: %s", claims)
 
 	// set both - for further processing in other agents and for the output
@@ -156,20 +175,29 @@ func (p TokenExchangeActivityProcessor) ProcessDeploy(ctx api.ActivityContext) a
 }
 
 func (p TokenExchangeActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.ActivityResult {
+	spanCtx, span := p.tracer.Start(ctx.Context(), "cfm.agent.jwtlet.dispose", trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
+
 	participantContextID, ok := ctx.Value(participantContextIDKey)
 	if !ok {
-		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing token exchange dispose for orchestration %s: participant context ID not found in context", ctx.OID())}
+		err := fmt.Errorf("error processing token exchange dispose for orchestration %s: participant context ID not found in context", ctx.OID())
+		span.RecordError(err)
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}
 	}
-	err := p.delete(ctx.Context(), fmt.Sprintf("/api/v1/mappings/%s/%s", clientIdentifier, participantContextID))
-	if err != nil {
+	span.SetAttributes(attribute.String("cfm.participantContextId", fmt.Sprintf("%v", participantContextID)))
+
+	if err := p.delete(spanCtx, fmt.Sprintf("/api/v1/mappings/%s/%s", clientIdentifier, participantContextID)); err != nil {
+		span.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error deleting resource mapping: %w", err)}
 	}
 
 	for _, clientID := range vaultClientIdentifiers {
-		if err := p.delete(ctx.Context(), fmt.Sprintf("/api/v1/mappings/%s/%s", clientID, participantContextID)); err != nil {
+		if err := p.delete(spanCtx, fmt.Sprintf("/api/v1/mappings/%s/%s", clientID, participantContextID)); err != nil {
+			span.RecordError(err)
 			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error deleting vault resource mapping for %s: %w", clientID, err)}
 		}
 	}
+	span.AddEvent("Deleted resource mappings")
 
 	// we do NOT delete the scope mappings, because they only exist once for all participants
 
