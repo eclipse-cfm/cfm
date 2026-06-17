@@ -65,6 +65,11 @@ type Orchestration struct {
 	ProcessingData    map[string]any          `json:"processingData"`
 	OutputData        map[string]any          `json:"outputData"`
 	Completed         map[string]struct{}     `json:"completed"`
+	// OriginTraceContext carries the W3C trace context (traceparent/tracestate) of the request that started
+	// this orchestration, captured at execution time. It lets reactive flows that have no inbound message to
+	// extract context from — notably auto-compensation launched from the KV watcher — link back to the
+	// originating trace.
+	OriginTraceContext map[string]string `json:"originTraceContext,omitempty"`
 }
 
 func (o *Orchestration) SetState(state OrchestrationState) {

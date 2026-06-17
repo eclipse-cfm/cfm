@@ -25,6 +25,9 @@ import (
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type MessageAck interface {
@@ -118,6 +121,18 @@ func (w *OrchestrationIndexWatcher) startCompensationOrchestration(ctx context.C
 		w.monitor.Warnf("No compensation orchestration definition found for orchestration [%s]", orchestration.ID)
 		return nil
 	}
+
+	// The KV watcher runs under a fresh context with no inbound message to extract trace context from, so
+	// without this the compensation would start a brand-new, disconnected trace. Link it back to the
+	// originating trace of the failed orchestration. A link (rather than a parent) is used because
+	// compensation is a reactive saga step, not a continuation of the original request.
+	var links []trace.Link
+	if len(orchestration.OriginTraceContext) > 0 {
+		originCtx := otel.GetTextMapPropagator().Extract(context.Background(), propagation.MapCarrier(orchestration.OriginTraceContext))
+		links = append(links, trace.LinkFromContext(originCtx))
+	}
+	ctx, span := otel.GetTracerProvider().Tracer("cfm.pmanager.orchestrator").Start(ctx, "nats.auto_compensation", trace.WithLinks(links...))
+	defer span.End()
 
 	w.monitor.Infof("Orchestration [%s] is in state [%s] with error: [%s]. Starting auto-compensation", orchestration.ID, orchestration.State.String(), orchestration.ProcessingData["error"])
 

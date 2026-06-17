@@ -27,6 +27,7 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 var (
@@ -88,6 +89,16 @@ func (o *NatsOrchestrator) Execute(ctx context.Context, orchestration *api.Orche
 
 	ctx, span := otel.GetTracerProvider().Tracer("cfm.pmanager.orchestrator").Start(ctx, "nats.execute_orchestration")
 	defer span.End()
+
+	// Capture the originating trace context so reactive flows that lack an inbound message to extract from
+	// (notably auto-compensation launched later from the KV watcher) can link back to this trace.
+	if orchestration.OriginTraceContext == nil {
+		carrier := propagation.MapCarrier{}
+		otel.GetTextMapPropagator().Inject(ctx, carrier)
+		if len(carrier) > 0 {
+			orchestration.OriginTraceContext = carrier
+		}
+	}
 
 	serializedOrchestration, err := json.Marshal(orchestration)
 	if err != nil {
