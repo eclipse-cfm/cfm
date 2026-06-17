@@ -220,6 +220,16 @@ func CheckRequiredParams(params ...any) error {
 
 func SetupTelemetry(serviceName string, shutdown <-chan struct{}) error {
 	spanCtx := context.Background()
+
+	// Install the propagator first, unconditionally: cross-service context propagation (W3C traceparent over
+	// HTTP and NATS headers) must not depend on the exporters being constructable. Otherwise a single exporter
+	// or resource init failure below would return early, leaving the global no-op propagator in place and
+	// silently breaking trace linkage across every NATS hop and outbound HTTP call in this runtime.
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	))
+
 	spanExporter, err := autoexport.NewSpanExporter(spanCtx)
 	if err != nil {
 		return err
@@ -260,11 +270,6 @@ func SetupTelemetry(serviceName string, shutdown <-chan struct{}) error {
 		sdklog.WithResource(res),
 	)
 	global.SetLoggerProvider(lp) // otelzap bridge reads from global.GetLoggerProvider()
-
-	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
-		propagation.TraceContext{},
-		propagation.Baggage{},
-	))
 
 	go func() {
 		<-shutdown

@@ -86,7 +86,7 @@ func (o *NatsOrchestrator) Execute(ctx context.Context, orchestration *api.Orche
 	initOrchMetrics()
 	orchStartedCounter.Add(ctx, 1)
 
-	_, span := otel.GetTracerProvider().Tracer("cfm.pmanager.orchestrator").Start(ctx, "nats.execute_orchestration")
+	ctx, span := otel.GetTracerProvider().Tracer("cfm.pmanager.orchestrator").Start(ctx, "nats.execute_orchestration")
 	defer span.End()
 
 	serializedOrchestration, err := json.Marshal(orchestration)
