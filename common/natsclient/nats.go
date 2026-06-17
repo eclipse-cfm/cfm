@@ -23,7 +23,6 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/propagation"
 )
 
 const (
@@ -115,7 +114,7 @@ func (a natsClientAdapter) Get(ctx context.Context, key string) (jetstream.KeyVa
 
 func (a natsClientAdapter) Publish(ctx context.Context, subject string, payload []byte, opts ...jetstream.PublishOpt) (*jetstream.PubAck, error) {
 	headers := nats.Header{}
-	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(headers))
+	otel.GetTextMapPropagator().Inject(ctx, &natsHeaderCarrier{headers: headers})
 	natsMsg := &nats.Msg{
 		Header:  headers,
 		Data:    payload,
