@@ -22,6 +22,7 @@ import (
 
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/natsfixtures"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -42,26 +43,39 @@ func TestContractDefinitionAgent_Integration(t *testing.T) {
 	require.NoError(t, err)
 	defer natsfixtures.TeardownNatsContainer(ctx, nt)
 
-	t.Setenv("CONTRACTDEFINITIONAGENT_URI", nt.URI)
-	t.Setenv("CONTRACTDEFINITIONAGENT_BUCKET", bucket)
-	t.Setenv("CONTRACTDEFINITIONAGENT_STREAM", streamName)
+	t.Setenv("CDAGENT_URI", nt.URI)
+	t.Setenv("CDAGENT_BUCKET", bucket)
+	t.Setenv("CDAGENT_STREAM", streamName)
+
+	// The event stream is provisioned out-of-band; the agent only binds a consumer to it and must fail to start if it
+	// is absent.
+	_, err = nt.Client.JetStream.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
+		Name:      streamName,
+		Retention: jetstream.InterestPolicy,
+		Storage:   jetstream.MemoryStorage,
+		Subjects:  []string{ContractDefinitionSubject},
+	})
+	require.NoError(t, err)
 
 	shutdown := make(chan struct{})
 	go LaunchAndWaitSignal(shutdown)
 	defer close(shutdown)
 
-	// The agent must create a durable consumer bound to the contract definition created subject.
+	// The agent must create a durable consumer bound to the contract definition subjects.
 	require.Eventually(t, func() bool {
 		stream, err := nt.Client.JetStream.Stream(ctx, streamName)
 		if err != nil {
 			return false
 		}
-		consumer, err := stream.Consumer(ctx, durableName)
-		if err != nil {
-			return false
-		}
-		return assert.ObjectsAreEqual([]string{ContractDefinitionCreatedSubject}, consumer.CachedInfo().Config.FilterSubjects)
-	}, testTimeout, pollInterval, "agent should create a durable consumer for the contract definition subject")
+		_, err = stream.Consumer(ctx, durableName)
+		return err == nil
+	}, testTimeout, pollInterval, "agent should create a durable consumer for the contract definition subjects")
+
+	stream, err := nt.Client.JetStream.Stream(ctx, streamName)
+	require.NoError(t, err)
+	consumer, err := stream.Consumer(ctx, durableName)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{ContractDefinitionSubject}, consumer.CachedInfo().Config.FilterSubjects)
 
 	// Publishing a CloudEvent must be consumed and acknowledged (no pending messages remain).
 	payload, _ := json.Marshal(map[string]any{
