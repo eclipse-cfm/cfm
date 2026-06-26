@@ -9,11 +9,12 @@ ASSEMBLY_DIR=assembly
 COMMON_DIR=common
 PMANAGER_DIR=pmanager
 TMANAGER_DIR=tmanager
-EDCV_DIR=agent/edcv
-IH_DIR=agent/ih
-REG_DIR=agent/registration
-ONBOARDING_DIR=agent/onboarding
-JWTLET_AGENT_DIR=agent/jwtletagent
+EDCV_DIR=agent/orchestration/edcv
+IH_DIR=agent/orchestration/ih
+REG_DIR=agent/orchestration/registration
+ONBOARDING_DIR=agent/orchestration/onboarding
+JWTLET_AGENT_DIR=agent/orchestration/jwtletagent
+CONTRACT_DEFINITION_AGENT_DIR=agent/lifecycle/contractdefinitionagent
 AGENT_COMMON=agent/common
 KIND_CLUSTER_NAME=edcv
 
@@ -71,6 +72,7 @@ build:
 	$(MAKE) -C $(REG_DIR) build
 	$(MAKE) -C $(ONBOARDING_DIR) build
 	$(MAKE) -C $(JWTLET_AGENT_DIR) build
+	$(MAKE) -C $(CONTRACT_DEFINITION_AGENT_DIR) build
 
 build-pmanager:
 	@echo "Building pmanager..."
@@ -89,6 +91,7 @@ build-all:
 	$(MAKE) -C $(REG_DIR) build-all
 	$(MAKE) -C $(ONBOARDING_DIR) build-all
 	$(MAKE) -C $(JWTLET_AGENT_DIR) build-all
+	$(MAKE) -C $(CONTRACT_DEFINITION_AGENT_DIR) build-all
 
 #==============================================================================
 # Test Commands - Delegate to Service Makefiles
@@ -106,6 +109,7 @@ test: install-gotestsum
 	$(MAKE) -C $(REG_DIR) test
 	$(MAKE) -C $(ONBOARDING_DIR) test
 	$(MAKE) -C $(JWTLET_AGENT_DIR) test
+	$(MAKE) -C $(CONTRACT_DEFINITION_AGENT_DIR) test
 	$(MAKE) -C $(ASSEMBLY_DIR) test
 	$(MAKE) -C $(AGENT_COMMON) test
 
@@ -159,6 +163,7 @@ clean:
 	$(MAKE) -C $(REG_DIR) clean
 	$(MAKE) -C $(ONBOARDING_DIR) clean
 	$(MAKE) -C $(JWTLET_AGENT_DIR) clean
+	$(MAKE) -C $(CONTRACT_DEFINITION_AGENT_DIR) clean
 
 #==============================================================================
 # Tool Commands - Delegate to Service Makefiles
@@ -189,7 +194,7 @@ generate-docs:
 # Docker Commands - Handled at Top Level
 #==============================================================================
 
-docker-build: docker-build-pmanager docker-build-tmanager docker-build-jwtletagent docker-build-edcvagent docker-build-ihagent docker-build-regagent docker-build-obagent
+docker-build: docker-build-pmanager docker-build-tmanager docker-build-jwtletagent docker-build-edcvagent docker-build-ihagent docker-build-regagent docker-build-obagent docker-build-contractdefinitionagent
 
 docker-build-pmanager:
 	@echo "Building pmanager Docker image..."
@@ -219,7 +224,11 @@ docker-build-obagent:
 	@echo "Building Onboarding agent Docker image..."
 	docker buildx build -f docker/Dockerfile.obagent.dockerfile -t $(DOCKER_REGISTRY)obagent:$(DOCKER_TAG) .
 
-docker-clean: docker-clean-pmanager docker-clean-tmanager docker-clean-jwtletagent docker-clean-edcvagent docker-clean-ihagent docker-clean-regagent docker-clean-obagent
+docker-build-contractdefinitionagent:
+	@echo "Building Contract Definition agent Docker image..."
+	docker buildx build -f docker/Dockerfile.contractdefinitionagent.dockerfile -t $(DOCKER_REGISTRY)contractdefinitionagent:$(DOCKER_TAG) .
+
+docker-clean: docker-clean-pmanager docker-clean-tmanager docker-clean-jwtletagent docker-clean-edcvagent docker-clean-ihagent docker-clean-regagent docker-clean-obagent docker-clean-contractdefinitionagent
 
 docker-clean-pmanager:
 	docker rmi $(DOCKER_REGISTRY)pmanager:$(DOCKER_TAG) || true
@@ -241,6 +250,9 @@ docker-clean-regagent:
 
 docker-clean-obagent:
 	docker rmi $(DOCKER_REGISTRY)obagent:$(DOCKER_TAG) || true
+
+docker-clean-contractdefinitionagent:
+	docker rmi $(DOCKER_REGISTRY)contractdefinitionagent:$(DOCKER_TAG) || true
 
 #==============================================================================
 # Load images into KinD Cluster
@@ -266,6 +278,9 @@ load-into-kind-regagent: docker-build-regagent
 
 load-into-kind-jwtletagent: docker-build-jwtletagent
 	kind load docker-image -n $(KIND_CLUSTER_NAME) $(DOCKER_REGISTRY)jwtletagent:$(DOCKER_TAG)
+
+load-into-kind-contractdefinitionagent: docker-build-contractdefinitionagent
+	kind load docker-image -n $(KIND_CLUSTER_NAME) $(DOCKER_REGISTRY)contractdefinitionagent:$(DOCKER_TAG)
 
 # builds and loads all images into KinD cluster. Will require kind to be installed and a kind cluster named KIND_CLUSTER_NAME running.
 load-into-kind: docker-build

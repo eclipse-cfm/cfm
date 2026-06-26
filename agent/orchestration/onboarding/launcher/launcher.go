@@ -1,0 +1,83 @@
+//  Copyright (c) 2025 Metaform Systems, Inc
+//
+//  This program and the accompanying materials are made available under the
+//  terms of the Apache License, Version 2.0 which is available at
+//  https://www.apache.org/licenses/LICENSE-2.0
+//
+//  SPDX-License-Identifier: Apache-2.0
+//
+//  Contributors:
+//       Metaform Systems, Inc. - initial API and implementation
+//
+
+package launcher
+
+import (
+	"net/http"
+
+	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
+	"github.com/eclipse-cfm/cfm/agent/common/issuerservice"
+	"github.com/eclipse-cfm/cfm/agent/orchestration/onboarding/activity"
+	"github.com/eclipse-cfm/cfm/assembly/httpclient"
+	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
+	"github.com/eclipse-cfm/cfm/common/runtime"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/common/tokenexchange"
+	"github.com/eclipse-cfm/cfm/pmanager/api"
+	"github.com/eclipse-cfm/cfm/pmanager/natsagent"
+)
+
+const (
+	ActivityType            = "onboarding-activity"
+	identityHubURLKey       = "identityhub.url"
+	issuerServiceBaseUrlKey = "issuerservice.url"
+	issuerIDKey             = "issuer.id"
+	tokenExchangeURLKey     = "tokenexchange.url"
+	tokenFilePathKey        = "tokenexchange.tokenFilePath"
+	audienceKey             = "tokenexchange.audience"
+)
+
+func LaunchAndWaitSignal(shutdown <-chan struct{}) {
+	config := natsagent.LauncherConfig{
+		AgentName:    "Onboarding Agent",
+		ServiceName:  "cfm.agent.onboarding",
+		ConfigPrefix: "obagent",
+		ActivityType: ActivityType,
+		AssemblyProvider: func() []system.ServiceAssembly {
+			return []system.ServiceAssembly{
+				&httpclient.HttpClientServiceAssembly{},
+			}
+		},
+		NewProcessor: func(ctx *natsagent.AgentContext) api.ActivityProcessor {
+			httpClient := ctx.Registry.Resolve(serviceapi.HttpClientKey).(http.Client)
+			ihURL := ctx.Config.GetString(identityHubURLKey)
+			issuerServiceBaseUrl := ctx.Config.GetString(issuerServiceBaseUrlKey)
+			issuerID := ctx.Config.GetString(issuerIDKey)
+
+			if err := runtime.CheckRequiredParams(identityHubURLKey, ihURL); err != nil {
+				panic(err)
+			}
+
+			provider := tokenexchange.NewTokenExchangeProvider(ctx.Config.GetString(tokenFilePathKey),
+				tokenexchange.WithTokenExchangeUrl(ctx.Config.GetString(tokenExchangeURLKey)),
+				tokenexchange.WithTokenExchangeAudience(ctx.Config.GetString(audienceKey)),
+				tokenexchange.WithHttpClient(&httpClient))
+
+			return activity.OnboardingActivityProcessor{
+				Monitor: ctx.Monitor,
+				IdentityApiClient: identityhub.HttpIdentityAPIClient{
+					BaseURL:       ihURL,
+					TokenProvider: provider,
+					HttpClient:    &httpClient,
+				},
+				IssuerServiceApiClient: issuerservice.HttpApiClient{
+					BaseURL:       issuerServiceBaseUrl,
+					TokenProvider: provider,
+					IssuerID:      issuerID,
+					HttpClient:    &httpClient,
+				},
+			}
+		},
+	}
+	natsagent.LaunchAgent(shutdown, config)
+}

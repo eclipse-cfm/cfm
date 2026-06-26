@@ -22,7 +22,7 @@ COPY . .
 
 # Build the agent binary
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    go build -ldflags="-s -w" -o bin/regagent ./agent/registration/cmd/server/main.go
+    go build -ldflags="-s -w" -o bin/regagent ./agent/orchestration/registration/cmd/server/main.go
 
 # Production stage
 FROM gcr.io/distroless/static-debian12:nonroot

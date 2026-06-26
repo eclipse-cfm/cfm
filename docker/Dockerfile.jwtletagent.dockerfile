@@ -23,7 +23,7 @@ COPY . .
 
 # Build the agent binary
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    go build -ldflags="-s -w" -o bin/jwtletagent ./agent/jwtletagent/cmd/server/main.go
+    go build -ldflags="-s -w" -o bin/jwtletagent ./agent/orchestration/jwtletagent/cmd/server/main.go
 
 # Production stage
 FROM gcr.io/distroless/static-debian12:nonroot

@@ -47,11 +47,17 @@ func initNatsMetrics() {
 }
 
 // RetriableMessageProcessor delegates to a dispatcher to process messages from a JetStream consumer and retries on failure.
+//
+// Two dispatcher forms are supported. Dispatcher receives only the decoded payload and is sufficient for most callers.
+// DispatcherCtx additionally receives the raw jetstream.Msg, giving access to the message subject, headers and bytes;
+// it is useful for agents that subscribe to multiple subjects and must branch on the subject. When DispatcherCtx is set
+// it takes precedence over Dispatcher.
 type RetriableMessageProcessor[T any] struct {
-	Client     MsgClient
-	Dispatcher func(ctx context.Context, payload T) error
-	Monitor    system.LogMonitor
-	Processing atomic.Bool
+	Client        MsgClient
+	Dispatcher    func(ctx context.Context, payload T) error
+	DispatcherCtx func(ctx context.Context, payload T, message jetstream.Msg) error
+	Monitor       system.LogMonitor
+	Processing    atomic.Bool
 }
 
 // ProcessLoop handles the main loop for consuming and processing messages from a JetStream consumer.
@@ -109,7 +115,12 @@ func (n *RetriableMessageProcessor[T]) ProcessMessage(ctx context.Context, messa
 		return fmt.Errorf("failed to unmarshal message: %w", err)
 	}
 
-	resultErr := n.Dispatcher(ctx, payload)
+	var resultErr error
+	if n.DispatcherCtx != nil {
+		resultErr = n.DispatcherCtx(ctx, payload, message)
+	} else {
+		resultErr = n.Dispatcher(ctx, payload)
+	}
 	if resultErr == nil {
 		return AckMessage(message)
 	}
