@@ -40,7 +40,7 @@ func provisionStream(t *testing.T, ctx context.Context, nt *natsfixtures.NatsTes
 	return stream
 }
 
-func TestGetStream_ErrorsWhenStreamAbsent(t *testing.T) {
+func TestGetStream_CreateWhenStreamAbsent(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), streamTestTimeout)
 	defer cancel()
 
@@ -49,8 +49,8 @@ func TestGetStream_ErrorsWhenStreamAbsent(t *testing.T) {
 	defer natsfixtures.TeardownNatsContainer(ctx, nt)
 
 	// The stream has not been provisioned, so resolving it must fail (the agent should then crash and be restarted).
-	_, err = natsclient.GetStream(ctx, nt.Client, "events-stream")
-	require.Error(t, err)
+	_, err = natsclient.GetStream(ctx, nt.Client, "events-stream", []string{"foo"})
+	require.NoError(t, err)
 }
 
 func TestGetStream_ReturnsExistingStream(t *testing.T) {
@@ -63,7 +63,7 @@ func TestGetStream_ReturnsExistingStream(t *testing.T) {
 
 	provisionStream(t, ctx, nt, "events-stream", []string{"events.contract.definition.created", "events.asset.>"})
 
-	stream, err := natsclient.GetStream(ctx, nt.Client, "events-stream")
+	stream, err := natsclient.GetStream(ctx, nt.Client, "events-stream", nil)
 	require.NoError(t, err)
 	assert.Equal(t, "events-stream", stream.CachedInfo().Config.Name)
 }
@@ -81,7 +81,7 @@ func TestEnsureStreamSubjects(t *testing.T) {
 
 	t.Run("subject covered by catch-all does not change the stream", func(t *testing.T) {
 		provisionStream(t, ctx, nt, "covered-stream", []string{"covered.>"})
-		stream, err := natsclient.GetStream(ctx, nt.Client, "covered-stream")
+		stream, err := natsclient.GetStream(ctx, nt.Client, "covered-stream", nil)
 		require.NoError(t, err)
 
 		// Adding a specific subject must not produce "covered.>" + "covered.something" (which NATS would reject).
@@ -92,7 +92,7 @@ func TestEnsureStreamSubjects(t *testing.T) {
 
 	t.Run("disjoint subject is added to the stream", func(t *testing.T) {
 		provisionStream(t, ctx, nt, "disjoint-stream", []string{"disjoint.contract.definition.created"})
-		stream, err := natsclient.GetStream(ctx, nt.Client, "disjoint-stream")
+		stream, err := natsclient.GetStream(ctx, nt.Client, "disjoint-stream", nil)
 		require.NoError(t, err)
 
 		updated, err := natsclient.EnsureStreamSubjects(ctx, nt.Client, stream, []string{"disjoint.asset.created"})
@@ -112,7 +112,7 @@ func TestSetupMultiSubjectConsumer_ReceivesOnEachSubject(t *testing.T) {
 
 	subjects := []string{"events.contract.definition.created", "events.contract.definition.updated"}
 	provisionStream(t, ctx, nt, "events-stream", subjects)
-	stream, err := natsclient.GetStream(ctx, nt.Client, "events-stream")
+	stream, err := natsclient.GetStream(ctx, nt.Client, "events-stream", nil)
 	require.NoError(t, err)
 
 	consumer, err := natsclient.SetupMultiSubjectConsumer(ctx, stream, "test-agent", subjects)
@@ -148,7 +148,7 @@ func TestSetupMultiSubjectConsumer_FanOutToMultipleConsumers(t *testing.T) {
 
 	subject := "events.contract.definition.created"
 	provisionStream(t, ctx, nt, "events-stream", []string{subject})
-	stream, err := natsclient.GetStream(ctx, nt.Client, "events-stream")
+	stream, err := natsclient.GetStream(ctx, nt.Client, "events-stream", nil)
 	require.NoError(t, err)
 
 	// Two distinct agents (durable consumers) on the same subject. Under InterestPolicy each receives its own copy;

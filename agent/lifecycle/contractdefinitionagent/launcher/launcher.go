@@ -23,8 +23,6 @@ const (
 	// ContractDefinitionSubject is the wildcard subject the agent subscribes to; it covers all contract definition
 	// lifecycle events (created, updated, ...).
 	ContractDefinitionSubject = "events.contract.definition.>"
-	// ContractDefinitionCreatedSubject is a concrete contract definition event subject covered by ContractDefinitionSubject.
-	ContractDefinitionCreatedSubject = "events.contract.definition.created"
 )
 
 func LaunchAndWaitSignal(shutdown <-chan struct{}) {

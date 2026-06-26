@@ -57,19 +57,27 @@ func SetupConsumer(ctx context.Context, stream jetstream.Stream, subject string)
 	})
 }
 
-// GetStream looks up an existing JetStream stream by name. The shared event stream must already exist; if it does not,
-// GetStream returns an error so the agent fails to start and the runtime (for example Kubernetes) restarts it until the
-// stream has been provisioned. Adding the agent's own subjects to an existing stream is done separately via
-// EnsureStreamSubjects.
-func GetStream(ctx context.Context, client *NatsClient, streamName string) (jetstream.Stream, error) {
+// GetStream looks up an existing JetStream stream by name. If the stream does not exist, it creates it with default
+// configuration. Adding the agent's own subjects to an existing stream is done separately via EnsureStreamSubjects.
+func GetStream(ctx context.Context, client *NatsClient, streamName string, subjects []string) (jetstream.Stream, error) {
 	stream, err := client.JetStream.Stream(ctx, streamName)
+
+	if err == nil {
+		// make sure the desired subjects are added to the stream
+		return EnsureStreamSubjects(ctx, client, stream, subjects)
+	}
+	// If stream doesn't exist, create it with the desired subjects
 	if errors.Is(err, jetstream.ErrStreamNotFound) {
-		return nil, fmt.Errorf("required NATS stream %q does not exist; it must be provisioned before the agent starts: %w", streamName, err)
+		cfg := jetstream.StreamConfig{
+			Name:      streamName,
+			Retention: jetstream.InterestPolicy,
+			Storage:   jetstream.MemoryStorage,
+			Subjects:  subjects,
+		}
+		// no need to call EnsureSteamSubjects, because we are creating the stream with the desired subjects
+		return client.JetStream.CreateStream(ctx, cfg)
 	}
-	if err != nil {
-		return nil, fmt.Errorf("unable to access NATS stream %q: %w", streamName, err)
-	}
-	return stream, nil
+	return nil, fmt.Errorf("unable to access NATS stream %q: %w", streamName, err)
 }
 
 // EnsureStreamSubjects adds the given subjects to an existing stream so the stream carries the events the agent consumes.
