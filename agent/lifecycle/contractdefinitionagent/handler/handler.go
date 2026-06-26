@@ -22,13 +22,13 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 )
 
-// ContractDefinitionEvent is the payload delivered on the "events.contract.definition.*" subjects.
-type ContractDefinitionEvent struct {
-	ID                 string `json:"id"`
+// ContractDefinitionData is the domain payload carried in the `data` field of a contract definition CloudEvent.
+type ContractDefinitionData struct {
 	ParticipantContext string `json:"participantContextId"`
-	AccessPolicyID     string `json:"accessPolicyId"`
-	ContractPolicyID   string `json:"contractPolicyId"`
 }
+
+// ContractDefinitionEvent is the CloudEvent delivered on the "events.contract.definition.*" subjects.
+type ContractDefinitionEvent = lifecycleagent.CloudEvent[ContractDefinitionData]
 
 // Config holds the dependencies required by the Processor.
 type Config struct {
@@ -48,8 +48,8 @@ func NewProcessor(config *Config) *Processor {
 // Process handles a single contract definition event. Returning a recoverable error (see common/types) causes the
 // message to be redelivered; any other error is treated as fatal and the message is dropped.
 func (p *Processor) Process(_ context.Context, evt lifecycleagent.EventContext[ContractDefinitionEvent]) error {
-	p.monitor.Infof("Received contract definition event on subject %s: id=%s participant=%s",
-		evt.Subject, evt.Payload.ID, evt.Payload.ParticipantContext)
+	p.monitor.Infof("Received contract definition event %s of type %q on subject %s: participantContextId = %s",
+		evt.Payload.ID, evt.Payload.Type, evt.Subject, evt.Payload.Data.ParticipantContext)
 
 	// TODO: implement contract definition reaction logic here.
 	return nil
