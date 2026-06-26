@@ -63,8 +63,14 @@ func TestContractDefinitionAgent_Integration(t *testing.T) {
 		return assert.ObjectsAreEqual([]string{ContractDefinitionCreatedSubject}, consumer.CachedInfo().Config.FilterSubjects)
 	}, testTimeout, pollInterval, "agent should create a durable consumer for the contract definition subject")
 
-	// Publishing an event must be consumed and acknowledged (no pending messages remain).
-	payload, _ := json.Marshal(map[string]string{"id": "cd-1", "participantContextId": "participant-1"})
+	// Publishing a CloudEvent must be consumed and acknowledged (no pending messages remain).
+	payload, _ := json.Marshal(map[string]any{
+		"specversion": "1.0",
+		"id":          "ce-1",
+		"source":      "/cfm/test",
+		"type":        "io.cfm.contract.definition.created",
+		"data":        map[string]string{"id": "cd-1", "participantContextId": "participant-1"},
+	})
 	_, err = natsclient.NewMsgClient(nt.Client).Publish(ctx, ContractDefinitionCreatedSubject, payload)
 	require.NoError(t, err)
 

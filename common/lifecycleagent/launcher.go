@@ -130,6 +130,8 @@ func LaunchAgent[T any](shutdown <-chan struct{}, config LauncherConfig[T]) {
 		monitor.Warnf("Error setting up telemetry: %s. Traces and metrics will not be available.", err.Error())
 	}
 
+	monitor.Debugf("Launching agent %s, with JetStream subjects: %s", cfg.Name, cfg.Subjects)
+
 	runtime.AssembleAndLaunch(assembler, cfg.Name, monitor, shutdown)
 }
 

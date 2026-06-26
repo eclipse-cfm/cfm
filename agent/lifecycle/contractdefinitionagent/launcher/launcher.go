@@ -26,7 +26,7 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 		AgentName:    "Contract Definition Agent",
 		ServiceName:  "cfm.agent.contractdefinition",
 		ConfigPrefix: "cdagent",
-		Subjects:     []string{ContractDefinitionCreatedSubject, "events.contract.definition.updated"},
+		Subjects:     []string{"events.contract.definition.>"},
 		NewProcessor: func(ctx *lifecycleagent.AgentContext) lifecycleagent.EventProcessor[handler.ContractDefinitionEvent] {
 			return handler.NewProcessor(&handler.Config{
 				LogMonitor: ctx.Monitor,
