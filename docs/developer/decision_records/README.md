@@ -27,3 +27,4 @@ the following sections:
 | 2025-12-216 | [Single Go Module](2025-12-16-single-go-module/README.md)              | Adoption of a single Go module                                                    |
 | 2025-12-216 | [Compensation Datamodel](2026-02-13-compensation-datamodel/README.md)  | Datamodel for compensation mechanisms                                             |
 | 2025-12-216 | [Mandatory authn/authz](2026-06-01-mandatory-authn_authz/README.md)    | Mandatory API authn/authz using OAuth2                                            |
+| 2026-06-26  | [Lifecycle Agents](2026-06-26-lifecycle-agents/README.md)              | Agents that react to domain lifecycle events delivered as CloudEvents             |
