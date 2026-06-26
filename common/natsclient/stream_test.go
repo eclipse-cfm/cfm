@@ -26,29 +26,21 @@ import (
 
 const streamTestTimeout = 30 * time.Second
 
-func TestSetupStreamWithSubjects_MultiTokenAndWildcard(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), streamTestTimeout)
-	defer cancel()
-
-	nt, err := natsfixtures.SetupNatsContainer(ctx, "cfm-bucket")
+// provisionStream creates the event stream out-of-band, mirroring how the stream is provisioned in production (lifecycle
+// agents never create it themselves).
+func provisionStream(t *testing.T, ctx context.Context, nt *natsfixtures.NatsTestContainer, name string, subjects []string) jetstream.Stream {
+	t.Helper()
+	stream, err := nt.Client.JetStream.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
+		Name:      name,
+		Retention: jetstream.InterestPolicy,
+		Storage:   jetstream.MemoryStorage,
+		Subjects:  subjects,
+	})
 	require.NoError(t, err)
-	defer natsfixtures.TeardownNatsContainer(ctx, nt)
-
-	// Multi-token subjects and a wildcard subject, kept non-overlapping (a single stream rejects overlapping subjects).
-	subjects := []string{"events.contract.definition.created", "events.asset.>"}
-
-	// Creating the stream is idempotent.
-	stream, err := natsclient.SetupStreamWithSubjects(ctx, nt.Client, "events-stream", subjects)
-	require.NoError(t, err)
-	_, err = natsclient.SetupStreamWithSubjects(ctx, nt.Client, "events-stream", subjects)
-	require.NoError(t, err)
-
-	info := stream.CachedInfo()
-	assert.Equal(t, jetstream.InterestPolicy, info.Config.Retention)
-	assert.ElementsMatch(t, subjects, info.Config.Subjects)
+	return stream
 }
 
-func TestSetupStreamWithSubjects_UnionOnUpdate(t *testing.T) {
+func TestGetStream_ErrorsWhenStreamAbsent(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), streamTestTimeout)
 	defer cancel()
 
@@ -56,14 +48,58 @@ func TestSetupStreamWithSubjects_UnionOnUpdate(t *testing.T) {
 	require.NoError(t, err)
 	defer natsfixtures.TeardownNatsContainer(ctx, nt)
 
-	_, err = natsclient.SetupStreamWithSubjects(ctx, nt.Client, "events-stream", []string{"events.a.created"})
-	require.NoError(t, err)
+	// The stream has not been provisioned, so resolving it must fail (the agent should then crash and be restarted).
+	_, err = natsclient.GetStream(ctx, nt.Client, "events-stream")
+	require.Error(t, err)
+}
 
-	// A second agent contributes another subject to the same stream; both must remain.
-	stream, err := natsclient.SetupStreamWithSubjects(ctx, nt.Client, "events-stream", []string{"events.b.created"})
-	require.NoError(t, err)
+func TestGetStream_ReturnsExistingStream(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), streamTestTimeout)
+	defer cancel()
 
-	assert.ElementsMatch(t, []string{"events.a.created", "events.b.created"}, stream.CachedInfo().Config.Subjects)
+	nt, err := natsfixtures.SetupNatsContainer(ctx, "cfm-bucket")
+	require.NoError(t, err)
+	defer natsfixtures.TeardownNatsContainer(ctx, nt)
+
+	provisionStream(t, ctx, nt, "events-stream", []string{"events.contract.definition.created", "events.asset.>"})
+
+	stream, err := natsclient.GetStream(ctx, nt.Client, "events-stream")
+	require.NoError(t, err)
+	assert.Equal(t, "events-stream", stream.CachedInfo().Config.Name)
+}
+
+func TestEnsureStreamSubjects(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), streamTestTimeout)
+	defer cancel()
+
+	nt, err := natsfixtures.SetupNatsContainer(ctx, "cfm-bucket")
+	require.NoError(t, err)
+	defer natsfixtures.TeardownNatsContainer(ctx, nt)
+
+	// Each subtest uses a distinct subject namespace: NATS prohibits overlapping subjects across streams in the same
+	// account, not just within one stream.
+
+	t.Run("subject covered by catch-all does not change the stream", func(t *testing.T) {
+		provisionStream(t, ctx, nt, "covered-stream", []string{"covered.>"})
+		stream, err := natsclient.GetStream(ctx, nt.Client, "covered-stream")
+		require.NoError(t, err)
+
+		// Adding a specific subject must not produce "covered.>" + "covered.something" (which NATS would reject).
+		updated, err := natsclient.EnsureStreamSubjects(ctx, nt.Client, stream, []string{"covered.contract.definition.created"})
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []string{"covered.>"}, updated.CachedInfo().Config.Subjects)
+	})
+
+	t.Run("disjoint subject is added to the stream", func(t *testing.T) {
+		provisionStream(t, ctx, nt, "disjoint-stream", []string{"disjoint.contract.definition.created"})
+		stream, err := natsclient.GetStream(ctx, nt.Client, "disjoint-stream")
+		require.NoError(t, err)
+
+		updated, err := natsclient.EnsureStreamSubjects(ctx, nt.Client, stream, []string{"disjoint.asset.created"})
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []string{"disjoint.contract.definition.created", "disjoint.asset.created"},
+			updated.CachedInfo().Config.Subjects)
+	})
 }
 
 func TestSetupMultiSubjectConsumer_ReceivesOnEachSubject(t *testing.T) {
@@ -75,7 +111,8 @@ func TestSetupMultiSubjectConsumer_ReceivesOnEachSubject(t *testing.T) {
 	defer natsfixtures.TeardownNatsContainer(ctx, nt)
 
 	subjects := []string{"events.contract.definition.created", "events.contract.definition.updated"}
-	stream, err := natsclient.SetupStreamWithSubjects(ctx, nt.Client, "events-stream", subjects)
+	provisionStream(t, ctx, nt, "events-stream", subjects)
+	stream, err := natsclient.GetStream(ctx, nt.Client, "events-stream")
 	require.NoError(t, err)
 
 	consumer, err := natsclient.SetupMultiSubjectConsumer(ctx, stream, "test-agent", subjects)
@@ -101,7 +138,7 @@ func TestSetupMultiSubjectConsumer_ReceivesOnEachSubject(t *testing.T) {
 	}, streamTestTimeout, 100*time.Millisecond, "consumer should receive a message on each filter subject")
 }
 
-func TestSetupStreamWithSubjects_FanOutToMultipleConsumers(t *testing.T) {
+func TestSetupMultiSubjectConsumer_FanOutToMultipleConsumers(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), streamTestTimeout)
 	defer cancel()
 
@@ -110,7 +147,8 @@ func TestSetupStreamWithSubjects_FanOutToMultipleConsumers(t *testing.T) {
 	defer natsfixtures.TeardownNatsContainer(ctx, nt)
 
 	subject := "events.contract.definition.created"
-	stream, err := natsclient.SetupStreamWithSubjects(ctx, nt.Client, "events-stream", []string{subject})
+	provisionStream(t, ctx, nt, "events-stream", []string{subject})
+	stream, err := natsclient.GetStream(ctx, nt.Client, "events-stream")
 	require.NoError(t, err)
 
 	// Two distinct agents (durable consumers) on the same subject. Under InterestPolicy each receives its own copy;

@@ -24,6 +24,7 @@ import (
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/natsfixtures"
 	"github.com/eclipse-cfm/cfm/common/types"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -59,6 +60,18 @@ func (p *recordingProcessor) Process(_ context.Context, evt lifecycleagent.Event
 	return nil
 }
 
+// provisionStream creates the shared event stream out-of-band, as it is in production. Lifecycle agents never create it.
+func provisionStream(t *testing.T, ctx context.Context, nt *natsfixtures.NatsTestContainer, subjects ...string) {
+	t.Helper()
+	_, err := nt.Client.JetStream.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
+		Name:      streamName,
+		Retention: jetstream.InterestPolicy,
+		Storage:   jetstream.MemoryStorage,
+		Subjects:  subjects,
+	})
+	require.NoError(t, err)
+}
+
 func setupAgentEnv(t *testing.T, prefix, uri string) {
 	// viper uppercases the env prefix and key, so the environment variables must be uppercase.
 	p := strings.ToUpper(prefix)
@@ -79,6 +92,9 @@ func launchAgent(t *testing.T, ctx context.Context, nt *natsfixtures.NatsTestCon
 			return proc
 		},
 	}
+
+	// The event stream is provisioned out-of-band; the agent only binds a consumer to it.
+	provisionStream(t, ctx, nt, subject)
 
 	shutdown := make(chan struct{})
 	go lifecycleagent.LaunchAgent(shutdown, cfg)

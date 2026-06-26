@@ -110,9 +110,16 @@ func (a *eventAgentServiceAssembly[T]) setupConsumer(natsClient *natsclient.Nats
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	stream, err := natsclient.SetupStreamWithSubjects(ctx, natsClient, a.streamName, a.subjects)
+	// The shared event stream must already exist; fail fast if it is not present so the agent is restarted until it is.
+	stream, err := natsclient.GetStream(ctx, natsClient, a.streamName)
 	if err != nil {
-		return nil, fmt.Errorf("error setting up agent stream: %w", err)
+		return nil, fmt.Errorf("error resolving agent stream: %w", err)
+	}
+
+	// Add this agent's subjects to the shared stream so it carries the events the agent consumes.
+	stream, err = natsclient.EnsureStreamSubjects(ctx, natsClient, stream, a.subjects)
+	if err != nil {
+		return nil, fmt.Errorf("error adding agent subjects to stream: %w", err)
 	}
 
 	consumer, err := natsclient.SetupMultiSubjectConsumer(ctx, stream, durableName(a.agentName), a.subjects)
