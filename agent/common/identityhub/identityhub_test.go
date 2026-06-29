@@ -22,7 +22,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/eclipse-cfm/cfm/agent/edcv"
+	"github.com/eclipse-cfm/cfm/agent/orchestration/edcv"
 	"github.com/eclipse-cfm/cfm/common/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"

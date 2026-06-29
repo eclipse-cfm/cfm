@@ -9,11 +9,11 @@ ASSEMBLY_DIR=assembly
 COMMON_DIR=common
 PMANAGER_DIR=pmanager
 TMANAGER_DIR=tmanager
-EDCV_DIR=agent/edcv
-IH_DIR=agent/ih
-REG_DIR=agent/registration
-ONBOARDING_DIR=agent/onboarding
-JWTLET_AGENT_DIR=agent/jwtletagent
+EDCV_DIR=agent/orchestration/edcv
+IH_DIR=agent/orchestration/ih
+REG_DIR=agent/orchestration/registration
+ONBOARDING_DIR=agent/orchestration/onboarding
+JWTLET_AGENT_DIR=agent/orchestration/jwtletagent
 AGENT_COMMON=agent/common
 KIND_CLUSTER_NAME=edcv
 
