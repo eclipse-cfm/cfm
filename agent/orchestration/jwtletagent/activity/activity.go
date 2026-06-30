@@ -118,7 +118,7 @@ func (p TokenExchangeActivityProcessor) ProcessDeploy(ctx api.ActivityContext) a
 	rm := resourceMapping{
 		ClientIdentifier:   clientIdentifier,
 		ParticipantContext: participantContextID,
-		Scopes:             []string{"read", "write", "admin"},
+		Scopes:             []string{"read", "write", "admin", "siglet-read", "siglet-write"},
 		Audiences:          []string{p.Audience},
 	}
 	p.Monitor.Debugf("Creating resource mapping for participant context: %s", participantContextID)
