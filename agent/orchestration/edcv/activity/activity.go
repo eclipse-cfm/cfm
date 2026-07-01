@@ -17,8 +17,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
 	"github.com/eclipse-cfm/cfm/agent/orchestration/edcv"
-	"github.com/eclipse-cfm/cfm/agent/orchestration/edcv/controlplane"
 	. "github.com/eclipse-cfm/cfm/common/collection"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
