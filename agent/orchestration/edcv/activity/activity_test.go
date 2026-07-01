@@ -347,6 +347,6 @@ func (m MockManagementApiClient) CreateParticipantContext(context.Context, contr
 	return m.expectedParticipantError
 }
 
-func (m MockManagementApiClient) CreateConfig(context.Context, string, controlplane.ParticipantContextConfig) error {
+func (m MockManagementApiClient) PatchConfig(context.Context, string, controlplane.ParticipantContextConfig) error {
 	return m.expectedConfigError
 }

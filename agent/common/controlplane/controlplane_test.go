@@ -230,107 +230,6 @@ func TestCreateParticipant_Conflict(t *testing.T) {
 	require.ErrorContains(t, client.CreateParticipantContext(t.Context(), context), "received status code 409")
 }
 
-func TestCreateParticipantConfig(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == CreateParticipantURL+"/test-participant/config" && r.Method == http.MethodPut {
-			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			var data map[string]any
-			err = json.Unmarshal(body, &data)
-
-			require.Equal(t, "test-participant", data["identity"])
-			require.NotEmptyf(t, data["entries"], "expected empty properties map")
-			require.NotEmptyf(t, data["privateEntries"], "expected empty properties map")
-
-			w.WriteHeader(http.StatusOK)
-		} else {
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer server.Close()
-
-	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
-	client := HttpManagementAPIClient{
-		BaseURL:       server.URL,
-		TokenProvider: tp,
-		HttpClient:    &http.Client{},
-	}
-
-	context := ParticipantContextConfig{
-		ParticipantContextID: "test-participant",
-		Entries:              map[string]string{"foo": "bar"},
-		SecretEntries:        map[string]string{"secret-foo": "secret-bar"},
-	}
-
-	err := client.CreateConfig(t.Context(), "test-participant", context)
-	require.NoError(t, err)
-}
-
-func TestCreateParticipantConfig_AuthError(t *testing.T) {
-	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("", fmt.Errorf("test error"))
-	client := HttpManagementAPIClient{
-		BaseURL:       "http://foo.bar",
-		TokenProvider: tp,
-		HttpClient:    &http.Client{},
-	}
-
-	context := ParticipantContextConfig{
-		ParticipantContextID: "test-participant",
-		Entries:              map[string]string{"foo": "bar"},
-		SecretEntries:        map[string]string{"secret-foo": "secret-bar"},
-	}
-
-	require.ErrorContains(t, client.CreateConfig(t.Context(), "test-participant", context), "test error")
-}
-
-func TestCreateParticipantConfig_BadRequest(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte("foobar"))
-	}))
-	defer server.Close()
-	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
-	client := HttpManagementAPIClient{
-		BaseURL:       server.URL,
-		TokenProvider: tp,
-		HttpClient:    &http.Client{},
-	}
-
-	context := ParticipantContextConfig{
-		ParticipantContextID: "test-participant",
-		Entries:              map[string]string{"foo": "bar"},
-		SecretEntries:        map[string]string{"secret-foo": "secret-bar"},
-	}
-
-	require.ErrorContains(t, client.CreateConfig(t.Context(), "test-participant", context), "foobar")
-}
-
-func TestCreateParticipantConfig_Conflict(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusConflict)
-		_, _ = w.Write([]byte("foobar"))
-	}))
-	defer server.Close()
-	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
-	client := HttpManagementAPIClient{
-		BaseURL:       server.URL,
-		TokenProvider: tp,
-		HttpClient:    &http.Client{},
-	}
-
-	context := ParticipantContextConfig{
-		ParticipantContextID: "test-participant",
-		Entries:              map[string]string{"foo": "bar"},
-		SecretEntries:        map[string]string{"secret-foo": "secret-bar"},
-	}
-
-	require.ErrorContains(t, client.CreateConfig(t.Context(), "test-participant", context), "foobar")
-}
-
 func TestDeleteParticipant(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == CreateParticipantURL+"/test-participant" && r.Method == http.MethodDelete {
@@ -397,4 +296,77 @@ func TestDeleteParticipant_ServerError(t *testing.T) {
 	}
 
 	require.ErrorContains(t, client.DeleteParticipantContext(t.Context(), "test-participant"), "received status code 500")
+}
+
+func TestPatchConfig(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == CreateParticipantURL+"/test-participant/config" && r.Method == http.MethodPatch {
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			var data map[string]any
+			require.NoError(t, json.Unmarshal(body, &data))
+
+			entries, ok := data["entries"].(map[string]any)
+			require.Truef(t, ok, "expected entries object, got %#v", data["entries"])
+			require.Equal(t, "signature", entries["edc.iam.sts.type"])
+			require.Equal(t, "priv-key-alias", entries["edc.iam.sts.signature.keyname"])
+			require.Equal(t, "key-1", entries["edc.iam.sts.signature.kid"])
+
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
+	client := HttpManagementAPIClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	config := ParticipantContextConfig{
+		ParticipantContextID: "test-participant",
+		Entries: map[string]string{
+			"edc.iam.sts.type":              "signature",
+			"edc.iam.sts.signature.keyname": "priv-key-alias",
+			"edc.iam.sts.signature.kid":     "key-1",
+		},
+	}
+
+	require.NoError(t, client.PatchConfig(t.Context(), "test-participant", config))
+}
+
+func TestPatchConfig_AuthError(t *testing.T) {
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("", fmt.Errorf("test error"))
+	client := HttpManagementAPIClient{
+		BaseURL:       "http://foo.bar",
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	err := client.PatchConfig(t.Context(), "test-participant", ParticipantContextConfig{ParticipantContextID: "test-participant"})
+	require.ErrorContains(t, err, "test error")
+}
+
+func TestPatchConfig_ServerError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("internal server error"))
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
+	client := HttpManagementAPIClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	err := client.PatchConfig(t.Context(), "test-participant", ParticipantContextConfig{ParticipantContextID: "test-participant"})
+	require.ErrorContains(t, err, "received status code 500")
 }
