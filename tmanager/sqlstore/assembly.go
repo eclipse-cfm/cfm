@@ -57,7 +57,13 @@ func (a *PostgresServiceAssembly) Init(ictx *system.InitContext) error {
 	a.db = db
 	otelsql.RegisterDBStatsMetrics(db, otelsql.WithAttributes(semconv.DBSystemNamePostgreSQL))
 
-	createTables(db)
+	// Fail fast: without its tables the store cannot serve any request. Returning the
+	// error aborts assembly, which panics the runtime so the process exits non-zero and
+	// the orchestrator restarts it once the database is reachable, rather than running
+	// permanently broken.
+	if err := createTables(db); err != nil {
+		return fmt.Errorf("failed to create tables: %w", err)
+	}
 
 	cellStore := newCellStore()
 	dataspaceStore := newDataspaceProfileStore()
