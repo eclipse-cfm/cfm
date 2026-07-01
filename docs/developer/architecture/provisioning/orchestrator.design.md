@@ -226,7 +226,7 @@ The following is an example of an activity agent configuration:
 package launcher
 
 import (
-	"github.com/eclipse-cfm/cfm/agent/edcv/activity"
+	"github.com/eclipse-cfm/cfm/agent/orchestration/edcv/activity"
 	"github.com/eclipse-cfm/cfm/assembly/httpclient"
 	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
 	"github.com/eclipse-cfm/cfm/assembly/vault"

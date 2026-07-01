@@ -1,4 +1,4 @@
-#  Copyright (c) 2025 Metaform Systems, Inc
+#  Copyright (c) 2026 Metaform Systems, Inc
 #
 #  This program and the accompanying materials are made available under the
 #  terms of the Apache License, Version 2.0 which is available at
@@ -23,11 +23,11 @@ COPY . .
 
 # Build the agent binary
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    go build -ldflags="-s -w" -o bin/ihagent ./agent/orchestration/ih/cmd/server/main.go
+    go build -ldflags="-s -w" -o bin/keymanagementagent ./agent/lifecycle/keymanagementagent/cmd/server/main.go
 
 # Production stage
 FROM gcr.io/distroless/static-debian12:nonroot
 
-COPY --from=builder /app/bin/ihagent /ihagent
+COPY --from=builder /app/bin/keymanagementagent /keymanagementagent
 
-ENTRYPOINT ["/ihagent"]
+ENTRYPOINT ["/keymanagementagent"]
