@@ -66,7 +66,11 @@ func (a *PostgresServiceAssembly) Init(context *system.InitContext) error {
 
 	err = createTables(db)
 	if err != nil {
-		context.LogMonitor.Warnw("Failed to create tables", "error", err)
+		// Fail fast: without its tables the store cannot serve any request (every
+		// query 500s). Returning the error aborts assembly, which panics the runtime
+		// so the process exits non-zero and the orchestrator restarts it once the
+		// database is reachable, rather than running permanently broken.
+		return fmt.Errorf("failed to create tables: %w", err)
 	}
 	return nil
 }
