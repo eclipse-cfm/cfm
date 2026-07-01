@@ -37,6 +37,9 @@ jobs:
           - name: jwtletagent
             dockerfile: docker/Dockerfile.jwtletagent.dockerfile
             context: .
+          - name: keymanagementagent
+            dockerfile: docker/Dockerfile.keymanagementagent.dockerfile
+            context: .
           - name: pmanager
             dockerfile: docker/Dockerfile.pmanager.dockerfile
             context: .
