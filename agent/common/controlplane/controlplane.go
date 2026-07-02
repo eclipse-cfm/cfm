@@ -22,7 +22,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/eclipse-cfm/cfm/agent/orchestration/edcv"
+	vault "github.com/eclipse-cfm/cfm/agent/common/vault"
 	"github.com/eclipse-cfm/cfm/common/token"
 )
 
@@ -44,7 +44,7 @@ type ParticipantContextConfig struct {
 	SecretEntries        map[string]string `json:"privateEntries"`
 }
 
-func NewParticipantContextConfig(participantContextID string, stsClientID string, stsClientSecretAlias string, participantID string, vConfig edcv.VaultConfig, stsTokenURL string) ParticipantContextConfig {
+func NewParticipantContextConfig(participantContextID string, stsClientID string, stsClientSecretAlias string, participantID string, vConfig vault.Config, stsTokenURL string) ParticipantContextConfig {
 	vaultConfig := map[string]any{
 		"config": vConfig,
 	}
@@ -79,7 +79,7 @@ type ParticipantContext struct {
 
 type ManagementAPIClient interface {
 	CreateParticipantContext(ctx context.Context, manifest ParticipantContext) error
-	CreateConfig(ctx context.Context, participantContextID string, config ParticipantContextConfig) error
+	PatchConfig(ctx context.Context, participantContextID string, config ParticipantContextConfig) error
 	DeleteConfig(ctx context.Context, participantContextID string) error
 	DeleteParticipantContext(ctx context.Context, participantContextID string) error
 }
@@ -166,8 +166,7 @@ func (h HttpManagementAPIClient) CreateParticipantContext(ctx context.Context, m
 	return nil
 }
 
-func (h HttpManagementAPIClient) CreateConfig(ctx context.Context, participantContextID string, config ParticipantContextConfig) error {
-
+func (h HttpManagementAPIClient) PatchConfig(ctx context.Context, participantContextID string, config ParticipantContextConfig) error {
 	accessToken, err := h.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
@@ -187,7 +186,7 @@ func (h HttpManagementAPIClient) CreateConfig(ctx context.Context, participantCo
 	}
 
 	url := fmt.Sprintf("%s%s/%s/config", h.BaseURL, CreateParticipantURL, participantContextID)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewBuffer(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, bytes.NewBuffer(payload))
 	if err != nil {
 		return err
 	}
@@ -195,15 +194,14 @@ func (h HttpManagementAPIClient) CreateConfig(ctx context.Context, participantCo
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	resp, err := h.HttpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to create participant context config on control plane: %w", err)
+		return fmt.Errorf("failed to patch participant context config on control plane: %w", err)
 	}
 
 	defer h.closeResponse(resp)
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to create participant context config on control plane: received status code %d, body: %s", resp.StatusCode, string(body))
-
+		return fmt.Errorf("failed to patch participant context config on control plane: received status code %d, body: %s", resp.StatusCode, string(body))
 	}
 	return nil
 }

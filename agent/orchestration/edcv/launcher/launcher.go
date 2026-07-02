@@ -15,8 +15,8 @@ package launcher
 import (
 	"net/http"
 
+	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
 	"github.com/eclipse-cfm/cfm/agent/orchestration/edcv/activity"
-	"github.com/eclipse-cfm/cfm/agent/orchestration/edcv/controlplane"
 	"github.com/eclipse-cfm/cfm/assembly/httpclient"
 	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
 	"github.com/eclipse-cfm/cfm/common/runtime"

@@ -17,8 +17,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
 	"github.com/eclipse-cfm/cfm/agent/orchestration/edcv"
-	"github.com/eclipse-cfm/cfm/agent/orchestration/edcv/controlplane"
 	. "github.com/eclipse-cfm/cfm/common/collection"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
@@ -136,7 +136,7 @@ func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data 
 	// create participant config in Control Plane
 	alias := participantContextId + "-sts-client-secret"
 	config := controlplane.NewParticipantContextConfig(participantContextId, stsClientID, alias, data.ParticipantID, vaultConfig, p.STSTokenURL)
-	if err := p.ManagementAPIClient.CreateConfig(ctx.Context(), participantContextId, config); err != nil {
+	if err := p.ManagementAPIClient.PatchConfig(ctx.Context(), participantContextId, config); err != nil {
 		ctrl.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("cannot create participant config in control plane: %w", err)}
 	}

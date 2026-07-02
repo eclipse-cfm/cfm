@@ -17,6 +17,7 @@ package launcher
 import (
 	"net/http"
 
+	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
 	"github.com/eclipse-cfm/cfm/agent/lifecycle/keymanagementagent/handler"
 	"github.com/eclipse-cfm/cfm/agent/lifecycle/keymanagementagent/siglet"
 	"github.com/eclipse-cfm/cfm/assembly/httpclient"
@@ -30,11 +31,12 @@ import (
 const (
 	// KeyPairSubject is the wildcard subject the agent subscribes to; it covers all key management
 	// lifecycle events (created, updated, ...).
-	KeyPairSubject         = "events.keypair.>"
-	tokenExchangeURLKey    = "tokenexchange.url"
-	tokenFilePathKey       = "tokenexchange.tokenFilePath"
-	audienceKey            = "tokenexchange.audience"
-	sigletManagementApiKey = "siglet.management.api"
+	KeyPairSubject               = "events.keypair.>"
+	tokenExchangeURLKey          = "tokenexchange.url"
+	tokenFilePathKey             = "tokenexchange.tokenFilePath"
+	audienceKey                  = "tokenexchange.audience"
+	sigletManagementUrlKey       = "siglet.management.url"
+	controlPlaneManagementURLKey = "controlplane.management.url"
 )
 
 func LaunchAndWaitSignal(shutdown <-chan struct{}) {
@@ -51,9 +53,13 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 		},
 		NewProcessor: func(ctx *lifecycleagent.AgentContext) lifecycleagent.EventProcessor[handler.KeyManagementEvent] {
 			httpClient := ctx.Registry.Resolve(serviceapi.HttpClientKey).(http.Client)
-			sigletManagementAPIUrl := ctx.Config.GetString(sigletManagementApiKey)
+			sigletManagementAPIUrl := ctx.Config.GetString(sigletManagementUrlKey)
+			controlPlaneURL := ctx.Config.GetString(controlPlaneManagementURLKey)
 
-			if err := runtime.CheckRequiredParams(sigletManagementApiKey, sigletManagementAPIUrl); err != nil {
+			if err := runtime.CheckRequiredParams(
+				sigletManagementUrlKey, sigletManagementAPIUrl,
+				controlPlaneManagementURLKey, controlPlaneURL,
+			); err != nil {
 				panic(err)
 			}
 
@@ -65,6 +71,11 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 			return handler.NewProcessor(&handler.Config{
 				LogMonitor:   ctx.Monitor,
 				SigletClient: siglet.NewSigletAPIClient(&httpClient, provider, sigletManagementAPIUrl),
+				ControlPlaneClient: controlplane.HttpManagementAPIClient{
+					BaseURL:       controlPlaneURL,
+					TokenProvider: provider,
+					HttpClient:    &httpClient,
+				},
 			})
 		},
 	}

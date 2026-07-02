@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/eclipse-cfm/cfm/agent/orchestration/edcv/controlplane"
+	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
@@ -347,6 +347,6 @@ func (m MockManagementApiClient) CreateParticipantContext(context.Context, contr
 	return m.expectedParticipantError
 }
 
-func (m MockManagementApiClient) CreateConfig(context.Context, string, controlplane.ParticipantContextConfig) error {
+func (m MockManagementApiClient) PatchConfig(context.Context, string, controlplane.ParticipantContextConfig) error {
 	return m.expectedConfigError
 }
