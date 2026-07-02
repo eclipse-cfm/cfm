@@ -52,7 +52,6 @@ var processingData = map[string]any{
 	"cfm.participant.credentialservice": "https://example.com/credentialservice",
 	"cfm.participant.protocolservice":   "https://example.com/protocolservice",
 	"publicURL":                         "http://test.example.com:1234/fizz/buzz",
-	STSClientIDKey:                      "test-sts-client-id",
 }
 
 func TestEDCVActivityProcessor_Process_WithValidData(t *testing.T) {
@@ -97,29 +96,6 @@ func TestEDCVActivityProcessor_Process_MissingParticipantID(t *testing.T) {
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	assert.NotNil(t, result.Error)
 	assert.Contains(t, result.Error.Error(), "error processing EDC-V activity")
-}
-
-func TestEDCVActivityProcessor_Process_MissingSTSClientID(t *testing.T) {
-	processor := NewProcessor(validConfig())
-	ctx := context.Background()
-	pd := copyOf(processingData)
-	delete(pd, STSClientIDKey)
-	outputData := make(map[string]any)
-
-	activity := api.Activity{
-		ID:            "activity-sts",
-		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
-	}
-
-	activityContext := api.NewActivityContext(ctx, "orchestration-sts", activity, pd, outputData)
-
-	result := processor.ProcessDeploy(activityContext)
-
-	require.NotNil(t, result)
-	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
-	assert.NotNil(t, result.Error)
-	assert.Contains(t, result.Error.Error(), STSClientIDKey)
 }
 
 func TestEDCVActivityProcessor_Process_EmptyProcessingData(t *testing.T) {

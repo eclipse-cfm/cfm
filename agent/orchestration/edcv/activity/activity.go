@@ -27,17 +27,11 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-const (
-	// STSClientIDKey is the context key written by the ih-agent and read here
-	STSClientIDKey = "ih.sts.clientId"
-)
-
 type EDCVActivityProcessor struct {
 	api.BaseActivityProcessor
 	Monitor             system.LogMonitor
 	ManagementAPIClient controlplane.ManagementAPIClient
 	VaultURL            string
-	STSTokenURL         string
 	tracer              trace.Tracer
 }
 
@@ -55,7 +49,6 @@ func NewProcessor(config *Config) *EDCVActivityProcessor {
 		Monitor:             config.LogMonitor,
 		ManagementAPIClient: config.ManagementAPIClient,
 		VaultURL:            config.VaultURL,
-		STSTokenURL:         config.STSTokenURL,
 		tracer:              otel.GetTracerProvider().Tracer("cfm.agent.edcv"),
 	}
 }
@@ -63,8 +56,7 @@ func NewProcessor(config *Config) *EDCVActivityProcessor {
 type Config struct {
 	system.LogMonitor
 	controlplane.ManagementAPIClient
-	VaultURL    string
-	STSTokenURL string
+	VaultURL string
 }
 
 func (p EDCVActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
@@ -94,17 +86,7 @@ func (p EDCVActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.Activ
 }
 
 // handleDeployAction creates the participant context and config in the EDC control plane.
-// It expects the STSClientID to already be present in the activity context (written by the ih-agent).
 func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data edcData, participantContextId string) api.ActivityResult {
-
-	stsClientIDVal, ok := ctx.Value(STSClientIDKey)
-	if !ok || stsClientIDVal == nil {
-		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("'%s' not found in activity context for orchestration %s — ensure the ih-agent runs before the edcv-agent", STSClientIDKey, ctx.OID())}
-	}
-	stsClientID, ok := stsClientIDVal.(string)
-	if !ok || stsClientID == "" {
-		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("'%s' in activity context is not a valid string for orchestration %s", STSClientIDKey, ctx.OID())}
-	}
 
 	did := data.ParticipantID
 	if !strings.HasPrefix(did, "did:web:") {
@@ -134,8 +116,7 @@ func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data 
 	ctrl.AddEvent("Created ParticipantContext in Control Plane")
 
 	// create participant config in Control Plane
-	alias := participantContextId + "-sts-client-secret"
-	config := controlplane.NewParticipantContextConfig(participantContextId, stsClientID, alias, data.ParticipantID, vaultConfig, p.STSTokenURL)
+	config := controlplane.NewParticipantContextConfig(participantContextId, data.ParticipantID, vaultConfig)
 	if err := p.ManagementAPIClient.PatchConfig(ctx.Context(), participantContextId, config); err != nil {
 		ctrl.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("cannot create participant config in control plane: %w", err)}

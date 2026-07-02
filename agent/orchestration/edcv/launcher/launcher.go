@@ -27,13 +27,12 @@ import (
 )
 
 const (
-	urlKey               = "vault.url"
-	ActivityType         = "edcv-activity"
-	identityHubStsURLKey = "identityhub.sts.url"
-	controlPlaneURLKey   = "controlplane.url"
-	tokenExchangeURLKey  = "tokenexchange.url"
-	tokenFilePathKey     = "tokenexchange.tokenFilePath"
-	audienceKey          = "tokenexchange.audience"
+	urlKey              = "vault.url"
+	ActivityType        = "edcv-activity"
+	controlPlaneURLKey  = "controlplane.url"
+	tokenExchangeURLKey = "tokenexchange.url"
+	tokenFilePathKey    = "tokenexchange.tokenFilePath"
+	audienceKey         = "tokenexchange.audience"
 )
 
 func LaunchAndWaitSignal(shutdown <-chan struct{}) {
@@ -49,11 +48,10 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 		},
 		NewProcessor: func(ctx *natsagent.AgentContext) api.ActivityProcessor {
 			httpClient := ctx.Registry.Resolve(serviceapi.HttpClientKey).(http.Client)
-			ihStsURL := ctx.Config.GetString(identityHubStsURLKey)
 			cpURL := ctx.Config.GetString(controlPlaneURLKey)
 			vaultURL := ctx.Config.GetString(urlKey)
 
-			if err := runtime.CheckRequiredParams(controlPlaneURLKey, cpURL, identityHubStsURLKey, ihStsURL); err != nil {
+			if err := runtime.CheckRequiredParams(controlPlaneURLKey, cpURL); err != nil {
 				panic(err)
 			}
 
@@ -62,9 +60,8 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 				tokenexchange.WithTokenExchangeAudience(ctx.Config.GetString(audienceKey)),
 				tokenexchange.WithHttpClient(&httpClient))
 			return activity.NewProcessor(&activity.Config{
-				LogMonitor:  ctx.Monitor,
-				VaultURL:    vaultURL,
-				STSTokenURL: ihStsURL,
+				LogMonitor: ctx.Monitor,
+				VaultURL:   vaultURL,
 				ManagementAPIClient: controlplane.HttpManagementAPIClient{
 					BaseURL:       cpURL,
 					TokenProvider: provider,

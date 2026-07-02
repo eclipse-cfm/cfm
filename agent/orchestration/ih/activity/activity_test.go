@@ -70,11 +70,6 @@ func TestIHActivityProcessor_ProcessDeploy_WithValidData(t *testing.T) {
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	assert.NoError(t, result.Error)
-
-	// STSClientID must be written back into the context
-	stsClientID, ok := activityContext.Value(STSClientIDKey)
-	require.True(t, ok)
-	assert.Equal(t, "test-sts-clientid", stsClientID)
 }
 
 func TestIHActivityProcessor_ProcessDeploy_MissingParticipantID(t *testing.T) {
@@ -195,14 +190,8 @@ type MockIdentityHubClient struct {
 	expectedError error
 }
 
-func (m MockIdentityHubClient) CreateParticipantContext(_ context.Context, _ identityhub.ParticipantManifest) (*identityhub.CreateParticipantContextResponse, error) {
-	if m.expectedError != nil {
-		return nil, m.expectedError
-	}
-	return &identityhub.CreateParticipantContextResponse{
-		STSClientID:     "test-sts-clientid",
-		STSClientSecret: "test-sts-secret-alias",
-	}, nil
+func (m MockIdentityHubClient) CreateParticipantContext(_ context.Context, _ identityhub.ParticipantManifest) error {
+	return m.expectedError
 }
 
 func (m MockIdentityHubClient) DeleteParticipantContext(_ context.Context, _ string) error {

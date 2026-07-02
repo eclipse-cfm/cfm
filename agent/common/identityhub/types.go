@@ -63,12 +63,10 @@ type ParticipantManifest struct {
 	KeyGeneratorParameters KeyGeneratorParameters
 	// VaultConfig configuration for accessing a vault
 	VaultConfig commonvault.Config
+	// ProvisionStsAccount indicates whether IdentityHub should provision an STS account for the participant. Defaults to false.
+	ProvisionStsAccount bool
 }
 
-type CreateParticipantContextResponse struct {
-	STSClientID     string `json:"clientId"`
-	STSClientSecret string `json:"clientSecret"`
-}
 type ParticipantManifestOptions func(*ParticipantManifest)
 
 func NewParticipantManifest(

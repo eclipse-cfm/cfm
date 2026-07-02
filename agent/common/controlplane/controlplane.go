@@ -44,18 +44,15 @@ type ParticipantContextConfig struct {
 	SecretEntries        map[string]string `json:"privateEntries"`
 }
 
-func NewParticipantContextConfig(participantContextID string, stsClientID string, stsClientSecretAlias string, participantID string, vConfig vault.Config, stsTokenURL string) ParticipantContextConfig {
+func NewParticipantContextConfig(participantContextID string, participantID string, vConfig vault.Config) ParticipantContextConfig {
 	vaultConfig := map[string]any{
 		"config": vConfig,
 	}
 	return ParticipantContextConfig{
 		ParticipantContextID: participantContextID,
 		Entries: map[string]string{
-			"edc.iam.sts.oauth.token.url":           stsTokenURL,
-			"edc.iam.issuer.id":                     participantID,
-			"edc.iam.sts.oauth.client.id":           stsClientID,
-			"edc.iam.sts.oauth.client.secret.alias": stsClientSecretAlias,
-			"edc.participant.id":                    participantID,
+			"edc.iam.issuer.id":  participantID,
+			"edc.participant.id": participantID,
 		},
 		SecretEntries: map[string]string{
 			"edc.vault.hashicorp.config": serialize(vaultConfig),

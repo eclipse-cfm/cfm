@@ -37,7 +37,7 @@ const (
 )
 
 type IdentityAPIClient interface {
-	CreateParticipantContext(ctx context.Context, manifest ParticipantManifest) (*CreateParticipantContextResponse, error)
+	CreateParticipantContext(ctx context.Context, manifest ParticipantManifest) error
 	RequestCredentials(ctx context.Context, participantContextID string, credentialRequest CredentialRequest) (string, error)
 	GetCredentialRequestState(ctx context.Context, participantContextID string, credentialRequestID string) (string, error)
 	QueryCredentialByType(ctx context.Context, participantContextID string, credentialType string) ([]common.VerifiableCredentialResource, error)
@@ -189,14 +189,15 @@ func (a HttpIdentityAPIClient) GetCredentialRequestState(ctx context.Context, pa
 	return stateStr, nil
 }
 
-func (a HttpIdentityAPIClient) CreateParticipantContext(ctx context.Context, manifest ParticipantManifest) (*CreateParticipantContextResponse, error) {
+func (a HttpIdentityAPIClient) CreateParticipantContext(ctx context.Context, manifest ParticipantManifest) error {
 	accessToken, err := a.TokenProvider.GetToken(ctx, ScopeApiAdmin, manifest.ParticipantContextID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get API access token: %w", err)
+		return fmt.Errorf("failed to get API access token: %w", err)
 	}
 
 	data := map[string]any{
-		"roles": []string{"participant"},
+		"roles":               []string{"participant"},
+		"provisionStsAccount": manifest.ProvisionStsAccount,
 		"serviceEndpoints": []map[string]any{
 			{
 				"type":            "CredentialService",
@@ -238,13 +239,13 @@ func (a HttpIdentityAPIClient) CreateParticipantContext(ctx context.Context, man
 
 	payload, err := json.Marshal(data)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	url := a.BaseURL + CreateParticipantURL
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(payload))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -252,23 +253,16 @@ func (a HttpIdentityAPIClient) CreateParticipantContext(ctx context.Context, man
 
 	resp, err := a.HttpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create participant context on IdentityHub: %w", err)
+		return fmt.Errorf("failed to create participant context on IdentityHub: %w", err)
 	}
 	defer a.closeResponse(resp)
 
-	body, _ := io.ReadAll(resp.Body)
-
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("failed to create participant context on IdentityHub: received status code %d, body: %s", resp.StatusCode, string(body))
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to create participant context on IdentityHub: received status code %d, body: %s", resp.StatusCode, string(body))
 	}
 
-	createResponse := &CreateParticipantContextResponse{}
-
-	if err := json.Unmarshal(body, createResponse); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal participant context creation response: %w", err)
-	}
-
-	return createResponse, nil
+	return nil
 }
 
 func (a HttpIdentityAPIClient) closeResponse(resp *http.Response) {
