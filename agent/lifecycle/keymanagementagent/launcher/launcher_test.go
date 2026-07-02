@@ -46,8 +46,8 @@ func TestKeyManagementAgent_Integration(t *testing.T) {
 	t.Setenv("KMAGENT_URI", nt.URI)
 	t.Setenv("KMAGENT_BUCKET", bucket)
 	t.Setenv("KMAGENT_STREAM", streamName)
-	t.Setenv("KMAGENT_SIGLET_MANAGEMENT_API", "https://example.com/api/siglet")
-	t.Setenv("KMAGENT_CONTROLPLANE_URL", "https://example.com/api/controlplane")
+	t.Setenv("KMAGENT_SIGLET_MANAGEMENT_URL", "https://example.com/api/siglet")
+	t.Setenv("KMAGENT_CONTROLPLANE_MANAGEMENT_URL", "https://example.com/api/controlplane")
 
 	// The event stream is provisioned out-of-band; the agent only binds a consumer to it and must fail to start if it
 	// is absent.
