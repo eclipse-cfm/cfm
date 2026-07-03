@@ -27,10 +27,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// STSClientIDKey is the key under which the STS client ID returned by IdentityHub is stored in the
-// activity processing data, so that downstream agents (e.g. the edcv-agent) can read it.
-const STSClientIDKey = "ih.sts.clientId"
-
 type IdentityHubActivityProcessor struct {
 	api.BaseActivityProcessor
 	HTTPClient        *http.Client
@@ -100,8 +96,7 @@ func (p IdentityHubActivityProcessor) ProcessDispose(ctx api.ActivityContext) ap
 	return p.handleDisposeAction(ctx.Context(), data.ParticipantContextId)
 }
 
-// handleDeployAction creates the participant context in IdentityHub and stores the returned STSClientID
-// in the activity context so that downstream agents can use it.
+// handleDeployAction creates the participant context in IdentityHub.
 func (p IdentityHubActivityProcessor) handleDeployAction(ctx api.ActivityContext, data ihData, participantContextId string) api.ActivityResult {
 
 	// apply URL templates if configured
@@ -138,15 +133,11 @@ func (p IdentityHubActivityProcessor) handleDeployAction(ctx api.ActivityContext
 		m.VaultConfig.VaultURL = p.VaultURL
 		m.VaultConfig.FolderPath = participantContextId + "/identityhub"
 	})
-	createResponse, err := p.IdentityAPIClient.CreateParticipantContext(ctx.Context(), manifest)
-	if err != nil {
+	if err := p.IdentityAPIClient.CreateParticipantContext(ctx.Context(), manifest); err != nil {
 		ihSpan.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("cannot create participant in IdentityHub: %w", err)}
 	}
 	ihSpan.End()
-
-	// make the STS client ID available to downstream agents
-	ctx.SetValue(STSClientIDKey, createResponse.STSClientID)
 
 	p.Monitor.Infof("IH activity for participant '%s' (client ID = %s) completed successfully", data.ParticipantID, participantContextId)
 	return api.ActivityResult{Result: api.ActivityResultComplete}

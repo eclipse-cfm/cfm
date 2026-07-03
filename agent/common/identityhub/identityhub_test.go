@@ -42,6 +42,7 @@ func TestIdentityAPIClient_CreateParticipantContext(t *testing.T) {
 			require.Equal(t, "test", data["participantContextId"])
 			require.Equal(t, "did:web:test", data["did"])
 			require.True(t, data["active"].(bool))
+			require.False(t, data["provisionStsAccount"].(bool))
 
 			serviceEndpoints := data["serviceEndpoints"].([]any)
 			require.Len(t, serviceEndpoints, 3)
@@ -87,7 +88,7 @@ func TestIdentityAPIClient_CreateParticipantContext(t *testing.T) {
 				VaultURL: "https://example.com/vault",
 			}
 		})
-	_, err := client.CreateParticipantContext(t.Context(), manifest)
+	err := client.CreateParticipantContext(t.Context(), manifest)
 	require.NoError(t, err)
 
 }
@@ -107,7 +108,7 @@ func TestIdentityAPIClient_AuthError(t *testing.T) {
 				VaultURL: "https://example.com/vault",
 			}
 		})
-	_, err := client.CreateParticipantContext(t.Context(), manifest)
+	err := client.CreateParticipantContext(t.Context(), manifest)
 	require.ErrorContains(t, err, "failed to get API access token: test error")
 }
 
@@ -132,7 +133,7 @@ func TestIdentityAPIClient_BadRequest(t *testing.T) {
 				VaultURL: "https://example.com/vault",
 			}
 		})
-	_, err := client.CreateParticipantContext(t.Context(), manifest)
+	err := client.CreateParticipantContext(t.Context(), manifest)
 	require.ErrorContains(t, err, "foobar")
 }
 

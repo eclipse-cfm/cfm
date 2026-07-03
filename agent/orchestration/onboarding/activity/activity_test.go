@@ -452,7 +452,7 @@ func (m MockIdentityHubClient) DeleteParticipantContext(ctx context.Context, par
 	panic("implement me")
 }
 
-func (m MockIdentityHubClient) CreateParticipantContext(context.Context, identityhub.ParticipantManifest) (*identityhub.CreateParticipantContextResponse, error) {
+func (m MockIdentityHubClient) CreateParticipantContext(context.Context, identityhub.ParticipantManifest) error {
 	panic("not used here")
 }
 
