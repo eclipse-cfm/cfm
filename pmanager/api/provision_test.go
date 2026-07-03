@@ -303,6 +303,25 @@ func TestVpaProperties_MatchingTypeWithProperties(t *testing.T) {
 	assert.Equal(t, props, result)
 }
 
+func TestVpaProperties_MatchingTypeNotFirst(t *testing.T) {
+	props := map[string]any{"region": "eu-west", "tier": "standard"}
+	processingData := map[string]any{
+		model.VPAData: []any{
+			map[string]any{"vpaType": otherVpaType.String()},
+			map[string]any{
+				"vpaType":    testVpaType.String(),
+				"properties": props,
+			},
+		},
+	}
+	ctx := NewActivityContext(context.Background(), "orch-1", getTestActivity(), processingData, map[string]any{})
+
+	result, err := ctx.VpaProperties(testVpaType)
+
+	require.NoError(t, err)
+	assert.Equal(t, props, result)
+}
+
 func TestVpaProperties_MatchingTypeWithoutProperties(t *testing.T) {
 	processingData := map[string]any{
 		model.VPAData: []any{

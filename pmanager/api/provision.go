@@ -293,7 +293,6 @@ func (d defaultActivityContext) VpaProperties(vpaType model.VPAType) (map[string
 			}
 			return make(map[string]any), nil
 		}
-		return nil, nil
 	}
 
 	return nil, nil
