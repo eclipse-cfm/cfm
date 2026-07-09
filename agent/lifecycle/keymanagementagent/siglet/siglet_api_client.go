@@ -26,8 +26,8 @@ import (
 )
 
 const (
-	ScopeApiRead  = "siglet-read"
-	ScopeApiWrite = "siglet-write"
+	ScopeApiRead  = "siglet-mgmt-api:read"
+	ScopeApiWrite = "siglet-mgmt-api:write"
 )
 
 type KeyMapping struct {

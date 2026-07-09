@@ -31,9 +31,11 @@ const (
 	CredentialRequestStateCreated = "CREATED"
 	CredentialRequestStateIssued  = "ISSUED"
 	CredentialRequestStateError   = "ERROR"
-	ScopeApiRead                  = "read"
-	ScopeApiWrite                 = "write"
-	ScopeApiAdmin                 = "admin"
+	ScopeCredentialsRead          = "identity-api:credentials:read"
+	ScopeCredentialsWrite         = "identity-api:credentials:write"
+	// ScopeApiAdmin is required for participant context creation/deletion: these act on
+	// participant contexts other than the token's own subject, which only admin may do.
+	ScopeApiAdmin = "identity-api:admin"
 )
 
 type IdentityAPIClient interface {
@@ -80,7 +82,7 @@ func (a HttpIdentityAPIClient) DeleteParticipantContext(ctx context.Context, par
 
 func (a HttpIdentityAPIClient) QueryCredentialByType(ctx context.Context, participantContextID string, credentialType string) ([]common.VerifiableCredentialResource, error) {
 
-	accessToken, err := a.TokenProvider.GetToken(ctx, ScopeApiRead, participantContextID)
+	accessToken, err := a.TokenProvider.GetToken(ctx, ScopeCredentialsRead, participantContextID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -114,7 +116,7 @@ func (a HttpIdentityAPIClient) QueryCredentialByType(ctx context.Context, partic
 }
 
 func (a HttpIdentityAPIClient) RequestCredentials(ctx context.Context, participantContextID string, credentialRequest CredentialRequest) (string, error) {
-	accessToken, err := a.TokenProvider.GetToken(ctx, ScopeApiWrite, participantContextID) // this should be the participant context's access token!
+	accessToken, err := a.TokenProvider.GetToken(ctx, ScopeCredentialsWrite, participantContextID) // this should be the participant context's access token!
 	if err != nil {
 		return "", fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -151,7 +153,7 @@ func (a HttpIdentityAPIClient) RequestCredentials(ctx context.Context, participa
 }
 
 func (a HttpIdentityAPIClient) GetCredentialRequestState(ctx context.Context, participantContextID string, credentialRequestID string) (string, error) {
-	accessToken, err := a.TokenProvider.GetToken(ctx, ScopeApiRead, participantContextID)
+	accessToken, err := a.TokenProvider.GetToken(ctx, ScopeCredentialsRead, participantContextID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get API access token: %w", err)
 	}

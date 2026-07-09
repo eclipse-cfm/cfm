@@ -27,9 +27,12 @@ import (
 )
 
 const (
-	ScopeApiRead  = "read"
-	ScopeApiWrite = "write"
-	ScopeApiAdmin = "admin"
+	// ScopeApiAdmin is required for all issuer-admin-api operations here: the token is bound
+	// to the tenant's participant context, which the IssuerService does not know (it only has
+	// the issuer's context), so the caller resolution only passes with admin. Resource-level
+	// scopes (e.g. issuer-admin-api:credentials:read) are rejected with
+	// "No participant for 'sub = ...' found".
+	ScopeApiAdmin = "issuer-admin-api:admin"
 )
 
 // IssuerCredentialResourceDto represents a DTO for verifiable credentials that the IssuerService has issued to holders.
@@ -57,7 +60,7 @@ type HttpApiClient struct {
 }
 
 func (i HttpApiClient) QueryCredentialsByType(ctx context.Context, holderID string, credentialType string) ([]IssuerCredentialResourceDto, error) {
-	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiRead, holderID)
+	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiAdmin, holderID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -186,7 +189,7 @@ func (i HttpApiClient) CreateHolder(ctx context.Context, participantContextID st
 }
 
 func (i HttpApiClient) RevokeCredential(ctx context.Context, participantContextID string, credentialID string) error {
-	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiWrite, participantContextID)
+	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
 	if err != nil {
 		return err
 	}
