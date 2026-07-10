@@ -98,7 +98,7 @@ func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data 
 	vaultConfig := edcv.VaultConfig{
 		VaultURL:   p.VaultURL,
 		SecretPath: "v1/participants",
-		FolderPath: participantContextId + "/identityhub",
+		FolderPath: participantContextId + "/controlplane",
 	}
 
 	_, ctrl := p.tracer.Start(ctx.Context(), "cfm.agent.edcv.deploy.controlplane", trace.WithSpanKind(trace.SpanKindClient))

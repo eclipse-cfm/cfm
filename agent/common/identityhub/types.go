@@ -65,6 +65,8 @@ type ParticipantManifest struct {
 	VaultConfig commonvault.Config
 	// ProvisionStsAccount indicates whether IdentityHub should provision an STS account for the participant. Defaults to false.
 	ProvisionStsAccount bool
+	// ProvisionApiKey indicates whether IdentityHub should provision an API key for the participant. Defaults to false.
+	ProvisionApiKey bool
 }
 
 type ParticipantManifestOptions func(*ParticipantManifest)
