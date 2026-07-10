@@ -200,6 +200,7 @@ func (a HttpIdentityAPIClient) CreateParticipantContext(ctx context.Context, man
 	data := map[string]any{
 		"roles":               []string{"participant"},
 		"provisionStsAccount": manifest.ProvisionStsAccount,
+		"provisionApiKey":     manifest.ProvisionApiKey,
 		"serviceEndpoints": []map[string]any{
 			{
 				"type":            "CredentialService",

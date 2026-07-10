@@ -43,6 +43,7 @@ func TestIdentityAPIClient_CreateParticipantContext(t *testing.T) {
 			require.Equal(t, "did:web:test", data["did"])
 			require.True(t, data["active"].(bool))
 			require.False(t, data["provisionStsAccount"].(bool))
+			require.False(t, data["provisionApiKey"].(bool))
 
 			serviceEndpoints := data["serviceEndpoints"].([]any)
 			require.Len(t, serviceEndpoints, 3)

@@ -34,6 +34,8 @@ func TestNewParticipantManifest_WithDefaults(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, manifest.VaultConfig.SecretPath, "v1/participants")
 	require.Equal(t, manifest.VaultConfig.FolderPath, "test-id/identityhub")
+	require.False(t, manifest.ProvisionStsAccount)
+	require.False(t, manifest.ProvisionApiKey)
 }
 
 func TestParticipantManifest_Serialization(t *testing.T) {
