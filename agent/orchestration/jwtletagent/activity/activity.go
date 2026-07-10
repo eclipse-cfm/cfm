@@ -24,6 +24,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
+	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
+	"github.com/eclipse-cfm/cfm/agent/common/issuerservice"
+	"github.com/eclipse-cfm/cfm/agent/lifecycle/keymanagementagent/siglet"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/common/token"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
@@ -47,6 +51,21 @@ const (
 var vaultClientIdentifiers = []string{
 	"system:serviceaccount:edc-v:controlplane",
 	"system:serviceaccount:edc-v:identityhub",
+}
+
+// agentScopes is the exact set of narrow scopes the CFM agents request against a participant
+// context, referenced from the API clients so the mapping cannot drift from what they request.
+// Every scope listed here must have a (1:1) scope mapping seeded in jwtlet.
+var agentScopes = []string{
+	controlplane.ScopeApiAdmin,
+	identityhub.ScopeApiAdmin,
+	identityhub.ScopeCredentialsRead,
+	identityhub.ScopeCredentialsWrite,
+	issuerservice.ScopeApiAdmin,
+	siglet.ScopeApiRead,
+	siglet.ScopeApiWrite,
+	"read",
+	"write",
 }
 
 type TokenExchangeActivityProcessor struct {
@@ -118,7 +137,7 @@ func (p TokenExchangeActivityProcessor) ProcessDeploy(ctx api.ActivityContext) a
 	rm := resourceMapping{
 		ClientIdentifier:   clientIdentifier,
 		ParticipantContext: participantContextID,
-		Scopes:             []string{"read", "write", "admin", "siglet-read", "siglet-write"},
+		Scopes:             agentScopes,
 		Audiences:          []string{p.Audience},
 	}
 	p.Monitor.Debugf("Creating resource mapping for participant context: %s", participantContextID)
@@ -148,10 +167,12 @@ func (p TokenExchangeActivityProcessor) ProcessDeploy(ctx api.ActivityContext) a
 	mapSpan.AddEvent("Created vault resource mappings")
 	mapSpan.End()
 
-	// step 2: verify the token exchange works for the new participant context
+	// step 2: verify the token exchange works for the new participant context. Requesting the
+	// full agent scope set also proves that every scope has a scope mapping seeded in jwtlet,
+	// so a missing mapping fails here instead of in a downstream agent.
 	exCtx, exSpan := p.tracer.Start(spanCtx, "cfm.agent.jwtlet.deploy.verify-token-exchange", trace.WithSpanKind(trace.SpanKindClient))
 	p.Monitor.Debugf("testing token exchange for participant context: %s", participantContextID)
-	scopedToken, err := p.TokenProvider.GetToken(exCtx, "read write", participantContextID)
+	scopedToken, err := p.TokenProvider.GetToken(exCtx, strings.Join(agentScopes, " "), participantContextID)
 	if err != nil {
 		exSpan.RecordError(err)
 		exSpan.End()

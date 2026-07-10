@@ -33,9 +33,11 @@ const (
 	ParticipantContextStateActivated   ParticipantContextState = "ACTIVATED"
 	ParticipantContextStateDeactivated ParticipantContextState = "DEACTIVATED"
 	contextConnector                                           = "https://w3id.org/edc/connector/management/v2"
-	ScopeApiWrite                                              = "write"
-	ScopeApiRead                                               = "read"
-	ScopeApiAdmin                                              = "admin"
+	ScopeApiWrite                                              = "management-api:write"
+	ScopeApiRead                                               = "management-api:read"
+	// ScopeApiAdmin is required for participant context lifecycle operations: they act on
+	// participant contexts other than the token's own subject, which only admin may do.
+	ScopeApiAdmin = "management-api:admin"
 )
 
 type ParticipantContextConfig struct {
