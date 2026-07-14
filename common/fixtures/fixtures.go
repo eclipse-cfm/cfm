@@ -15,7 +15,15 @@ package fixtures
 import (
 	"net"
 	"testing"
+
+	"github.com/eclipse-cfm/cfm/common/system"
 )
+
+// IsolateConfig points the configuration file search path at an empty temp directory so that configuration files on
+// the developer's machine (e.g. $HOME/.appname) cannot leak into the test. The override is undone when the test ends.
+func IsolateConfig(t *testing.T) {
+	t.Setenv(system.ConfigDirEnvVar, t.TempDir())
+}
 
 // GetRandomPort returns a random available port or fails the test
 func GetRandomPort(t *testing.T) int {
