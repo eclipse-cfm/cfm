@@ -31,8 +31,7 @@ const (
 type agentServiceAssembly struct {
 	agentName        string
 	activityType     string
-	uri              string
-	bucket           string
+	clientConfig     natsclient.ClientConfig
 	streamName       string
 	assemblyProvider func() []system.ServiceAssembly
 	newProcessor     func(ctx *AgentContext) api.ActivityProcessor
@@ -53,7 +52,7 @@ func (h *agentServiceAssembly) Requires() []system.ServiceType {
 
 func (a *agentServiceAssembly) Start(startCtx *system.StartContext) error {
 	var err error
-	a.natsClient, err = natsclient.NewNatsClient(a.uri, a.bucket)
+	a.natsClient, err = natsclient.NewNatsClient(a.clientConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create NATS client: %w", err)
 	}

@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/runtime"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/nats-io/nats.go"
@@ -84,12 +85,11 @@ type LauncherConfig[T any] struct {
 }
 
 type agentConfig struct {
-	Name       string
-	URI        string
-	Bucket     string
-	StreamName string
-	Subjects   []string
-	VConfig    *viper.Viper
+	Name         string
+	ClientConfig natsclient.ClientConfig
+	StreamName   string
+	Subjects     []string
+	VConfig      *viper.Viper
 }
 
 // LaunchAgent bootstraps and runs a lifecycle agent until the shutdown channel is closed.
@@ -116,8 +116,7 @@ func LaunchAgent[T any](shutdown <-chan struct{}, config LauncherConfig[T]) {
 
 	agentAssembly := &eventAgentServiceAssembly[T]{
 		agentName:    config.AgentName,
-		uri:          cfg.URI,
-		bucket:       cfg.Bucket,
+		clientConfig: cfg.ClientConfig,
 		streamName:   cfg.StreamName,
 		subjects:     cfg.Subjects,
 		newProcessor: config.NewProcessor,
@@ -154,13 +153,17 @@ func loadAgentConfig(name string, configPrefix string, defaultSubjects []string)
 		panic(fmt.Errorf("error loading agent configuration: at least one subject must be configured via LauncherConfig.Subjects, %s.%s or %s.%s", configPrefix, subjectsKey, configPrefix, subjectKey))
 	}
 
+	auth, err := natsclient.AuthFromConfig(vConfig)
+	if err != nil {
+		panic(fmt.Errorf("error loading agent configuration: %w", err))
+	}
+
 	return &agentConfig{
-		Name:       name,
-		URI:        uri,
-		Bucket:     bucketValue,
-		StreamName: streamValue,
-		Subjects:   subjects,
-		VConfig:    vConfig,
+		Name:         name,
+		ClientConfig: natsclient.ClientConfig{URL: uri, Bucket: bucketValue, Auth: auth},
+		StreamName:   streamValue,
+		Subjects:     subjects,
+		VConfig:      vConfig,
 	}
 }
 

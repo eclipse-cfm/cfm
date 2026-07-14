@@ -22,8 +22,7 @@ import (
 )
 
 type natsOrchestrationServiceAssembly struct {
-	uri                 string
-	bucket              string
+	clientConfig        natsclient.ClientConfig
 	streamName          string
 	natsClient          *natsclient.NatsClient
 	orchestrationClient *natsOrchestrationClient
@@ -32,11 +31,10 @@ type natsOrchestrationServiceAssembly struct {
 	system.DefaultServiceAssembly
 }
 
-func NewNatsOrchestrationServiceAssembly(uri string, bucket string, streamName string) system.ServiceAssembly {
+func NewNatsOrchestrationServiceAssembly(clientConfig natsclient.ClientConfig, streamName string) system.ServiceAssembly {
 	return &natsOrchestrationServiceAssembly{
-		uri:        uri,
-		bucket:     bucket,
-		streamName: streamName,
+		clientConfig: clientConfig,
+		streamName:   streamName,
 	}
 }
 
@@ -53,7 +51,7 @@ func (d *natsOrchestrationServiceAssembly) Requires() []system.ServiceType {
 }
 
 func (a *natsOrchestrationServiceAssembly) Init(ctx *system.InitContext) error {
-	natsClient, err := natsclient.NewNatsClient(a.uri, a.bucket)
+	natsClient, err := natsclient.NewNatsClient(a.clientConfig)
 	if err != nil {
 		return err
 	}

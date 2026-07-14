@@ -36,23 +36,32 @@ type NatsTestContainer struct {
 }
 
 func SetupNatsContainer(ctx context.Context, bucket string) (*NatsTestContainer, error) {
+	return SetupNatsContainerWithAuth(ctx, bucket, "", nil)
+}
+
+// SetupNatsContainerWithAuth starts a NATS container whose server configuration includes the given authorization
+// block (raw NATS server config syntax, e.g. `authorization { token: "s3cret" }`) and connects a client using the
+// given auth strategy. An empty block and nil strategy yield an unauthenticated setup.
+func SetupNatsContainerWithAuth(ctx context.Context, bucket string, authorizationBlock string, auth natsclient.AuthStrategy) (*NatsTestContainer, error) {
 	// Create NATS configuration
 	natsConfig := fmt.Sprintf(`
 		# Basic server configuration
 		port: 4222
 		monitor_port: 8222
-		
+
 		# JetStream configuration
 		jetstream {
 			store_dir: "/tmp/jetstream"
 			max_memory_store: 64MB
 			max_file_store: 512MB
 		}
-		
+
 		# Enable debug/trace
 		debug: true
 		trace: true
-		`)
+
+		%s
+		`, authorizationBlock)
 
 	// Create temporary config file
 	tmpDir, err := os.MkdirTemp("", "nats-config-*")
@@ -106,8 +115,10 @@ func SetupNatsContainer(ctx context.Context, bucket string) (*NatsTestContainer,
 
 	uri := fmt.Sprintf("nats://%s:%s", hostIP, mappedPort.Port())
 
-	natsClient, err := natsclient.NewNatsClient(uri, bucket)
+	natsClient, err := natsclient.NewNatsClient(natsclient.ClientConfig{URL: uri, Bucket: bucket, Auth: auth})
 	if err != nil {
+		// terminate the container so failed connection attempts (e.g. negative auth tests) do not leak containers
+		_ = container.Terminate(ctx)
 		return nil, fmt.Errorf("failed to create NATS client: %w", err)
 	}
 

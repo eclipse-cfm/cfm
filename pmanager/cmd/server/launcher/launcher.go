@@ -17,6 +17,7 @@ import (
 
 	cfmauth "github.com/eclipse-cfm/cfm/assembly/auth"
 	"github.com/eclipse-cfm/cfm/assembly/routing"
+	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/runtime"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
@@ -65,6 +66,11 @@ func Launch(shutdown <-chan struct{}) {
 		panic(fmt.Errorf("error launching Provision Manager: %w", err))
 	}
 
+	natsAuth, err := natsclient.AuthFromConfig(vConfig)
+	if err != nil {
+		panic(fmt.Errorf("error launching Provision Manager: %w", err))
+	}
+
 	assembler := system.NewServiceAssembler(logMonitor, vConfig, mode)
 
 	assembler.Register(&routing.RouterServiceAssembly{})
@@ -78,7 +84,7 @@ func Launch(shutdown <-chan struct{}) {
 		assembler.Register(&memorystore.MemoryStoreServiceAssembly{})
 	}
 
-	assembler.Register(natsorchestration.NewOrchestratorServiceAssembly(uri, bucketValue, streamValue))
+	assembler.Register(natsorchestration.NewOrchestratorServiceAssembly(natsclient.ClientConfig{URL: uri, Bucket: bucketValue, Auth: natsAuth}, streamValue))
 	assembler.Register(natsprovision.NewProvisionServiceAssembly(streamValue))
 	assembler.Register(&core.PMCoreServiceAssembly{})
 

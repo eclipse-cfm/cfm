@@ -28,20 +28,18 @@ const (
 )
 
 type natsOrchestratorServiceAssembly struct {
-	uri        string
-	bucket     string
-	streamName string
-	natsClient *natsclient.NatsClient
+	clientConfig natsclient.ClientConfig
+	streamName   string
+	natsClient   *natsclient.NatsClient
 	system.DefaultServiceAssembly
 	processCancel context.CancelFunc
 	subscription  *nats.Subscription
 }
 
-func NewOrchestratorServiceAssembly(uri string, bucket string, streamName string) system.ServiceAssembly {
+func NewOrchestratorServiceAssembly(clientConfig natsclient.ClientConfig, streamName string) system.ServiceAssembly {
 	return &natsOrchestratorServiceAssembly{
-		uri:        uri,
-		bucket:     bucket,
-		streamName: streamName,
+		clientConfig: clientConfig,
+		streamName:   streamName,
 	}
 }
 
@@ -58,7 +56,7 @@ func (a *natsOrchestratorServiceAssembly) Requires() []system.ServiceType {
 }
 
 func (a *natsOrchestratorServiceAssembly) Init(ctx *system.InitContext) error {
-	natsClient, err := natsclient.NewNatsClient(a.uri, a.bucket)
+	natsClient, err := natsclient.NewNatsClient(a.clientConfig)
 	if err != nil {
 		return err
 	}
@@ -103,7 +101,7 @@ func (a *natsOrchestratorServiceAssembly) Prepare(ctx *system.InitContext) error
 		definitionManager: definitionManager,
 	}
 	var err error
-	a.subscription, err = a.natsClient.JetStream.Conn().Subscribe("$KV."+a.bucket+".>", func(msg *nats.Msg) {
+	a.subscription, err = a.natsClient.JetStream.Conn().Subscribe("$KV."+a.clientConfig.Bucket+".>", func(msg *nats.Msg) {
 		watcher.onMessage(msg.Data, msg)
 	})
 	return err
