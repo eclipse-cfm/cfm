@@ -15,6 +15,7 @@ package natsagent
 import (
 	"fmt"
 
+	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/runtime"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
@@ -48,11 +49,10 @@ type AgentRegistry interface {
 }
 
 type agentConfig struct {
-	Name       string
-	URI        string
-	Bucket     string
-	StreamName string
-	VConfig    *viper.Viper
+	Name         string
+	ClientConfig natsclient.ClientConfig
+	StreamName   string
+	VConfig      *viper.Viper
 }
 
 func LaunchAgent(shutdown <-chan struct{}, config LauncherConfig) {
@@ -79,8 +79,7 @@ func LaunchAgent(shutdown <-chan struct{}, config LauncherConfig) {
 	agentAssembly := &agentServiceAssembly{
 		agentName:        config.AgentName,
 		activityType:     config.ActivityType,
-		uri:              cfg.URI,
-		bucket:           cfg.Bucket,
+		clientConfig:     cfg.ClientConfig,
 		streamName:       cfg.StreamName,
 		newProcessor:     config.NewProcessor,
 		requires:         requires,
@@ -109,11 +108,16 @@ func loadAgentConfig(name string, configPrefix string) *agentConfig {
 	if err != nil {
 		panic(fmt.Errorf("error loading agent configuration: %w", err))
 	}
+
+	auth, err := natsclient.AuthFromConfig(vConfig)
+	if err != nil {
+		panic(fmt.Errorf("error loading agent configuration: %w", err))
+	}
+
 	return &agentConfig{
-		Name:       name,
-		URI:        uri,
-		Bucket:     bucketValue,
-		StreamName: streamValue,
-		VConfig:    vConfig,
+		Name:         name,
+		ClientConfig: natsclient.ClientConfig{URL: uri, Bucket: bucketValue, Auth: auth},
+		StreamName:   streamValue,
+		VConfig:      vConfig,
 	}
 }

@@ -17,6 +17,7 @@ import (
 
 	cfmauth "github.com/eclipse-cfm/cfm/assembly/auth"
 	"github.com/eclipse-cfm/cfm/assembly/routing"
+	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/runtime"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
@@ -66,6 +67,11 @@ func Launch(shutdown <-chan struct{}) {
 		panic(fmt.Errorf("error launching Tenant Manager: %w", err))
 	}
 
+	natsAuth, err := natsclient.AuthFromConfig(vConfig)
+	if err != nil {
+		panic(fmt.Errorf("error launching Tenant Manager: %w", err))
+	}
+
 	assembler := system.NewServiceAssembler(logMonitor, vConfig, mode)
 	assembler.Register(&routing.RouterServiceAssembly{})
 	assembler.Register(&cfmauth.AuthServiceAssembly{})
@@ -79,7 +85,7 @@ func Launch(shutdown <-chan struct{}) {
 		assembler.Register(&memorystore.InMemoryServiceAssembly{})
 	}
 
-	assembler.Register(natsprovision.NewNatsOrchestrationServiceAssembly(uri, bucketValue, streamValue))
+	assembler.Register(natsprovision.NewNatsOrchestrationServiceAssembly(natsclient.ClientConfig{URL: uri, Bucket: bucketValue, Auth: natsAuth}, streamValue))
 	if err := runtime.SetupTelemetry("cfm.tmanager", shutdown); err != nil {
 		logMonitor.Warnf("Error setting up telemetry: %s. Traces and metrics will not be available.", err.Error())
 	}

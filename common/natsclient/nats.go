@@ -39,18 +39,38 @@ type NatsClient struct {
 	KVStore    jetstream.KeyValue
 }
 
-// NewNatsClient creates and returns a new NatsClient instance connected to the specified URL and bucket with given options.
-// If options are not provided, default Connection settings are used for the NATS Client configuration.
+// ClientConfig configures a NATS client connection.
+type ClientConfig struct {
+	// URL of the NATS server(s).
+	URL string
+	// Bucket is the JetStream key-value bucket the client operates on.
+	Bucket string
+	// Auth supplies the authentication mechanism; nil connects anonymously.
+	Auth AuthStrategy
+}
+
+// NewNatsClient creates and returns a new NatsClient instance connected according to the given config. Default
+// connection resilience options are always applied; authentication options derived from cfg.Auth and any extra
+// options are appended after them and take precedence.
 // Returns an error if the Connection to NATS or JetStream initialization fails.
-func NewNatsClient(url string, bucket string, options ...nats.Option) (*NatsClient, error) {
-	if options == nil || len(options) == 0 {
-		options = []nats.Option{nats.PingInterval(defaultDuration),
-			nats.MaxPingsOutstanding(defaultPings),
-			nats.ReconnectWait(time.Second),
-			nats.RetryOnFailedConnect(true),
-			nats.MaxReconnects(forever)}
+func NewNatsClient(cfg ClientConfig, extra ...nats.Option) (*NatsClient, error) {
+	options := []nats.Option{
+		nats.PingInterval(defaultDuration),
+		nats.MaxPingsOutstanding(defaultPings),
+		nats.ReconnectWait(time.Second),
+		nats.RetryOnFailedConnect(true),
+		nats.MaxReconnects(forever),
 	}
-	connection, err := nats.Connect(url, options...)
+	if cfg.Auth != nil {
+		authOptions, err := cfg.Auth.Options()
+		if err != nil {
+			return nil, fmt.Errorf("failed to configure NATS authentication: %w", err)
+		}
+		options = append(options, authOptions...)
+	}
+	options = append(options, extra...)
+
+	connection, err := nats.Connect(cfg.URL, options...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to NATS: %w", err)
 	}
@@ -61,10 +81,10 @@ func NewNatsClient(url string, bucket string, options ...nats.Option) (*NatsClie
 		return nil, fmt.Errorf("failed to create jetstream context: %w", err)
 	}
 
-	kvManager, err := jetStream.CreateOrUpdateKeyValue(context.Background(), jetstream.KeyValueConfig{Bucket: bucket})
+	kvManager, err := jetStream.CreateOrUpdateKeyValue(context.Background(), jetstream.KeyValueConfig{Bucket: cfg.Bucket})
 	if err != nil {
 		connection.Close()
-		return nil, fmt.Errorf("failed to create jetstream key value store with bucket %s: %w", bucket, err)
+		return nil, fmt.Errorf("failed to create jetstream key value store with bucket %s: %w", cfg.Bucket, err)
 	}
 
 	return &NatsClient{

@@ -30,8 +30,7 @@ const timeout = 10 * time.Second
 // dispatches it to the agent's EventProcessor.
 type eventAgentServiceAssembly[T any] struct {
 	agentName    string
-	uri          string
-	bucket       string
+	clientConfig natsclient.ClientConfig
 	streamName   string
 	subjects     []string
 	newProcessor func(ctx *AgentContext) EventProcessor[T]
@@ -52,7 +51,7 @@ func (a *eventAgentServiceAssembly[T]) Requires() []system.ServiceType {
 
 func (a *eventAgentServiceAssembly[T]) Start(startCtx *system.StartContext) error {
 	var err error
-	a.natsClient, err = natsclient.NewNatsClient(a.uri, a.bucket)
+	a.natsClient, err = natsclient.NewNatsClient(a.clientConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create NATS client: %w", err)
 	}
