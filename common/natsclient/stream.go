@@ -80,6 +80,17 @@ func GetStream(ctx context.Context, client *NatsClient, streamName string, subje
 	return nil, fmt.Errorf("unable to access NATS stream %q: %w", streamName, err)
 }
 
+// GetExistingStream looks up an existing JetStream stream by name without creating it. It returns an
+// error if the stream does not exist, so callers that rely on an externally-managed stream fail fast
+// until it is present. Unlike GetStream it does not create the stream or reconcile its subjects.
+func GetExistingStream(ctx context.Context, client *NatsClient, streamName string) (jetstream.Stream, error) {
+	stream, err := client.JetStream.Stream(ctx, streamName)
+	if err != nil {
+		return nil, fmt.Errorf("unable to access NATS stream %q: %w", streamName, err)
+	}
+	return stream, nil
+}
+
 // EnsureStreamSubjects adds the given subjects to an existing stream so the stream carries the events the agent consumes.
 //
 // NATS rejects a stream whose subjects overlap, so the subjects cannot simply be unioned: registering
