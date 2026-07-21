@@ -19,7 +19,7 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/lib/pq v1.12.3
 	github.com/nats-io/nats.go v1.52.0
-	github.com/nats-io/nkeys v0.4.15
+	github.com/nats-io/nkeys v0.4.16
 	github.com/oaswrap/spec v0.5.1
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
