@@ -14,10 +14,10 @@ package launcher
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/common/fixtures"
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/natsfixtures"
 	"github.com/eclipse-cfm/cfm/common/runtime"
@@ -65,9 +65,10 @@ func TestTestAgent_Integration(t *testing.T) {
 	}
 
 	// Required agent config
-	_ = os.Setenv("TESTAGENT_URI", nt.URI)
-	_ = os.Setenv("TESTAGENT_BUCKET", "cfm-bucket")
-	_ = os.Setenv("TESTAGENT_STREAM", streamName)
+	fixtures.IsolateConfig(t)
+	t.Setenv("TESTAGENT_URI", nt.URI)
+	t.Setenv("TESTAGENT_BUCKET", "cfm-bucket")
+	t.Setenv("TESTAGENT_STREAM", streamName)
 
 	// Create and start the test agent
 	shutdownChannel := make(chan struct{})
