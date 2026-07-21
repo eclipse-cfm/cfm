@@ -33,6 +33,7 @@ type eventAgentServiceAssembly[T any] struct {
 	clientConfig natsclient.ClientConfig
 	streamName   string
 	subjects     []string
+	createStream bool
 	newProcessor func(ctx *AgentContext) EventProcessor[T]
 	requires     []system.ServiceType
 	system.DefaultServiceAssembly
@@ -109,8 +110,16 @@ func (a *eventAgentServiceAssembly[T]) setupConsumer(natsClient *natsclient.Nats
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	// The shared event stream must already exist; fail fast if it is not present so the agent is restarted until it is.
-	stream, err := natsclient.GetStream(ctx, natsClient, a.streamName, a.subjects)
+	var stream jetstream.Stream
+	var err error
+	if a.createStream {
+		// Create the shared event stream with the agent's subjects if it does not already exist.
+		stream, err = natsclient.GetStream(ctx, natsClient, a.streamName, a.subjects)
+	} else {
+		// The shared event stream is managed externally and must already exist; fail fast if it is not
+		// present so the agent is restarted until it is.
+		stream, err = natsclient.GetExistingStream(ctx, natsClient, a.streamName)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("error resolving agent stream: %w", err)
 	}

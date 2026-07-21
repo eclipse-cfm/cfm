@@ -27,11 +27,12 @@ import (
 )
 
 const (
-	uriKey      = "uri"
-	bucketKey   = "bucket"
-	streamKey   = "stream"
-	subjectsKey = "subjects"
-	subjectKey  = "subject"
+	uriKey          = "uri"
+	bucketKey       = "bucket"
+	streamKey       = "stream"
+	subjectsKey     = "subjects"
+	subjectKey      = "subject"
+	createStreamKey = "createStream"
 )
 
 // EventContext carries a single decoded event together with the metadata of the NATS message that delivered it. The
@@ -89,6 +90,7 @@ type agentConfig struct {
 	ClientConfig natsclient.ClientConfig
 	StreamName   string
 	Subjects     []string
+	CreateStream bool
 	VConfig      *viper.Viper
 }
 
@@ -119,6 +121,7 @@ func LaunchAgent[T any](shutdown <-chan struct{}, config LauncherConfig[T]) {
 		clientConfig: cfg.ClientConfig,
 		streamName:   cfg.StreamName,
 		subjects:     cfg.Subjects,
+		createStream: cfg.CreateStream,
 		newProcessor: config.NewProcessor,
 		requires:     requires,
 	}
@@ -142,6 +145,9 @@ func loadAgentConfig(name string, configPrefix string, defaultSubjects []string)
 
 	subjects := mergeSubjects(defaultSubjects, vConfig.GetStringSlice(subjectsKey), vConfig.GetString(subjectKey))
 
+	// The shared event stream is expected to be provisioned out-of-band; agents only create it when explicitly opted in.
+	createStream := vConfig.GetBool(createStreamKey)
+
 	err := runtime.CheckRequiredParams(
 		fmt.Sprintf("%s.%s", configPrefix, uriKey), uri,
 		fmt.Sprintf("%s.%s", configPrefix, bucketKey), bucketValue,
@@ -163,6 +169,7 @@ func loadAgentConfig(name string, configPrefix string, defaultSubjects []string)
 		ClientConfig: natsclient.ClientConfig{URL: uri, Bucket: bucketValue, Auth: auth},
 		StreamName:   streamValue,
 		Subjects:     subjects,
+		CreateStream: createStream,
 		VConfig:      vConfig,
 	}
 }

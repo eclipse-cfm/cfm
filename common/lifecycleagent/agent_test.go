@@ -140,6 +140,55 @@ func TestLifecycleAgent_DispatchesDecodedEvent(t *testing.T) {
 	}
 }
 
+func TestLifecycleAgent_CreateStreamEnabled_CreatesAndDispatches(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), agentTestTimeout)
+	defer cancel()
+
+	nt, err := natsfixtures.SetupNatsContainer(ctx, bucket)
+	require.NoError(t, err)
+	defer natsfixtures.TeardownNatsContainer(ctx, nt)
+
+	subject := "events.create.created"
+	setupAgentEnv(t, "createagent", nt.URI)
+	// viper uppercases the env prefix and key, so the environment variable must be uppercase.
+	t.Setenv("CREATEAGENT_CREATESTREAM", "true")
+
+	proc := &recordingProcessor{received: make(chan lifecycleagent.EventContext[testEvent], 8)}
+	// The stream is deliberately NOT provisioned; with createStream enabled the agent must create it itself.
+	shutdown := make(chan struct{})
+	go lifecycleagent.LaunchAgent(shutdown, lifecycleagent.LauncherConfig[testEvent]{
+		AgentName:    "createagent",
+		ServiceName:  "cfm.agent.createagent",
+		ConfigPrefix: "createagent",
+		Subjects:     []string{subject},
+		NewProcessor: func(*lifecycleagent.AgentContext) lifecycleagent.EventProcessor[testEvent] {
+			return proc
+		},
+	})
+	defer close(shutdown)
+
+	// Wait until the agent has created the stream and bound its durable consumer.
+	require.Eventually(t, func() bool {
+		stream, err := nt.Client.JetStream.Stream(ctx, streamName)
+		if err != nil {
+			return false
+		}
+		_, err = stream.Consumer(ctx, "createagent")
+		return err == nil
+	}, agentTestTimeout, pollInterval, "agent should create the stream and consumer when createStream is enabled")
+
+	payload, _ := json.Marshal(testEvent{ID: "evt-create"})
+	_, err = natsclient.NewMsgClient(nt.Client).Publish(ctx, subject, payload)
+	require.NoError(t, err)
+
+	select {
+	case evt := <-proc.received:
+		assert.Equal(t, "evt-create", evt.Payload.ID)
+	case <-time.After(agentTestTimeout):
+		t.Fatal("timed out waiting for the event to be dispatched")
+	}
+}
+
 func TestLifecycleAgent_RecoverableErrorIsRedelivered(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), agentTestTimeout)
 	defer cancel()
