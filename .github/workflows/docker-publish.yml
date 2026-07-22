@@ -40,6 +40,9 @@ jobs:
           - name: keymanagementagent
             dockerfile: docker/Dockerfile.keymanagementagent.dockerfile
             context: .
+          - name: sigletagent
+            dockerfile: docker/Dockerfile.sigletagent.dockerfile
+            context: .
           - name: pmanager
             dockerfile: docker/Dockerfile.pmanager.dockerfile
             context: .

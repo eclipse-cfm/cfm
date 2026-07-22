@@ -83,6 +83,25 @@ type ManagementAPIClient interface {
 	DeleteParticipantContext(ctx context.Context, participantContextID string) error
 }
 
+// DataPlaneRegistration describes a data-plane instance to register with the control plane for a
+// participant context. For a Siglet data plane, Endpoint is the DPS signaling endpoint and the
+// transfer types are the ones configured as transfer-type mappings in Siglet.
+type DataPlaneRegistration struct {
+	// ID is the unique identifier of the data-plane instance, e.g. "<participant>-siglet".
+	ID string `json:"dataplaneId"`
+	// TransferTypes are the transfer types the data plane supports, e.g. "HttpData-PULL".
+	TransferTypes []string `json:"transferTypes"`
+	// Endpoint is the data plane's DPS signaling endpoint the control plane sends flow events to.
+	Endpoint string `json:"endpoint"`
+}
+
+// DataPlaneRegistrationClient registers and unregisters data-plane instances with the EDC control
+// plane, scoped to a participant context. HttpManagementAPIClient implements this interface.
+type DataPlaneRegistrationClient interface {
+	RegisterDataPlane(ctx context.Context, participantContextID string, registration DataPlaneRegistration) error
+	UnregisterDataPlane(ctx context.Context, participantContextID string, dataPlaneID string) error
+}
+
 type HttpManagementAPIClient struct {
 	BaseURL       string
 	TokenProvider token.TokenProvider
@@ -203,6 +222,73 @@ func (h HttpManagementAPIClient) PatchConfig(ctx context.Context, participantCon
 		return fmt.Errorf("failed to patch participant context config on control plane: received status code %d, body: %s", resp.StatusCode, string(body))
 	}
 	return nil
+}
+
+// RegisterDataPlane registers a data-plane instance with the control plane for the given participant
+// context via PUT /v5beta/participants/{participantContextID}/dataplanes.
+func (h HttpManagementAPIClient) RegisterDataPlane(ctx context.Context, participantContextID string, registration DataPlaneRegistration) error {
+	accessToken, err := h.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
+	if err != nil {
+		return fmt.Errorf("failed to get API access token: %w", err)
+	}
+
+	payload, err := json.Marshal(registration)
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("%s%s/%s/dataplanes", h.BaseURL, CreateParticipantURL, participantContextID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewBuffer(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", applicationJSON)
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	resp, err := h.HttpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to register data plane on control plane: %w", err)
+	}
+
+	defer h.closeResponse(resp)
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to register data plane on control plane: received status code %d, body: %s", resp.StatusCode, string(body))
+	}
+	return nil
+}
+
+// UnregisterDataPlane removes a previously registered data-plane instance from the control plane via
+// DELETE /v5beta/participants/{participantContextID}/dataplanes/{dataPlaneID}.
+func (h HttpManagementAPIClient) UnregisterDataPlane(ctx context.Context, participantContextID string, dataPlaneID string) error {
+	accessToken, err := h.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
+	if err != nil {
+		return fmt.Errorf("failed to get API access token: %w", err)
+	}
+
+	url := fmt.Sprintf("%s%s/%s/dataplanes/%s", h.BaseURL, CreateParticipantURL, participantContextID, dataPlaneID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	resp, err := h.HttpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to unregister data plane on control plane: %w", err)
+	}
+
+	defer h.closeResponse(resp)
+
+	switch {
+	case resp.StatusCode == http.StatusNotFound:
+		// treat an already-absent data plane as success so dispose is idempotent
+		return nil
+	case resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusBadRequest:
+		return nil
+	default:
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to unregister data plane on control plane: received status code %d, body: %s", resp.StatusCode, string(body))
+	}
 }
 
 func (h HttpManagementAPIClient) closeResponse(resp *http.Response) {
