@@ -53,18 +53,24 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 			sigletManagementURL := ctx.Config.GetString(sigletManagementURLKey)
 			sigletSignalingURL := ctx.Config.GetString(sigletSignalingURLKey)
 			cpURL := ctx.Config.GetString(controlPlaneURLKey)
+			tokenExchangeURL := ctx.Config.GetString(tokenExchangeURLKey)
+			tokenFilePath := ctx.Config.GetString(tokenFilePathKey)
+			audience := ctx.Config.GetString(audienceKey)
 
 			if err := runtime.CheckRequiredParams(
 				sigletManagementURLKey, sigletManagementURL,
 				sigletSignalingURLKey, sigletSignalingURL,
 				controlPlaneURLKey, cpURL,
+				tokenExchangeURLKey, tokenExchangeURL,
+				tokenFilePathKey, tokenFilePath,
+				audienceKey, audience,
 			); err != nil {
 				panic(err)
 			}
 
-			provider := tokenexchange.NewTokenExchangeProvider(ctx.Config.GetString(tokenFilePathKey),
-				tokenexchange.WithTokenExchangeUrl(ctx.Config.GetString(tokenExchangeURLKey)),
-				tokenexchange.WithTokenExchangeAudience(ctx.Config.GetString(audienceKey)),
+			provider := tokenexchange.NewTokenExchangeProvider(tokenFilePath,
+				tokenexchange.WithTokenExchangeUrl(tokenExchangeURL),
+				tokenexchange.WithTokenExchangeAudience(audience),
 				tokenexchange.WithHttpClient(&httpClient))
 
 			return activity.NewProcessor(&activity.Config{

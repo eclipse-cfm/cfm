@@ -1,4 +1,4 @@
-cd.PHONY: test clean
+.PHONY: test clean
 
 # Build settings
 BUILD_DIR=bin

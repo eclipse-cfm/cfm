@@ -1,4 +1,4 @@
-cd.PHONY: build test clean run server
+.PHONY: build test clean run server
 
 # Binary name
 SERVER_BINARY=regagent
