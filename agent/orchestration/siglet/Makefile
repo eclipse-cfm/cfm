@@ -1,7 +1,7 @@
 .PHONY: build test clean run server
 
 # Binary name
-SERVER_BINARY=edcvagent
+SERVER_BINARY=sigletagent
 
 # Build settings
 BUILD_DIR=bin

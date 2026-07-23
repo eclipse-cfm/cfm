@@ -370,3 +370,103 @@ func TestPatchConfig_ServerError(t *testing.T) {
 	err := client.PatchConfig(t.Context(), "test-participant", ParticipantContextConfig{ParticipantContextID: "test-participant"})
 	require.ErrorContains(t, err, "received status code 500")
 }
+
+func TestRegisterDataPlane(t *testing.T) {
+	var received map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut && r.URL.Path == CreateParticipantURL+"/test-participant/dataplanes" {
+			require.Equal(t, "Bearer token", r.Header.Get("Authorization"))
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			require.NoError(t, json.Unmarshal(body, &received))
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
+	client := HttpManagementAPIClient{BaseURL: server.URL, TokenProvider: tp, HttpClient: &http.Client{}}
+
+	err := client.RegisterDataPlane(t.Context(), "test-participant", DataPlaneRegistration{
+		ID:            "test-participant-siglet",
+		TransferTypes: []string{"HttpData-PULL"},
+		Endpoint:      "http://siglet.edc-v.svc.cluster.local:8081/api/v1/test-participant/dataflows",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "test-participant-siglet", received["dataplaneId"])
+	require.Equal(t, "http://siglet.edc-v.svc.cluster.local:8081/api/v1/test-participant/dataflows", received["endpoint"])
+}
+
+func TestRegisterDataPlane_AuthError(t *testing.T) {
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("", fmt.Errorf("test error"))
+	client := HttpManagementAPIClient{BaseURL: "http://foo.bar", TokenProvider: tp, HttpClient: &http.Client{}}
+
+	err := client.RegisterDataPlane(t.Context(), "test-participant", DataPlaneRegistration{ID: "test-participant-siglet"})
+	require.ErrorContains(t, err, "test error")
+}
+
+func TestRegisterDataPlane_ServerError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("boom"))
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
+	client := HttpManagementAPIClient{BaseURL: server.URL, TokenProvider: tp, HttpClient: &http.Client{}}
+
+	err := client.RegisterDataPlane(t.Context(), "test-participant", DataPlaneRegistration{ID: "test-participant-siglet"})
+	require.ErrorContains(t, err, "received status code 500")
+}
+
+func TestUnregisterDataPlane(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete && r.URL.Path == CreateParticipantURL+"/test-participant/dataplanes/siglet-1" {
+			require.Equal(t, "Bearer token", r.Header.Get("Authorization"))
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
+	client := HttpManagementAPIClient{BaseURL: server.URL, TokenProvider: tp, HttpClient: &http.Client{}}
+
+	err := client.UnregisterDataPlane(t.Context(), "test-participant", "siglet-1")
+	require.NoError(t, err)
+}
+
+func TestUnregisterDataPlane_NotFoundIsSuccess(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
+	client := HttpManagementAPIClient{BaseURL: server.URL, TokenProvider: tp, HttpClient: &http.Client{}}
+
+	err := client.UnregisterDataPlane(t.Context(), "test-participant", "siglet-1")
+	require.NoError(t, err)
+}
+
+func TestUnregisterDataPlane_ServerError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
+	client := HttpManagementAPIClient{BaseURL: server.URL, TokenProvider: tp, HttpClient: &http.Client{}}
+
+	err := client.UnregisterDataPlane(t.Context(), "test-participant", "siglet-1")
+	require.ErrorContains(t, err, "received status code 500")
+}

@@ -1,4 +1,4 @@
-cd.PHONY: build test clean run server dev-server
+.PHONY: build test clean run server dev-server
 
 # Binary name
 SERVER_BINARY=pmanager

@@ -14,6 +14,7 @@ IH_DIR=agent/orchestration/ih
 REG_DIR=agent/orchestration/registration
 ONBOARDING_DIR=agent/orchestration/onboarding
 JWTLET_AGENT_DIR=agent/orchestration/jwtletagent
+SIGLET_AGENT_DIR=agent/orchestration/siglet
 KEY_MANAGEMENT_AGENT_DIR=agent/lifecycle/keymanagementagent
 AGENT_COMMON=agent/common
 KIND_CLUSTER_NAME=edcv
@@ -72,6 +73,7 @@ build:
 	$(MAKE) -C $(REG_DIR) build
 	$(MAKE) -C $(ONBOARDING_DIR) build
 	$(MAKE) -C $(JWTLET_AGENT_DIR) build
+	$(MAKE) -C $(SIGLET_AGENT_DIR) build
 	$(MAKE) -C $(KEY_MANAGEMENT_AGENT_DIR) build
 
 build-pmanager:
@@ -91,6 +93,7 @@ build-all:
 	$(MAKE) -C $(REG_DIR) build-all
 	$(MAKE) -C $(ONBOARDING_DIR) build-all
 	$(MAKE) -C $(JWTLET_AGENT_DIR) build-all
+	$(MAKE) -C $(SIGLET_AGENT_DIR) build-all
 	$(MAKE) -C $(KEY_MANAGEMENT_AGENT_DIR) build-all
 
 #==============================================================================
@@ -109,6 +112,7 @@ test: install-gotestsum
 	$(MAKE) -C $(REG_DIR) test
 	$(MAKE) -C $(ONBOARDING_DIR) test
 	$(MAKE) -C $(JWTLET_AGENT_DIR) test
+	$(MAKE) -C $(SIGLET_AGENT_DIR) test
 	$(MAKE) -C $(KEY_MANAGEMENT_AGENT_DIR) test
 	$(MAKE) -C $(ASSEMBLY_DIR) test
 	$(MAKE) -C $(AGENT_COMMON) test
@@ -163,6 +167,7 @@ clean:
 	$(MAKE) -C $(REG_DIR) clean
 	$(MAKE) -C $(ONBOARDING_DIR) clean
 	$(MAKE) -C $(JWTLET_AGENT_DIR) clean
+	$(MAKE) -C $(SIGLET_AGENT_DIR) clean
 	$(MAKE) -C $(KEY_MANAGEMENT_AGENT_DIR) clean
 
 #==============================================================================
@@ -194,7 +199,7 @@ generate-docs:
 # Docker Commands - Handled at Top Level
 #==============================================================================
 
-docker-build: docker-build-pmanager docker-build-tmanager docker-build-jwtletagent docker-build-edcvagent docker-build-ihagent docker-build-regagent docker-build-obagent docker-build-keymanagementagent
+docker-build: docker-build-pmanager docker-build-tmanager docker-build-jwtletagent docker-build-edcvagent docker-build-ihagent docker-build-regagent docker-build-obagent docker-build-keymanagementagent docker-build-sigletagent
 
 docker-build-pmanager:
 	@echo "Building pmanager Docker image..."
@@ -228,7 +233,11 @@ docker-build-keymanagementagent:
 	@echo "Building Key Management agent Docker image..."
 	docker buildx build -f docker/Dockerfile.keymanagementagent.dockerfile -t $(DOCKER_REGISTRY)keymanagementagent:$(DOCKER_TAG) .
 
-docker-clean: docker-clean-pmanager docker-clean-tmanager docker-clean-jwtletagent docker-clean-edcvagent docker-clean-ihagent docker-clean-regagent docker-clean-obagent docker-clean-keymanagementagent
+docker-build-sigletagent:
+	@echo "Building Siglet agent Docker image..."
+	docker buildx build -f docker/Dockerfile.sigletagent.dockerfile -t $(DOCKER_REGISTRY)sigletagent:$(DOCKER_TAG) .
+
+docker-clean: docker-clean-pmanager docker-clean-tmanager docker-clean-jwtletagent docker-clean-edcvagent docker-clean-ihagent docker-clean-regagent docker-clean-obagent docker-clean-keymanagementagent docker-clean-sigletagent
 
 docker-clean-pmanager:
 	docker rmi $(DOCKER_REGISTRY)pmanager:$(DOCKER_TAG) || true
@@ -253,6 +262,9 @@ docker-clean-obagent:
 
 docker-clean-keymanagementagent:
 	docker rmi $(DOCKER_REGISTRY)keymanagementagent:$(DOCKER_TAG) || true
+
+docker-clean-sigletagent:
+	docker rmi $(DOCKER_REGISTRY)sigletagent:$(DOCKER_TAG) || true
 
 #==============================================================================
 # Load images into KinD Cluster
@@ -281,6 +293,9 @@ load-into-kind-jwtletagent: docker-build-jwtletagent
 
 load-into-kind-keymanagementagent: docker-build-keymanagementagent
 	kind load docker-image -n $(KIND_CLUSTER_NAME) $(DOCKER_REGISTRY)keymanagementagent:$(DOCKER_TAG)
+
+load-into-kind-sigletagent: docker-build-sigletagent
+	kind load docker-image -n $(KIND_CLUSTER_NAME) $(DOCKER_REGISTRY)sigletagent:$(DOCKER_TAG)
 
 # builds and loads all images into KinD cluster. Will require kind to be installed and a kind cluster named KIND_CLUSTER_NAME running.
 load-into-kind: docker-build

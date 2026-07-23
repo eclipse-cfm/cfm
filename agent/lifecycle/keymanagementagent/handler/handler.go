@@ -19,7 +19,7 @@ import (
 	"context"
 
 	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
-	"github.com/eclipse-cfm/cfm/agent/lifecycle/keymanagementagent/siglet"
+	"github.com/eclipse-cfm/cfm/agent/common/siglet"
 	"github.com/eclipse-cfm/cfm/common/lifecycleagent"
 	"github.com/eclipse-cfm/cfm/common/system"
 )

@@ -27,7 +27,7 @@ import (
 	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
 	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
 	"github.com/eclipse-cfm/cfm/agent/common/issuerservice"
-	"github.com/eclipse-cfm/cfm/agent/lifecycle/keymanagementagent/siglet"
+	"github.com/eclipse-cfm/cfm/agent/common/siglet"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/common/token"
 	"github.com/eclipse-cfm/cfm/pmanager/api"

@@ -18,8 +18,8 @@ import (
 	"net/http"
 
 	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
+	"github.com/eclipse-cfm/cfm/agent/common/siglet"
 	"github.com/eclipse-cfm/cfm/agent/lifecycle/keymanagementagent/handler"
-	"github.com/eclipse-cfm/cfm/agent/lifecycle/keymanagementagent/siglet"
 	"github.com/eclipse-cfm/cfm/assembly/httpclient"
 	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
 	"github.com/eclipse-cfm/cfm/common/lifecycleagent"
