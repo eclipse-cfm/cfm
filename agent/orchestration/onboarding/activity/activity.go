@@ -135,7 +135,7 @@ func (p OnboardingActivityProcessor) processExistingRequest(ctx api.ActivityCont
 	case identityhub.CredentialRequestStateError:
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("credential request for participant '%s' failed", credentialRequest.ParticipantContextID)}
 	default:
-		return api.ActivityResult{Result: api.ActivityResultRetryError, Error: fmt.Errorf("unexpected credential request state '%s'", state)}
+		return api.ActivityResult{Result: api.ActivityResultRetryError, WaitOnReschedule: time.Duration(30 * float64(time.Second)), Error: fmt.Errorf("unexpected credential request state '%s'", state)}
 	}
 }
 

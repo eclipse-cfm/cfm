@@ -17,6 +17,7 @@ package activity
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -55,12 +56,13 @@ func newProcessorForTest(t *testing.T, tp *fakeTokenProvider, mappingsBase strin
 	require.NoError(t, os.WriteFile(tokenFile, []byte("workload-token"), 0o600))
 
 	return NewProcessor(&Config{
-		LogMonitor:         system.NoopMonitor{},
-		TokenProvider:      tp,
-		HttpClient:         http.DefaultClient,
-		ManagementBasePath: mappingsBase,
-		TokenFilePath:      tokenFile,
-		Audience:           "test-audience",
+		LogMonitor:              system.NoopMonitor{},
+		TokenProvider:           tp,
+		HttpClient:              http.DefaultClient,
+		ManagementBasePath:      mappingsBase,
+		TokenFilePath:           tokenFile,
+		Audience:                "test-audience",
+		ServiceAccountNamespace: "test-ns",
 	})
 }
 
@@ -86,6 +88,31 @@ func TestProcessDeploy_VerifiesFullAgentScopeSet(t *testing.T) {
 	require.EqualValues(t, api.ActivityResultComplete, result.Result, "expected deploy to complete, got error: %v", result.Error)
 	require.Len(t, tp.requestedScopes, 1, "token exchange verification should request a token exactly once")
 	assert.Equal(t, strings.Join(agentScopes, " "), tp.requestedScopes[0])
+}
+
+// TestProcessDeploy_UsesConfiguredNamespace asserts that the ServiceAccount client identifiers of
+// the created resource mappings are derived from the configured namespace instead of a hardcoded one.
+func TestProcessDeploy_UsesConfiguredNamespace(t *testing.T) {
+	var identifiers []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var rm resourceMapping
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&rm))
+		identifiers = append(identifiers, rm.ClientIdentifier)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	tp := &fakeTokenProvider{token: stubToken()}
+	processor := newProcessorForTest(t, tp, server.URL)
+
+	result := processor.ProcessDeploy(newDeployContext())
+
+	require.EqualValues(t, api.ActivityResultComplete, result.Result, "expected deploy to complete, got error: %v", result.Error)
+	assert.Equal(t, []string{
+		"system:serviceaccount:test-ns:cfm-agents",
+		"system:serviceaccount:test-ns:controlplane",
+		"system:serviceaccount:test-ns:identityhub",
+	}, identifiers)
 }
 
 // TestProcessDeploy_FailsWhenScopeHasNoMapping asserts that if the token exchange fails — e.g.

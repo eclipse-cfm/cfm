@@ -42,15 +42,15 @@ const (
 	jsonContentType         = "application/json"
 	contentTypeHeader       = "Content-Type"
 	authHeader              = "Authorization"
-	clientIdentifier        = "system:serviceaccount:edc-v:cfm-agents"
+	agentsServiceAccount    = "cfm-agents"
 )
 
-// vaultClientIdentifiers are the workload ServiceAccounts that exchange their projected token for a
+// vaultServiceAccounts are the workload ServiceAccounts that exchange their projected token for a
 // participant-scoped token used to authenticate against Vault. The resulting token's `sub` is the
 // participant context id, which scopes the workload to that participant's vault partition.
-var vaultClientIdentifiers = []string{
-	"system:serviceaccount:edc-v:controlplane",
-	"system:serviceaccount:edc-v:identityhub",
+var vaultServiceAccounts = []string{
+	"controlplane",
+	"identityhub",
 }
 
 // agentScopes is the exact set of narrow scopes the CFM agents request against a participant
@@ -77,6 +77,9 @@ type TokenExchangeActivityProcessor struct {
 	TokenFilePath      string
 	Audience           string
 	ManagementBasePath string
+
+	clientIdentifier       string
+	vaultClientIdentifiers []string
 }
 
 type tokenExchangeData struct {
@@ -102,18 +105,33 @@ type Config struct {
 	ManagementBasePath string
 	TokenFilePath      string
 	Audience           string
+	// ServiceAccountNamespace is the Kubernetes namespace the CFM workload ServiceAccounts live in,
+	// used to build the client identifiers of the resource mappings.
+	ServiceAccountNamespace string
 }
 
 func NewProcessor(config *Config) *TokenExchangeActivityProcessor {
-	return &TokenExchangeActivityProcessor{
-		Monitor:            config.LogMonitor,
-		TokenProvider:      config.TokenProvider,
-		HttpClient:         config.HttpClient,
-		tracer:             otel.GetTracerProvider().Tracer("cfm.agent.jwtlet"),
-		ManagementBasePath: config.ManagementBasePath,
-		TokenFilePath:      config.TokenFilePath,
-		Audience:           config.Audience,
+	vaultClientIdentifiers := make([]string, 0, len(vaultServiceAccounts))
+	for _, sa := range vaultServiceAccounts {
+		vaultClientIdentifiers = append(vaultClientIdentifiers, serviceAccountIdentifier(config.ServiceAccountNamespace, sa))
 	}
+	return &TokenExchangeActivityProcessor{
+		Monitor:                config.LogMonitor,
+		TokenProvider:          config.TokenProvider,
+		HttpClient:             config.HttpClient,
+		tracer:                 otel.GetTracerProvider().Tracer("cfm.agent.jwtlet"),
+		ManagementBasePath:     config.ManagementBasePath,
+		TokenFilePath:          config.TokenFilePath,
+		Audience:               config.Audience,
+		clientIdentifier:       serviceAccountIdentifier(config.ServiceAccountNamespace, agentsServiceAccount),
+		vaultClientIdentifiers: vaultClientIdentifiers,
+	}
+}
+
+// serviceAccountIdentifier builds the subject Kubernetes puts into a ServiceAccount's projected
+// token, which is what jwtlet sees as the client identifier of a workload.
+func serviceAccountIdentifier(namespace, name string) string {
+	return fmt.Sprintf("system:serviceaccount:%s:%s", namespace, name)
 }
 
 func (p TokenExchangeActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
@@ -135,7 +153,7 @@ func (p TokenExchangeActivityProcessor) ProcessDeploy(ctx api.ActivityContext) a
 
 	// the CFM agents must be able to exchange their token for a participant-scoped EDC API token
 	rm := resourceMapping{
-		ClientIdentifier:   clientIdentifier,
+		ClientIdentifier:   p.clientIdentifier,
 		ParticipantContext: participantContextID,
 		Scopes:             agentScopes,
 		Audiences:          []string{p.Audience},
@@ -150,7 +168,7 @@ func (p TokenExchangeActivityProcessor) ProcessDeploy(ctx api.ActivityContext) a
 
 	// the control plane and identity hub must be able to exchange their token for a participant-scoped
 	// token used to authenticate against Vault (resource = participant context id)
-	for _, clientID := range vaultClientIdentifiers {
+	for _, clientID := range p.vaultClientIdentifiers {
 		vm := resourceMapping{
 			ClientIdentifier:   clientID,
 			ParticipantContext: participantContextID,
@@ -207,12 +225,12 @@ func (p TokenExchangeActivityProcessor) ProcessDispose(ctx api.ActivityContext) 
 	}
 	span.SetAttributes(attribute.String("cfm.participantContextId", fmt.Sprintf("%v", participantContextID)))
 
-	if err := p.delete(spanCtx, fmt.Sprintf("/api/v1/mappings/%s/%s", clientIdentifier, participantContextID)); err != nil {
+	if err := p.delete(spanCtx, fmt.Sprintf("/api/v1/mappings/%s/%s", p.clientIdentifier, participantContextID)); err != nil {
 		span.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error deleting resource mapping: %w", err)}
 	}
 
-	for _, clientID := range vaultClientIdentifiers {
+	for _, clientID := range p.vaultClientIdentifiers {
 		if err := p.delete(spanCtx, fmt.Sprintf("/api/v1/mappings/%s/%s", clientID, participantContextID)); err != nil {
 			span.RecordError(err)
 			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error deleting vault resource mapping for %s: %w", clientID, err)}

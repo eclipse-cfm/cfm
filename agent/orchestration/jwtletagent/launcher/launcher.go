@@ -33,6 +33,8 @@ const (
 	managementUrlKey    = "management.url"
 	tokenFilePathKey    = "tokenexchange.tokenFilePath"
 	audienceKey         = "tokenexchange.audience"
+	namespaceKey        = "serviceaccount.namespace"
+	defaultNamespace    = "edc-v"
 )
 
 func LaunchAndWaitSignal(shutdown <-chan struct{}) {
@@ -48,10 +50,12 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 		},
 		NewProcessor: func(ctx *natsagent.AgentContext) api.ActivityProcessor {
 			httpClient := ctx.Registry.Resolve(serviceapi.HttpClientKey).(http.Client)
+			ctx.Config.SetDefault(namespaceKey, defaultNamespace)
 			tokenExchangeURL := ctx.Config.GetString(tokenExchangeURLKey)
 			tokenFilePath := ctx.Config.GetString(tokenFilePathKey)
 			audience := ctx.Config.GetString(audienceKey)
 			managementBasePath := ctx.Config.GetString(managementUrlKey)
+			namespace := ctx.Config.GetString(namespaceKey)
 
 			if err := runtime.CheckRequiredParams(tokenExchangeURLKey, tokenExchangeURL, tokenFilePathKey, tokenFilePath, managementUrlKey, managementBasePath); err != nil {
 				panic(err)
@@ -65,12 +69,13 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 			)
 
 			return activity.NewProcessor(&activity.Config{
-				LogMonitor:         ctx.Monitor,
-				TokenProvider:      provider,
-				HttpClient:         &httpClient,
-				TokenFilePath:      tokenFilePath,
-				Audience:           audience,
-				ManagementBasePath: managementBasePath,
+				LogMonitor:              ctx.Monitor,
+				TokenProvider:           provider,
+				HttpClient:              &httpClient,
+				TokenFilePath:           tokenFilePath,
+				Audience:                audience,
+				ManagementBasePath:      managementBasePath,
+				ServiceAccountNamespace: namespace,
 			})
 		},
 	}
