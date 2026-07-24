@@ -100,6 +100,7 @@ func (t TokenExchangeProvider) GetToken(ctx context.Context, scope string, parti
 	formData := url.Values{}
 	formData.Set("grant_type", "urn:ietf:params:oauth:grant-type:token-exchange")
 	formData.Set("subject_token", string(content))
+	formData.Set("subject_token_type", "urn:ietf:params:oauth:token-type:jwt")
 	formData.Set("resource", participantContextID)
 	formData.Set("scope", scope)
 	formData.Set("audience", t.tokenExchangeAudience)
