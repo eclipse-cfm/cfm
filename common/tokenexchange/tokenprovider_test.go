@@ -67,6 +67,7 @@ func TestGetToken_Success(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "urn:ietf:params:oauth:grant-type:token-exchange", form.Get("grant_type"))
 		assert.Equal(t, testSubjectToken, form.Get("subject_token"))
+		assert.Equal(t, "urn:ietf:params:oauth:token-type:jwt", form.Get("subject_token_type"))
 		assert.Equal(t, testParticipantContext, form.Get("resource"))
 		assert.Equal(t, testScope, form.Get("scope"))
 		assert.Equal(t, testAudience, form.Get("audience"))
