@@ -112,6 +112,7 @@ func TestProcessDeploy_UsesConfiguredNamespace(t *testing.T) {
 		"system:serviceaccount:test-ns:cfm-agents",
 		"system:serviceaccount:test-ns:controlplane",
 		"system:serviceaccount:test-ns:identityhub",
+		"system:serviceaccount:test-ns:siglet-sa",
 	}, identifiers)
 }
 
