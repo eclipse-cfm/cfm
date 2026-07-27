@@ -51,6 +51,7 @@ const (
 var vaultServiceAccounts = []string{
 	"controlplane",
 	"identityhub",
+	"siglet-sa",
 }
 
 // agentScopes is the exact set of narrow scopes the CFM agents request against a participant
