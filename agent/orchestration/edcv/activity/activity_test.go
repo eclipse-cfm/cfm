@@ -54,6 +54,71 @@ var processingData = map[string]any{
 	"publicURL":                         "http://test.example.com:1234/fizz/buzz",
 }
 
+// connectorVpaData returns a cfm.vpa.data slice carrying a single cfm.connector entry whose
+// properties hold the given dataspace profiles under the dataspaceProfilesKey.
+func connectorVpaData(profiles []string) []any {
+	return []any{
+		map[string]any{
+			"vpaType": model.ConnectorType.String(),
+			"properties": map[string]any{
+				DataspaceProfilesKey: profiles,
+			},
+		},
+	}
+}
+
+func TestEDCVActivityProcessor_Process_WithProfiles(t *testing.T) {
+	captured := make([]string, 0)
+	processor := NewProcessor(validConfig(WithControlPlane(MockManagementApiClient{associatedProfiles: &captured})))
+
+	ctx := context.Background()
+	pd := copyOf(processingData)
+	pd[model.VPAData] = connectorVpaData([]string{"cx-neptune", "cx-pluto"})
+
+	activity := api.Activity{ID: "test-activity", Type: "edcv", Discriminator: api.DeployDiscriminator}
+	activityContext := api.NewActivityContext(ctx, "orch-123", activity, pd, make(map[string]any))
+
+	result := processor.ProcessDeploy(activityContext)
+
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
+	assert.NoError(t, result.Error)
+	assert.Equal(t, []string{"cx-neptune", "cx-pluto"}, captured)
+}
+
+func TestEDCVActivityProcessor_Process_EmptyProfiles_NoAssociation(t *testing.T) {
+	captured := make([]string, 0)
+	processor := NewProcessor(validConfig(WithControlPlane(MockManagementApiClient{associatedProfiles: &captured})))
+
+	ctx := context.Background()
+	pd := copyOf(processingData)
+	pd[model.VPAData] = connectorVpaData([]string{})
+
+	activity := api.Activity{ID: "test-activity", Type: "edcv", Discriminator: api.DeployDiscriminator}
+	activityContext := api.NewActivityContext(ctx, "orch-123", activity, pd, make(map[string]any))
+
+	result := processor.ProcessDeploy(activityContext)
+
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
+	assert.NoError(t, result.Error)
+	assert.Empty(t, captured)
+}
+
+func TestEDCVActivityProcessor_Process_ProfileAssociationFailure(t *testing.T) {
+	processor := NewProcessor(validConfig(WithControlPlane(MockManagementApiClient{expectedProfileError: fmt.Errorf("some error")})))
+
+	ctx := context.Background()
+	pd := copyOf(processingData)
+	pd[model.VPAData] = connectorVpaData([]string{"cx-neptune"})
+
+	activity := api.Activity{ID: "test-activity", Type: "edcv", Discriminator: api.DeployDiscriminator}
+	activityContext := api.NewActivityContext(ctx, "orch-123", activity, pd, make(map[string]any))
+
+	result := processor.ProcessDeploy(activityContext)
+
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
+	assert.ErrorContains(t, result.Error, "some error")
+}
+
 func TestEDCVActivityProcessor_Process_WithValidData(t *testing.T) {
 	processor := NewProcessor(validConfig())
 
@@ -309,6 +374,11 @@ func copyOf(m map[string]any) map[string]any {
 type MockManagementApiClient struct {
 	expectedParticipantError error
 	expectedConfigError      error
+	expectedProfileError     error
+	// associatedProfiles, when non-nil, captures the profiles passed to AssociateProfiles so tests
+	// can assert on them. A pointer is used so the value-receiver method can record across the copy
+	// stored behind the ManagementAPIClient interface.
+	associatedProfiles *[]string
 }
 
 func (m MockManagementApiClient) DeleteConfig(ctx context.Context, participantContextID string) error {
@@ -325,4 +395,14 @@ func (m MockManagementApiClient) CreateParticipantContext(context.Context, contr
 
 func (m MockManagementApiClient) PatchConfig(context.Context, string, controlplane.ParticipantContextConfig) error {
 	return m.expectedConfigError
+}
+
+func (m MockManagementApiClient) AssociateProfiles(_ context.Context, _ string, profiles []string) error {
+	if m.expectedProfileError != nil {
+		return m.expectedProfileError
+	}
+	if m.associatedProfiles != nil {
+		*m.associatedProfiles = profiles
+	}
+	return nil
 }
