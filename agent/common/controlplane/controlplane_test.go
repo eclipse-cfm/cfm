@@ -230,6 +230,65 @@ func TestCreateParticipant_Conflict(t *testing.T) {
 	require.ErrorContains(t, client.CreateParticipantContext(t.Context(), context), "received status code 409")
 }
 
+func TestAssociateProfiles(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == CreateParticipantURL+"/test-participant/profiles" && r.Method == http.MethodPut {
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			var data map[string]any
+			require.NoError(t, json.Unmarshal(body, &data))
+
+			require.Equal(t, dataspaceProfileType, data["@type"])
+			require.Equal(t, []any{"cx-neptune", "cx-pluto"}, data["profiles"])
+
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
+	client := HttpManagementAPIClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	err := client.AssociateProfiles(t.Context(), "test-participant", []string{"cx-neptune", "cx-pluto"})
+	require.NoError(t, err)
+}
+
+func TestAssociateProfiles_AuthError(t *testing.T) {
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("", fmt.Errorf("test error"))
+	client := HttpManagementAPIClient{
+		BaseURL:       "http://foo.bar",
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	require.ErrorContains(t, client.AssociateProfiles(t.Context(), "test-participant", []string{"cx-neptune"}), "test error")
+}
+
+func TestAssociateProfiles_BadRequest(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("foobar"))
+	}))
+	defer server.Close()
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
+	client := HttpManagementAPIClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	require.ErrorContains(t, client.AssociateProfiles(t.Context(), "test-participant", []string{"cx-neptune"}), "received status code 400")
+}
+
 func TestDeleteParticipant(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == CreateParticipantURL+"/test-participant" && r.Method == http.MethodDelete {

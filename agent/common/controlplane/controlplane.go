@@ -33,6 +33,7 @@ const (
 	ParticipantContextStateActivated   ParticipantContextState = "ACTIVATED"
 	ParticipantContextStateDeactivated ParticipantContextState = "DEACTIVATED"
 	contextConnector                                           = "https://w3id.org/edc/connector/management/v2"
+	dataspaceProfileType                                       = "AssociateDataspaceProfile"
 	ScopeApiWrite                                              = "management-api:write"
 	ScopeApiRead                                               = "management-api:read"
 	// ScopeApiAdmin is required for participant context lifecycle operations: they act on
@@ -81,6 +82,9 @@ type ManagementAPIClient interface {
 	PatchConfig(ctx context.Context, participantContextID string, config ParticipantContextConfig) error
 	DeleteConfig(ctx context.Context, participantContextID string) error
 	DeleteParticipantContext(ctx context.Context, participantContextID string) error
+	// AssociateProfiles associates the given dataspace profiles with the participant context in the
+	// control plane. Callers are responsible for not invoking it with an empty profiles slice.
+	AssociateProfiles(ctx context.Context, participantContextID string, profiles []string) error
 }
 
 // DataPlaneRegistration describes a data-plane instance to register with the control plane for a
@@ -289,6 +293,46 @@ func (h HttpManagementAPIClient) UnregisterDataPlane(ctx context.Context, partic
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to unregister data plane on control plane: received status code %d, body: %s", resp.StatusCode, string(body))
 	}
+}
+
+// AssociateProfiles associates the given dataspace profiles with the participant context via
+// PUT /v5beta/participants/{participantContextID}/profiles.
+func (h HttpManagementAPIClient) AssociateProfiles(ctx context.Context, participantContextID string, profiles []string) error {
+	accessToken, err := h.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
+	if err != nil {
+		return fmt.Errorf("failed to get API access token: %w", err)
+	}
+
+	jsonLdData := map[string]any{
+		"@context": []string{contextConnector},
+		"@type":    dataspaceProfileType,
+		"profiles": profiles,
+	}
+
+	payload, err := json.Marshal(jsonLdData)
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("%s%s/%s/profiles", h.BaseURL, CreateParticipantURL, participantContextID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewBuffer(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", applicationJSON)
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	resp, err := h.HttpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to associate dataspace profiles on control plane: %w", err)
+	}
+
+	defer h.closeResponse(resp)
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to associate dataspace profiles on control plane: received status code %d, body: %s", resp.StatusCode, string(body))
+	}
+	return nil
 }
 
 func (h HttpManagementAPIClient) closeResponse(resp *http.Response) {
