@@ -38,6 +38,20 @@ func sampleMapping() TransferTypeMapping {
 				TokenSource:      "provider",
 				Endpoint:         "https://data.provider.example.com/assets",
 				TxRenewalSupport: true,
+				ClaimMappings: []ClaimMapping{
+					{From: "flow.metadata.region", To: "region"},
+					{From: "flow.metadata.tier", To: "tier", Optional: true},
+				},
+				EndpointMappings: []EndpointMapping{
+					{
+						Key:      "region",
+						Value:    "us-east-1",
+						Endpoint: "https://us-east-1.data.provider.example.com/assets",
+						ClaimMappings: []ClaimMapping{
+							{From: `"us-east-1"`, To: "region"},
+						},
+					},
+				},
 			},
 		},
 	}
@@ -65,6 +79,19 @@ func TestHttpApiClient_CreateTransferTypeMapping(t *testing.T) {
 	assert.Equal(t, "participant-1", received.ParticipantContextID)
 	assert.Equal(t, "HTTP", received.Mappings["HttpData-PULL"].EndpointType)
 	assert.True(t, received.Mappings["HttpData-PULL"].TxRenewalSupport)
+
+	claimMappings := received.Mappings["HttpData-PULL"].ClaimMappings
+	require.Len(t, claimMappings, 2)
+	assert.Equal(t, "flow.metadata.region", claimMappings[0].From)
+	assert.Equal(t, "region", claimMappings[0].To)
+	assert.False(t, claimMappings[0].Optional)
+	assert.Equal(t, "tier", claimMappings[1].To)
+	assert.True(t, claimMappings[1].Optional)
+
+	endpointMappings := received.Mappings["HttpData-PULL"].EndpointMappings
+	require.Len(t, endpointMappings, 1)
+	require.Len(t, endpointMappings[0].ClaimMappings, 1)
+	assert.Equal(t, "region", endpointMappings[0].ClaimMappings[0].To)
 }
 
 func TestHttpApiClient_CreateTransferTypeMapping_AuthError(t *testing.T) {
