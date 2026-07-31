@@ -122,24 +122,37 @@ func (p SigletActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.Act
 // handleDeployAction configures the transfer-type mappings in Siglet (upsert) and registers the
 // Siglet data-plane instance with the control plane.
 func (p SigletActivityProcessor) handleDeployAction(ctx context.Context, participantContextId string, mappings map[string]siglet.TransferType) api.ActivityResult {
-	mapping := siglet.TransferTypeMapping{
-		ParticipantContextID: participantContextId,
-		Mappings:             mappings,
+	// Only mappings that carry enough information to be a valid Siglet mapping are configured in
+	// Siglet; the rest are still registered as data-plane transfer types below.
+	sigletMappings := make(map[string]siglet.TransferType, len(mappings))
+	for name, tt := range mappings {
+		if isSigletConfigurable(tt) {
+			sigletMappings[name] = tt
+		}
 	}
 
-	// upsert: replace when a mapping already exists, otherwise create
-	existing, err := p.transferTypeMappingClient.GetTransferTypeMapping(ctx, participantContextId)
-	if err != nil {
-		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("cannot read transfer type mapping from Siglet: %w", err)}
-	}
-	if existing != nil {
-		if err := p.transferTypeMappingClient.ReplaceTransferTypeMapping(ctx, mapping); err != nil {
-			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("cannot replace transfer type mapping in Siglet: %w", err)}
+	if len(sigletMappings) > 0 {
+		mapping := siglet.TransferTypeMapping{
+			ParticipantContextID: participantContextId,
+			Mappings:             sigletMappings,
+		}
+
+		// upsert: replace when a mapping already exists, otherwise create
+		existing, err := p.transferTypeMappingClient.GetTransferTypeMapping(ctx, participantContextId)
+		if err != nil {
+			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("cannot read transfer type mapping from Siglet: %w", err)}
+		}
+		if existing != nil {
+			if err := p.transferTypeMappingClient.ReplaceTransferTypeMapping(ctx, mapping); err != nil {
+				return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("cannot replace transfer type mapping in Siglet: %w", err)}
+			}
+		} else {
+			if err := p.transferTypeMappingClient.CreateTransferTypeMapping(ctx, mapping); err != nil {
+				return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("cannot create transfer type mapping in Siglet: %w", err)}
+			}
 		}
 	} else {
-		if err := p.transferTypeMappingClient.CreateTransferTypeMapping(ctx, mapping); err != nil {
-			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("cannot create transfer type mapping in Siglet: %w", err)}
-		}
+		p.monitor.Infof("No Siglet-configurable transfer type mappings for participant '%s'; registering data plane only", participantContextId)
 	}
 
 	if err := p.dataPlaneClient.RegisterDataPlane(ctx, participantContextId, p.dataPlaneRegistration(participantContextId, mappings)); err != nil {
@@ -197,6 +210,17 @@ func extractMappings(props map[string]any) (map[string]siglet.TransferType, erro
 		}
 	}
 	return mappings, nil
+}
+
+// isSigletConfigurable reports whether a transfer-type mapping carries enough information to be
+// configured in Siglet: an endpoint type plus either a static endpoint or at least one endpoint
+// mapping. A mapping that only names its transfer type is still registered as a data-plane transfer
+// type with the control plane, but is not sent to Siglet.
+func isSigletConfigurable(tt siglet.TransferType) bool {
+	if strings.TrimSpace(tt.EndpointType) == "" {
+		return false
+	}
+	return strings.TrimSpace(tt.Endpoint) != "" || len(tt.EndpointMappings) > 0
 }
 
 // dataPlaneRegistration builds the control-plane registration for the Siglet data plane. The transfer

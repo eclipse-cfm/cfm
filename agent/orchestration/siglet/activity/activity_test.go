@@ -132,6 +132,59 @@ func TestSiglet_Deploy_DefaultsTokenSourceAndRenewal(t *testing.T) {
 	assert.False(t, tt.TxRenewalSupport)
 }
 
+func TestSiglet_Deploy_FiltersIncompleteMappings(t *testing.T) {
+	sigletClient := &MockSigletClient{}
+	dpClient := &MockDataPlaneClient{}
+	processor := NewProcessor(validConfig(WithSiglet(sigletClient), WithDataPlane(dpClient)))
+
+	props := map[string]any{
+		TransferTypeMappingsKey: map[string]any{
+			// complete: sent to Siglet
+			"HttpData-PULL": map[string]any{
+				"transferType": "HttpData-PULL",
+				"endpointType": "HTTP",
+				"endpoint":     "https://data.provider.example.com/assets",
+			},
+			// incomplete: registered as a data-plane transfer type but not sent to Siglet
+			"HttpData-PUSH": map[string]any{
+				"transferType": "HttpData-PUSH",
+			},
+		},
+	}
+
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), api.DeployDiscriminator))
+
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
+	require.NotNil(t, sigletClient.lastMapping)
+	assert.Contains(t, sigletClient.lastMapping.Mappings, "HttpData-PULL")
+	assert.NotContains(t, sigletClient.lastMapping.Mappings, "HttpData-PUSH")
+
+	assert.True(t, dpClient.registered, "expected the data plane to be registered")
+	assert.ElementsMatch(t, []string{"HttpData-PULL", "HttpData-PUSH"}, dpClient.lastRegistration.TransferTypes)
+}
+
+func TestSiglet_Deploy_AllIncomplete_RegistersDataPlaneOnly(t *testing.T) {
+	sigletClient := &MockSigletClient{}
+	dpClient := &MockDataPlaneClient{}
+	processor := NewProcessor(validConfig(WithSiglet(sigletClient), WithDataPlane(dpClient)))
+
+	props := map[string]any{
+		TransferTypeMappingsKey: map[string]any{
+			"HttpData-PUSH": map[string]any{
+				"transferType": "HttpData-PUSH",
+			},
+		},
+	}
+
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), api.DeployDiscriminator))
+
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
+	assert.False(t, sigletClient.created, "expected no mapping to be created in Siglet")
+	assert.False(t, sigletClient.replaced, "expected no mapping to be replaced in Siglet")
+	assert.True(t, dpClient.registered, "expected the data plane to be registered")
+	assert.Contains(t, dpClient.lastRegistration.TransferTypes, "HttpData-PUSH")
+}
+
 func TestSiglet_Deploy_UpsertReplacesExisting(t *testing.T) {
 	sigletClient := &MockSigletClient{existing: &siglet.TransferTypeMapping{ParticipantContextID: "participant-1"}}
 	processor := NewProcessor(validConfig(WithSiglet(sigletClient)))

@@ -25,12 +25,26 @@ import (
 	"github.com/eclipse-cfm/cfm/common/token"
 )
 
+// ClaimMapping binds the result of a CEL expression (From) to a JWT claim key (To). It mirrors a
+// Siglet claim mapping. Siglet validates these server-side; the client passes them through as-is.
+type ClaimMapping struct {
+	// From is a CEL expression evaluated against the flow root variable.
+	From string `json:"from"`
+	// To is the target JWT claim key. Must not collide with a reserved JWT claim.
+	To string `json:"to"`
+	// Optional, when true, skips the mapping if its expression fails or yields null. Defaults to false.
+	Optional bool `json:"optional,omitempty"`
+}
+
 // EndpointMapping resolves a data endpoint dynamically from flow metadata (see Siglet's
 // endpoint_mappings). Used as an alternative to a static Endpoint on a TransferType.
 type EndpointMapping struct {
 	Key      string `json:"key"`
 	Value    string `json:"value"`
 	Endpoint string `json:"endpoint"`
+	// ClaimMappings are applied only when this endpoint mapping matches; layered over the transfer
+	// type's root ClaimMappings, winning ties on a shared To key.
+	ClaimMappings []ClaimMapping `json:"claimMappings,omitempty"`
 }
 
 // TransferType describes how Siglet maps a single DPS transfer type (the flow profile) to a data
@@ -48,6 +62,9 @@ type TransferType struct {
 	EndpointMappings []EndpointMapping `json:"endpointMappings,omitempty"`
 	// TxRenewalSupport indicates whether the transfer type supports transfer renewal. Defaults to false.
 	TxRenewalSupport bool `json:"txRenewalSupport"`
+	// ClaimMappings are applied to every flow using this transfer type. When an EndpointMapping
+	// matches, its ClaimMappings are layered on top and win on a shared To key.
+	ClaimMappings []ClaimMapping `json:"claimMappings,omitempty"`
 }
 
 // TransferTypeMapping is the complete set of transfer-type mappings for a single participant context.
