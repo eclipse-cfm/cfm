@@ -14,7 +14,6 @@ package launcher
 
 import (
 	"context"
-	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -30,6 +29,8 @@ const (
 )
 
 func TestTestAgent_Integration(t *testing.T) {
+	fixtures.IsolateConfig(t)
+
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
@@ -43,11 +44,11 @@ func TestTestAgent_Integration(t *testing.T) {
 	natsfixtures.SetupTestStream(t, ctx, nt.Client, streamName)
 
 	// Required agent config
-	_ = os.Setenv("PM_URI", nt.URI)
-	_ = os.Setenv("PM_BUCKET", "cfm-bucket")
-	_ = os.Setenv("PM_STREAM", streamName)
-	_ = os.Setenv("PM_HTTPPORT", strconv.Itoa(fixtures.GetRandomPort(t)))
-	_ = os.Setenv("PM_AUTH_ENABLED", "false")
+	t.Setenv("PM_URI", nt.URI)
+	t.Setenv("PM_BUCKET", "cfm-bucket")
+	t.Setenv("PM_STREAM", streamName)
+	t.Setenv("PM_HTTPPORT", strconv.Itoa(fixtures.GetRandomPort(t)))
+	t.Setenv("PM_AUTH_ENABLED", "false")
 
 	// Create and start the test agent
 	shutdownChannel := make(chan struct{})

@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/common/fixtures"
 	"github.com/eclipse-cfm/cfm/common/lifecycleagent"
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/natsfixtures"
@@ -73,6 +74,8 @@ func Test_VerifyLifecycleAgentDispatchesCloudEvent(t *testing.T) {
 		Subjects:  []string{subject},
 	})
 	require.NoError(t, err)
+
+	fixtures.IsolateConfig(t)
 
 	// viper uppercases the env prefix and key, so the environment variables must be uppercase.
 	p := strings.ToUpper(agentName)

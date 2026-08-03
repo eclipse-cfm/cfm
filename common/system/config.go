@@ -14,19 +14,29 @@ package system
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/spf13/viper"
 )
+
+// ConfigDirEnvVar overrides the configuration file search path. When set, only the given directory is searched for
+// configuration files, replacing the default locations entirely. This pins the config location in deployments and
+// isolates tests from configuration files on the developer's machine.
+const ConfigDirEnvVar = "CFM_CONFIG_DIR"
 
 // LoadConfigOrPanic initializes a Config instance with the specified configuration name.
 // Configuration will be read from a file (if it exists) and can be overridden using environment variables.
 func LoadConfigOrPanic(name string) *viper.Viper {
 	v := viper.New()
 	v.SetConfigName(name)
-	v.AddConfigPath("/etc/appname/")
-	v.AddConfigPath("$HOME/.appname")
-	v.AddConfigPath(".")
+	if dir := os.Getenv(ConfigDirEnvVar); dir != "" {
+		v.AddConfigPath(dir)
+	} else {
+		v.AddConfigPath("/etc/appname/")
+		v.AddConfigPath("$HOME/.appname")
+		v.AddConfigPath(".")
+	}
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 	v.SetEnvPrefix(name)

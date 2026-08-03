@@ -13,9 +13,9 @@
 package natsagent
 
 import (
-	"os"
 	"testing"
 
+	"github.com/eclipse-cfm/cfm/common/fixtures"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/stretchr/testify/require"
@@ -23,15 +23,9 @@ import (
 
 func Test_LaunchAgent_WithAssemblyProvider(t *testing.T) {
 	// Setup environment variables
-	_ = os.Setenv("TESTAGENT_URI", "nats://localhost:4222")
-	_ = os.Setenv("TESTAGENT_BUCKET", "test-bucket")
-	_ = os.Setenv("TESTAGENT_STREAM", "test-stream")
-
-	t.Cleanup(func() {
-		_ = os.Unsetenv("TESTAGENT_URI")
-		_ = os.Unsetenv("TESTAGENT_BUCKET")
-		_ = os.Unsetenv("TESTAGENT_STREAM")
-	})
+	t.Setenv("TESTAGENT_URI", "nats://localhost:4222")
+	t.Setenv("TESTAGENT_BUCKET", "test-bucket")
+	t.Setenv("TESTAGENT_STREAM", "test-stream")
 
 	// Create a flag to track if AssemblyProvider was called
 	var assemblyProviderCalled bool
@@ -90,16 +84,12 @@ func Test_LaunchAgent_WithAssemblyProvider(t *testing.T) {
 }
 
 func Test_LaunchAgent_WithoutAssemblyProvider(t *testing.T) {
-	// Setup environment variables
-	_ = os.Setenv("TESTAGENT_URI", "nats://localhost:4222")
-	_ = os.Setenv("TESTAGENT_BUCKET", "test-bucket")
-	_ = os.Setenv("TESTAGENT_STREAM", "test-stream")
+	fixtures.IsolateConfig(t)
 
-	t.Cleanup(func() {
-		_ = os.Unsetenv("TESTAGENT_URI")
-		_ = os.Unsetenv("TESTAGENT_BUCKET")
-		_ = os.Unsetenv("TESTAGENT_STREAM")
-	})
+	// Setup environment variables
+	t.Setenv("TESTAGENT_URI", "nats://localhost:4222")
+	t.Setenv("TESTAGENT_BUCKET", "test-bucket")
+	t.Setenv("TESTAGENT_STREAM", "test-stream")
 
 	// Create launcher config without AssemblyProvider
 	config := LauncherConfig{
@@ -125,15 +115,11 @@ func Test_LaunchAgent_WithoutAssemblyProvider(t *testing.T) {
 }
 
 func Test_loadAgentConfig_MissingRequiredParams(t *testing.T) {
-	// Test with missing URI
-	_ = os.Setenv("TESTAGENT_BUCKET", "test-bucket")
-	_ = os.Setenv("TESTAGENT_STREAM", "test-stream")
+	fixtures.IsolateConfig(t)
 
-	t.Cleanup(func() {
-		_ = os.Unsetenv("TESTAGENT_URI")
-		_ = os.Unsetenv("TESTAGENT_BUCKET")
-		_ = os.Unsetenv("TESTAGENT_STREAM")
-	})
+	// Test with missing URI
+	t.Setenv("TESTAGENT_BUCKET", "test-bucket")
+	t.Setenv("TESTAGENT_STREAM", "test-stream")
 
 	// Verify that missing required params causes panic
 	require.Panics(t, func() {

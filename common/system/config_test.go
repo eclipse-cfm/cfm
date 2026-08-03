@@ -11,15 +11,10 @@ import (
 
 const appName = "testapp"
 
-//nolint:errcheck
 func TestLoadConfigFromEnvironment(t *testing.T) {
 	// setup
-	os.Setenv("TESTAPP_FOO", "foo_value")
-	os.Setenv("TESTAPP_BAR", "bar_value")
-	defer func() {
-		os.Unsetenv("FOO")
-		os.Unsetenv("BAR")
-	}()
+	t.Setenv("TESTAPP_FOO", "foo_value")
+	t.Setenv("TESTAPP_BAR", "bar_value")
 
 	v := LoadConfigOrPanic(appName)
 
@@ -50,6 +45,27 @@ bar: "bar_value"
 	assert.Equal(t, "bar_value", v.GetString("bar"))
 }
 
+func TestLoadConfigDirOverride(t *testing.T) {
+	// a config file in the current directory, which must be ignored when the override is set
+	cwdContent := []byte(`foo: "cwd_value"`)
+	require.NoError(t, os.WriteFile("./testapp.yaml", cwdContent, 0644))
+	defer func() { _ = os.Remove("./testapp.yaml") }()
+
+	// a config file in the override directory
+	overrideDir := t.TempDir()
+	overrideContent := []byte(`foo: "override_value"`)
+	require.NoError(t, os.WriteFile(filepath.Join(overrideDir, "testapp.yaml"), overrideContent, 0644))
+
+	t.Setenv(ConfigDirEnvVar, overrideDir)
+	v := LoadConfigOrPanic(appName)
+	assert.Equal(t, "override_value", v.GetString("foo"), "only the override directory must be searched")
+
+	// pointing the override at an empty directory must yield no file-based configuration at all
+	t.Setenv(ConfigDirEnvVar, t.TempDir())
+	v = LoadConfigOrPanic(appName)
+	assert.Empty(t, v.GetString("foo"), "config files outside the override directory must be ignored")
+}
+
 //nolint:errcheck
 func TestLoadConfigEnvPriorityOverFile(t *testing.T) {
 	// create the config file
@@ -68,12 +84,8 @@ bar: "bar_value_file"
 	defer os.Remove("./testapp.yaml")
 
 	// Set environment variables
-	os.Setenv("TESTAPP_FOO", "foo_value_file")
-	os.Setenv("TESTAPP_BAR", "bar_value_env")
-	defer func() {
-		os.Unsetenv("TESTAPP_FOO")
-		os.Unsetenv("TESTAPP_BAR")
-	}()
+	t.Setenv("TESTAPP_FOO", "foo_value_file")
+	t.Setenv("TESTAPP_BAR", "bar_value_env")
 
 	v := LoadConfigOrPanic(appName)
 

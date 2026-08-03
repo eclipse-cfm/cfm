@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/common/fixtures"
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/natsfixtures"
 	"github.com/nats-io/nats.go/jetstream"
@@ -42,6 +43,8 @@ func TestKeyManagementAgent_Integration(t *testing.T) {
 	nt, err := natsfixtures.SetupNatsContainer(ctx, bucket)
 	require.NoError(t, err)
 	defer natsfixtures.TeardownNatsContainer(ctx, nt)
+
+	fixtures.IsolateConfig(t)
 
 	t.Setenv("KMAGENT_URI", nt.URI)
 	t.Setenv("KMAGENT_BUCKET", bucket)

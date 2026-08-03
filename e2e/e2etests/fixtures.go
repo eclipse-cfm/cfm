@@ -44,6 +44,8 @@ func launchPlatformWithAgent(t *testing.T, natsURI string, pgDsn string) *e2efix
 }
 
 func launchPlatform(t *testing.T, natsURI string, pgDsn string) (chan struct{}, *e2efixtures.ApiClient) {
+	fixtures.IsolateConfig(t)
+
 	_ = os.Setenv("TM_POSTGRES", "true")
 	_ = os.Setenv("TM_DSN", pgDsn)
 	_ = os.Setenv("TM_URI", natsURI)
