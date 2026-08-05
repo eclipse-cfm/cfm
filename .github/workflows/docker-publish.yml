@@ -43,6 +43,9 @@ jobs:
           - name: sigletagent
             dockerfile: docker/Dockerfile.sigletagent.dockerfile
             context: .
+          - name: certoagent
+            dockerfile: docker/Dockerfile.certoagent.dockerfile
+            context: .
           - name: pmanager
             dockerfile: docker/Dockerfile.pmanager.dockerfile
             context: .
