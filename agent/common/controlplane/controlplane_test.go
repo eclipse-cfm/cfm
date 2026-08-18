@@ -457,6 +457,47 @@ func TestRegisterDataPlane(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "test-participant-siglet", received["dataplaneId"])
 	require.Equal(t, "http://siglet.edc-v.svc.cluster.local:8081/api/v1/test-participant/dataflows", received["endpoint"])
+	require.NotContains(t, received, "authorization", "an absent authorization profile must not be sent")
+}
+
+func TestRegisterDataPlane_WithAuthorization(t *testing.T) {
+	var received map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut && r.URL.Path == CreateParticipantURL+"/test-participant/dataplanes" {
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			require.NoError(t, json.Unmarshal(body, &received))
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
+	client := HttpManagementAPIClient{BaseURL: server.URL, TokenProvider: tp, HttpClient: &http.Client{}}
+
+	err := client.RegisterDataPlane(t.Context(), "test-participant", DataPlaneRegistration{
+		ID:            "test-participant-siglet",
+		TransferTypes: []string{"HttpData-PULL"},
+		Endpoint:      "http://siglet.edc-v.svc.cluster.local:8081/api/v1/test-participant/dataflows",
+		Authorization: map[string]any{
+			"type":                  "oauth2_token_exchange",
+			"tokenExchangeEndpoint": "https://broker.example.com/token",
+			"issuer":                "https://broker.example.com",
+			"jwksUri":               "https://broker.example.com/.well-known/jwks.json",
+			"resource":              "test-participant",
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, map[string]any{
+		"type":                  "oauth2_token_exchange",
+		"tokenExchangeEndpoint": "https://broker.example.com/token",
+		"issuer":                "https://broker.example.com",
+		"jwksUri":               "https://broker.example.com/.well-known/jwks.json",
+		"resource":              "test-participant",
+	}, received["authorization"])
 }
 
 func TestRegisterDataPlane_AuthError(t *testing.T) {
