@@ -116,6 +116,34 @@ func TestProcessDeploy_UsesConfiguredNamespace(t *testing.T) {
 	}, identifiers)
 }
 
+// TestProcessDeploy_MapsPerServiceAccountScopes asserts that each workload ServiceAccount gets the
+// scopes its vaultServiceAccounts entry declares, rather than one scope set shared by all of them:
+// every workload needs the vault read scope, and the control plane additionally needs the signaling
+// scope to authorize DPS exchanges with the data plane.
+func TestProcessDeploy_MapsPerServiceAccountScopes(t *testing.T) {
+	scopesByIdentifier := map[string][]string{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var rm resourceMapping
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&rm))
+		scopesByIdentifier[rm.ClientIdentifier] = rm.Scopes
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	tp := &fakeTokenProvider{token: stubToken()}
+	processor := newProcessorForTest(t, tp, server.URL)
+
+	result := processor.ProcessDeploy(newDeployContext())
+
+	require.EqualValues(t, api.ActivityResultComplete, result.Result, "expected deploy to complete, got error: %v", result.Error)
+	assert.Equal(t, map[string][]string{
+		"system:serviceaccount:test-ns:cfm-agents":   agentScopes,
+		"system:serviceaccount:test-ns:controlplane": {"read", "signaling"},
+		"system:serviceaccount:test-ns:identityhub":  {"read"},
+		"system:serviceaccount:test-ns:siglet-sa":    {"read"},
+	}, scopesByIdentifier)
+}
+
 // TestProcessDeploy_FailsWhenScopeHasNoMapping asserts that if the token exchange fails — e.g.
 // because a requested scope has no mapping seeded in jwtlet — deploy fails fast with a fatal error
 // rather than completing and leaving the participant context broken for downstream agents.
