@@ -43,15 +43,32 @@ const (
 	contentTypeHeader       = "Content-Type"
 	authHeader              = "Authorization"
 	agentsServiceAccount    = "cfm-agents"
+
+	// scopeVaultRead is the scope every CFM workload needs on its participant-scoped token to
+	// authenticate against the participant's Vault partition.
+	scopeVaultRead = "read"
+
+	// scopeSignaling is the scope the control plane needs to authorize DPS signaling exchanges with
+	// the participant's data plane. It must match the scope the siglet agent puts into the data-plane
+	// authorization profile (`tokenexchange.scope`, see agent/orchestration/siglet/launcher/launcher.go).
+	scopeSignaling = "signaling"
 )
 
+// vaultServiceAccount is a workload ServiceAccount that exchanges its projected token for a
+// participant-scoped token, together with the scopes its resource mapping grants.
+type vaultServiceAccount struct {
+	name   string
+	scopes []string
+}
+
 // vaultServiceAccounts are the workload ServiceAccounts that exchange their projected token for a
-// participant-scoped token used to authenticate against Vault. The resulting token's `sub` is the
-// participant context id, which scopes the workload to that participant's vault partition.
-var vaultServiceAccounts = []string{
-	"controlplane",
-	"identityhub",
-	"siglet-sa",
+// participant-scoped token. The resulting token's `sub` is the participant context id, which scopes
+// the workload to that participant's vault partition. Every workload gets scopeVaultRead; the control
+// plane additionally gets scopeSignaling for DPS signaling with the data plane.
+var vaultServiceAccounts = []vaultServiceAccount{
+	{name: "controlplane", scopes: []string{scopeVaultRead, scopeSignaling}},
+	{name: "identityhub", scopes: []string{scopeVaultRead}},
+	{name: "siglet-sa", scopes: []string{scopeVaultRead}},
 }
 
 // agentScopes is the exact set of narrow scopes the CFM agents request against a participant
@@ -79,8 +96,15 @@ type TokenExchangeActivityProcessor struct {
 	Audience           string
 	ManagementBasePath string
 
-	clientIdentifier       string
-	vaultClientIdentifiers []string
+	clientIdentifier    string
+	vaultClientMappings []vaultClientMapping
+}
+
+// vaultClientMapping is a resolved vaultServiceAccount: the client identifier jwtlet sees for the
+// workload, plus the scopes its resource mapping grants.
+type vaultClientMapping struct {
+	clientIdentifier string
+	scopes           []string
 }
 
 type tokenExchangeData struct {
@@ -112,20 +136,23 @@ type Config struct {
 }
 
 func NewProcessor(config *Config) *TokenExchangeActivityProcessor {
-	vaultClientIdentifiers := make([]string, 0, len(vaultServiceAccounts))
+	vaultClientMappings := make([]vaultClientMapping, 0, len(vaultServiceAccounts))
 	for _, sa := range vaultServiceAccounts {
-		vaultClientIdentifiers = append(vaultClientIdentifiers, serviceAccountIdentifier(config.ServiceAccountNamespace, sa))
+		vaultClientMappings = append(vaultClientMappings, vaultClientMapping{
+			clientIdentifier: serviceAccountIdentifier(config.ServiceAccountNamespace, sa.name),
+			scopes:           sa.scopes,
+		})
 	}
 	return &TokenExchangeActivityProcessor{
-		Monitor:                config.LogMonitor,
-		TokenProvider:          config.TokenProvider,
-		HttpClient:             config.HttpClient,
-		tracer:                 otel.GetTracerProvider().Tracer("cfm.agent.jwtlet"),
-		ManagementBasePath:     config.ManagementBasePath,
-		TokenFilePath:          config.TokenFilePath,
-		Audience:               config.Audience,
-		clientIdentifier:       serviceAccountIdentifier(config.ServiceAccountNamespace, agentsServiceAccount),
-		vaultClientIdentifiers: vaultClientIdentifiers,
+		Monitor:             config.LogMonitor,
+		TokenProvider:       config.TokenProvider,
+		HttpClient:          config.HttpClient,
+		tracer:              otel.GetTracerProvider().Tracer("cfm.agent.jwtlet"),
+		ManagementBasePath:  config.ManagementBasePath,
+		TokenFilePath:       config.TokenFilePath,
+		Audience:            config.Audience,
+		clientIdentifier:    serviceAccountIdentifier(config.ServiceAccountNamespace, agentsServiceAccount),
+		vaultClientMappings: vaultClientMappings,
 	}
 }
 
@@ -168,19 +195,20 @@ func (p TokenExchangeActivityProcessor) ProcessDeploy(ctx api.ActivityContext) a
 	mapSpan.AddEvent("Created CFM agents resource mapping")
 
 	// the control plane and identity hub must be able to exchange their token for a participant-scoped
-	// token used to authenticate against Vault (resource = participant context id)
-	for _, clientID := range p.vaultClientIdentifiers {
+	// token used to authenticate against Vault (resource = participant context id). The control plane
+	// additionally needs the signaling scope to authorize DPS exchanges with the data plane.
+	for _, mapping := range p.vaultClientMappings {
 		vm := resourceMapping{
-			ClientIdentifier:   clientID,
+			ClientIdentifier:   mapping.clientIdentifier,
 			ParticipantContext: participantContextID,
-			Scopes:             []string{"read"},
+			Scopes:             mapping.scopes,
 			Audiences:          []string{p.Audience},
 		}
-		p.Monitor.Debugf("Creating vault resource mapping for %s -> %s", clientID, participantContextID)
+		p.Monitor.Debugf("Creating vault resource mapping for %s -> %s", mapping.clientIdentifier, participantContextID)
 		if err := p.post(mapCtx, "/api/v1/mappings", vm); err != nil {
 			mapSpan.RecordError(err)
 			mapSpan.End()
-			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating vault resource mapping for %s: %w", clientID, err)}
+			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating vault resource mapping for %s: %w", mapping.clientIdentifier, err)}
 		}
 	}
 	mapSpan.AddEvent("Created vault resource mappings")
@@ -231,10 +259,10 @@ func (p TokenExchangeActivityProcessor) ProcessDispose(ctx api.ActivityContext) 
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error deleting resource mapping: %w", err)}
 	}
 
-	for _, clientID := range p.vaultClientIdentifiers {
-		if err := p.delete(spanCtx, fmt.Sprintf("/api/v1/mappings/%s/%s", clientID, participantContextID)); err != nil {
+	for _, mapping := range p.vaultClientMappings {
+		if err := p.delete(spanCtx, fmt.Sprintf("/api/v1/mappings/%s/%s", mapping.clientIdentifier, participantContextID)); err != nil {
 			span.RecordError(err)
-			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error deleting vault resource mapping for %s: %w", clientID, err)}
+			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error deleting vault resource mapping for %s: %w", mapping.clientIdentifier, err)}
 		}
 	}
 	span.AddEvent("Deleted resource mappings")
