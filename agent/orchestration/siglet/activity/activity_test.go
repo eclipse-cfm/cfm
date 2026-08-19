@@ -36,6 +36,10 @@ func WithDataPlane(client controlplane.DataPlaneRegistrationClient) ConfigOption
 	return func(config *Config) { config.DataPlaneClient = client }
 }
 
+func WithAuthorization(authorization AuthorizationConfig) ConfigOptions {
+	return func(config *Config) { config.Authorization = authorization }
+}
+
 func validConfig(opts ...ConfigOptions) *Config {
 	c := Config{
 		LogMonitor:                system.NoopMonitor{},
@@ -60,6 +64,32 @@ func mappingsProps() map[string]any {
 			},
 		},
 	}
+}
+
+// configuredAuthorization is the agent-level fallback used by the authorization tests.
+func configuredAuthorization() AuthorizationConfig {
+	return AuthorizationConfig{
+		TokenExchangeEndpoint: "https://broker.example.com/token",
+		Issuer:                "https://broker.example.com",
+		JwksUri:               "https://broker.example.com/.well-known/jwks.json",
+	}
+}
+
+// propsWithAuthorization returns the transfer-type mapping properties plus an authorization object.
+func propsWithAuthorization(authorization map[string]any) map[string]any {
+	props := mappingsProps()
+	props[AuthorizationKey] = authorization
+	return props
+}
+
+// tokenExchangeAuthorization returns a VPA authorization object declaring the supported type, plus
+// the given property overrides.
+func tokenExchangeAuthorization(overrides map[string]any) map[string]any {
+	authorization := map[string]any{"type": "oauth2_token_exchange"}
+	for key, value := range overrides {
+		authorization[key] = value
+	}
+	return authorization
 }
 
 // validVpaData returns a VPA data slice with a single dataplane entry. If properties is nil, the
@@ -252,6 +282,138 @@ func TestSiglet_Deploy_ControlPlaneError(t *testing.T) {
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	assert.ErrorContains(t, result.Error, "cp boom")
+}
+
+func TestSiglet_Deploy_NoAuthorizationInVpa_RegistersWithoutProfile(t *testing.T) {
+	dpClient := &MockDataPlaneClient{}
+	processor := NewProcessor(validConfig(WithDataPlane(dpClient), WithAuthorization(configuredAuthorization())))
+
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(mappingsProps())), api.DeployDiscriminator))
+
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
+	assert.NoError(t, result.Error)
+	assert.True(t, dpClient.registered)
+	assert.Nil(t, dpClient.lastRegistration.Authorization, "an absent authorization key must not register a profile")
+}
+
+func TestSiglet_Deploy_TypeOnlyAuthorization_UsesConfiguredFallbacks(t *testing.T) {
+	dpClient := &MockDataPlaneClient{}
+	processor := NewProcessor(validConfig(WithDataPlane(dpClient), WithAuthorization(configuredAuthorization())))
+
+	props := propsWithAuthorization(tokenExchangeAuthorization(nil))
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), api.DeployDiscriminator))
+
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
+	assert.NoError(t, result.Error)
+	require.NotNil(t, dpClient.lastRegistration.Authorization)
+	assert.Equal(t, map[string]any{
+		"type":                  "oauth2_token_exchange",
+		"tokenExchangeEndpoint": "https://broker.example.com/token",
+		"issuer":                "https://broker.example.com",
+		"jwksUri":               "https://broker.example.com/.well-known/jwks.json",
+		"resource":              "participant-1",
+	}, dpClient.lastRegistration.Authorization)
+	assert.NotContains(t, dpClient.lastRegistration.Authorization, "scope", "an unset scope must be omitted")
+}
+
+func TestSiglet_Deploy_Authorization_UsesConfiguredScope(t *testing.T) {
+	dpClient := &MockDataPlaneClient{}
+	authorization := configuredAuthorization()
+	authorization.Scope = "signaling:dataflow"
+	processor := NewProcessor(validConfig(WithDataPlane(dpClient), WithAuthorization(authorization)))
+
+	props := propsWithAuthorization(tokenExchangeAuthorization(nil))
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), api.DeployDiscriminator))
+
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
+	assert.Equal(t, "signaling:dataflow", dpClient.lastRegistration.Authorization["scope"])
+}
+
+func TestSiglet_Deploy_Authorization_VpaOverridesConfiguration(t *testing.T) {
+	dpClient := &MockDataPlaneClient{}
+	authorization := configuredAuthorization()
+	authorization.Scope = "configured:scope"
+	processor := NewProcessor(validConfig(WithDataPlane(dpClient), WithAuthorization(authorization)))
+
+	props := propsWithAuthorization(tokenExchangeAuthorization(map[string]any{
+		"tokenExchangeEndpoint": "https://vpa.example.com/token",
+		"issuer":                "https://vpa.example.com",
+		"jwksUri":               "https://vpa.example.com/jwks",
+		"resource":              "urn:dps:principal:participant-1",
+		"scope":                 "vpa:scope",
+	}))
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), api.DeployDiscriminator))
+
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
+	assert.NoError(t, result.Error)
+	assert.Equal(t, map[string]any{
+		"type":                  "oauth2_token_exchange",
+		"tokenExchangeEndpoint": "https://vpa.example.com/token",
+		"issuer":                "https://vpa.example.com",
+		"jwksUri":               "https://vpa.example.com/jwks",
+		"resource":              "urn:dps:principal:participant-1",
+		"scope":                 "vpa:scope",
+	}, dpClient.lastRegistration.Authorization)
+}
+
+func TestSiglet_Deploy_Authorization_MissingRequiredProperty(t *testing.T) {
+	sigletClient := &MockSigletClient{}
+	dpClient := &MockDataPlaneClient{}
+	authorization := configuredAuthorization()
+	authorization.Issuer = ""
+	processor := NewProcessor(validConfig(WithSiglet(sigletClient), WithDataPlane(dpClient), WithAuthorization(authorization)))
+
+	props := propsWithAuthorization(tokenExchangeAuthorization(nil))
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), api.DeployDiscriminator))
+
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
+	require.Error(t, result.Error)
+	assert.Contains(t, result.Error.Error(), "issuer")
+	assert.Contains(t, result.Error.Error(), "tokenexchange.issuer")
+	// the profile is resolved before anything is applied, so nothing is left half-configured
+	assert.False(t, sigletClient.created, "expected no transfer type mapping to be created")
+	assert.False(t, dpClient.registered, "expected the data plane not to be registered")
+}
+
+func TestSiglet_Deploy_Authorization_UnsupportedType(t *testing.T) {
+	sigletClient := &MockSigletClient{}
+	dpClient := &MockDataPlaneClient{}
+	processor := NewProcessor(validConfig(WithSiglet(sigletClient), WithDataPlane(dpClient), WithAuthorization(configuredAuthorization())))
+
+	props := propsWithAuthorization(map[string]any{"type": "oauth2_client_credentials"})
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), api.DeployDiscriminator))
+
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
+	require.Error(t, result.Error)
+	assert.Contains(t, result.Error.Error(), "oauth2_client_credentials")
+	assert.False(t, sigletClient.created)
+	assert.False(t, dpClient.registered)
+}
+
+func TestSiglet_Deploy_Authorization_MissingType(t *testing.T) {
+	dpClient := &MockDataPlaneClient{}
+	processor := NewProcessor(validConfig(WithDataPlane(dpClient), WithAuthorization(configuredAuthorization())))
+
+	props := propsWithAuthorization(map[string]any{"issuer": "https://vpa.example.com"})
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), api.DeployDiscriminator))
+
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
+	require.Error(t, result.Error)
+	assert.Contains(t, result.Error.Error(), "'type'")
+	assert.False(t, dpClient.registered)
+}
+
+func TestSiglet_Deploy_Authorization_NotAnObject(t *testing.T) {
+	dpClient := &MockDataPlaneClient{}
+	processor := NewProcessor(validConfig(WithDataPlane(dpClient), WithAuthorization(configuredAuthorization())))
+
+	props := mappingsProps()
+	props[AuthorizationKey] = "not-an-object"
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), api.DeployDiscriminator))
+
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
+	require.Error(t, result.Error)
+	assert.False(t, dpClient.registered)
 }
 
 func TestSiglet_Dispose_HappyPath(t *testing.T) {

@@ -35,6 +35,12 @@ const (
 	tokenExchangeURLKey    = "tokenexchange.url"
 	tokenFilePathKey       = "tokenexchange.tokenFilePath"
 	audienceKey            = "tokenexchange.audience"
+	// Fallbacks for the data-plane authorization profile, used for the properties a cfm.dataplane VPA
+	// leaves unset. Optional: they are only needed when a VPA opts into an authorization profile, so a
+	// missing value is reported by the deploy activity rather than at launch.
+	issuerKey  = "tokenexchange.issuer"
+	jwksURIKey = "tokenexchange.jwksUri"
+	scopeKey   = "tokenexchange.scope"
 )
 
 func LaunchAndWaitSignal(shutdown <-chan struct{}) {
@@ -56,6 +62,9 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 			tokenExchangeURL := ctx.Config.GetString(tokenExchangeURLKey)
 			tokenFilePath := ctx.Config.GetString(tokenFilePathKey)
 			audience := ctx.Config.GetString(audienceKey)
+			issuer := ctx.Config.GetString(issuerKey)
+			jwksURI := ctx.Config.GetString(jwksURIKey)
+			scope := ctx.Config.GetString(scopeKey)
 
 			if err := runtime.CheckRequiredParams(
 				sigletManagementURLKey, sigletManagementURL,
@@ -81,6 +90,12 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 					BaseURL:       cpURL,
 					TokenProvider: provider,
 					HttpClient:    &httpClient,
+				},
+				Authorization: activity.AuthorizationConfig{
+					TokenExchangeEndpoint: tokenExchangeURL + "/token",
+					Issuer:                issuer,
+					JwksUri:               jwksURI,
+					Scope:                 scope,
 				},
 			})
 		},

@@ -97,6 +97,10 @@ type DataPlaneRegistration struct {
 	TransferTypes []string `json:"transferTypes"`
 	// Endpoint is the data plane's DPS signaling endpoint the control plane sends flow events to.
 	Endpoint string `json:"endpoint"`
+	// Authorization is the optional DPS authorization profile the control plane uses to authorize
+	// signaling exchanges with this data plane. It is a flat object: "type" plus the properties of
+	// that profile. Omitted from the request when nil.
+	Authorization map[string]any `json:"authorization,omitempty"`
 }
 
 // DataPlaneRegistrationClient registers and unregisters data-plane instances with the EDC control
