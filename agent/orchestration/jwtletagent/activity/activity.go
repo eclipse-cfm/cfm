@@ -54,21 +54,24 @@ const (
 	scopeSignaling = "signaling"
 )
 
-// vaultServiceAccount is a workload ServiceAccount that exchanges its projected token for a
+// ClientMapping names a workload ServiceAccount that exchanges its projected token for a
 // participant-scoped token, together with the scopes its resource mapping grants.
-type vaultServiceAccount struct {
-	name   string
-	scopes []string
+type ClientMapping struct {
+	// Name is the bare ServiceAccount name; the client identifier jwtlet sees is built from it and
+	// Config.ServiceAccountNamespace.
+	Name   string   `json:"name" mapstructure:"name"`
+	Scopes []string `json:"scopes" mapstructure:"scopes"`
 }
 
-// vaultServiceAccounts are the workload ServiceAccounts that exchange their projected token for a
-// participant-scoped token. The resulting token's `sub` is the participant context id, which scopes
-// the workload to that participant's vault partition. Every workload gets scopeVaultRead; the control
-// plane additionally gets scopeSignaling for DPS signaling with the data plane.
-var vaultServiceAccounts = []vaultServiceAccount{
-	{name: "controlplane", scopes: []string{scopeVaultRead, scopeSignaling}},
-	{name: "identityhub", scopes: []string{scopeVaultRead}},
-	{name: "siglet-sa", scopes: []string{scopeVaultRead}},
+// defaultClientMappings are the client mappings used when none are configured. The workloads they
+// name exchange their projected token for a participant-scoped token whose `sub` is the participant
+// context id, which scopes the workload to that participant's vault partition. Every workload gets
+// scopeVaultRead; the control plane additionally gets scopeSignaling for DPS signaling with the
+// data plane.
+var defaultClientMappings = []ClientMapping{
+	{Name: "controlplane", Scopes: []string{scopeVaultRead, scopeSignaling}},
+	{Name: "identityhub", Scopes: []string{scopeVaultRead}},
+	{Name: "siglet-sa", Scopes: []string{scopeVaultRead}},
 }
 
 // agentScopes is the exact set of narrow scopes the CFM agents request against a participant
@@ -96,13 +99,13 @@ type TokenExchangeActivityProcessor struct {
 	Audience           string
 	ManagementBasePath string
 
-	clientIdentifier    string
-	vaultClientMappings []vaultClientMapping
+	clientIdentifier string
+	resolvedMappings []resolvedMapping
 }
 
-// vaultClientMapping is a resolved vaultServiceAccount: the client identifier jwtlet sees for the
-// workload, plus the scopes its resource mapping grants.
-type vaultClientMapping struct {
+// resolvedMapping is a ClientMapping with its ServiceAccount name resolved to the client identifier
+// jwtlet sees for the workload.
+type resolvedMapping struct {
 	clientIdentifier string
 	scopes           []string
 }
@@ -133,26 +136,35 @@ type Config struct {
 	// ServiceAccountNamespace is the Kubernetes namespace the CFM workload ServiceAccounts live in,
 	// used to build the client identifiers of the resource mappings.
 	ServiceAccountNamespace string
+	// ClientMappings are the workload ServiceAccounts that exchange their projected token for a
+	// participant-scoped token, and the scopes each one gets (config key `clientmappings`). When
+	// empty, defaultClientMappings is used, so a deployment that does not configure the key keeps
+	// the built-in mappings.
+	ClientMappings []ClientMapping
 }
 
 func NewProcessor(config *Config) *TokenExchangeActivityProcessor {
-	vaultClientMappings := make([]vaultClientMapping, 0, len(vaultServiceAccounts))
-	for _, sa := range vaultServiceAccounts {
-		vaultClientMappings = append(vaultClientMappings, vaultClientMapping{
-			clientIdentifier: serviceAccountIdentifier(config.ServiceAccountNamespace, sa.name),
-			scopes:           sa.scopes,
+	mappings := config.ClientMappings
+	if len(mappings) == 0 {
+		mappings = defaultClientMappings
+	}
+	resolvedMappings := make([]resolvedMapping, 0, len(mappings))
+	for _, mapping := range mappings {
+		resolvedMappings = append(resolvedMappings, resolvedMapping{
+			clientIdentifier: serviceAccountIdentifier(config.ServiceAccountNamespace, mapping.Name),
+			scopes:           mapping.Scopes,
 		})
 	}
 	return &TokenExchangeActivityProcessor{
-		Monitor:             config.LogMonitor,
-		TokenProvider:       config.TokenProvider,
-		HttpClient:          config.HttpClient,
-		tracer:              otel.GetTracerProvider().Tracer("cfm.agent.jwtlet"),
-		ManagementBasePath:  config.ManagementBasePath,
-		TokenFilePath:       config.TokenFilePath,
-		Audience:            config.Audience,
-		clientIdentifier:    serviceAccountIdentifier(config.ServiceAccountNamespace, agentsServiceAccount),
-		vaultClientMappings: vaultClientMappings,
+		Monitor:            config.LogMonitor,
+		TokenProvider:      config.TokenProvider,
+		HttpClient:         config.HttpClient,
+		tracer:             otel.GetTracerProvider().Tracer("cfm.agent.jwtlet"),
+		ManagementBasePath: config.ManagementBasePath,
+		TokenFilePath:      config.TokenFilePath,
+		Audience:           config.Audience,
+		clientIdentifier:   serviceAccountIdentifier(config.ServiceAccountNamespace, agentsServiceAccount),
+		resolvedMappings:   resolvedMappings,
 	}
 }
 
@@ -194,24 +206,26 @@ func (p TokenExchangeActivityProcessor) ProcessDeploy(ctx api.ActivityContext) a
 	}
 	mapSpan.AddEvent("Created CFM agents resource mapping")
 
-	// the control plane and identity hub must be able to exchange their token for a participant-scoped
-	// token used to authenticate against Vault (resource = participant context id). The control plane
-	// additionally needs the signaling scope to authorize DPS exchanges with the data plane.
-	for _, mapping := range p.vaultClientMappings {
-		vm := resourceMapping{
+	// the participant's workloads must be able to exchange their token for a participant-scoped token
+	// used to authenticate against Vault (resource = participant context id). Which workloads these
+	// are, and the scopes they get, comes from the configured client mappings (defaultClientMappings
+	// when unconfigured, where the control plane additionally gets the signaling scope to authorize
+	// DPS exchanges with the data plane).
+	for _, mapping := range p.resolvedMappings {
+		wm := resourceMapping{
 			ClientIdentifier:   mapping.clientIdentifier,
 			ParticipantContext: participantContextID,
 			Scopes:             mapping.scopes,
 			Audiences:          []string{p.Audience},
 		}
-		p.Monitor.Debugf("Creating vault resource mapping for %s -> %s", mapping.clientIdentifier, participantContextID)
-		if err := p.post(mapCtx, "/api/v1/mappings", vm); err != nil {
+		p.Monitor.Debugf("Creating workload resource mapping for %s -> %s", mapping.clientIdentifier, participantContextID)
+		if err := p.post(mapCtx, "/api/v1/mappings", wm); err != nil {
 			mapSpan.RecordError(err)
 			mapSpan.End()
-			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating vault resource mapping for %s: %w", mapping.clientIdentifier, err)}
+			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating resource mapping for %s: %w", mapping.clientIdentifier, err)}
 		}
 	}
-	mapSpan.AddEvent("Created vault resource mappings")
+	mapSpan.AddEvent("Created workload resource mappings")
 	mapSpan.End()
 
 	// step 2: verify the token exchange works for the new participant context. Requesting the
@@ -259,10 +273,10 @@ func (p TokenExchangeActivityProcessor) ProcessDispose(ctx api.ActivityContext) 
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error deleting resource mapping: %w", err)}
 	}
 
-	for _, mapping := range p.vaultClientMappings {
+	for _, mapping := range p.resolvedMappings {
 		if err := p.delete(spanCtx, fmt.Sprintf("/api/v1/mappings/%s/%s", mapping.clientIdentifier, participantContextID)); err != nil {
 			span.RecordError(err)
-			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error deleting vault resource mapping for %s: %w", mapping.clientIdentifier, err)}
+			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error deleting resource mapping for %s: %w", mapping.clientIdentifier, err)}
 		}
 	}
 	span.AddEvent("Deleted resource mappings")
