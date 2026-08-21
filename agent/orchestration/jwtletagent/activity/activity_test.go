@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -50,7 +51,10 @@ func stubToken() string {
 	return "header." + payload + ".signature"
 }
 
-func newProcessorForTest(t *testing.T, tp *fakeTokenProvider, mappingsBase string) *TokenExchangeActivityProcessor {
+// newProcessorForTest builds a processor against the given mappings endpoint. Passing no
+// clientMappings leaves Config.ClientMappings empty, which is what an unconfigured deployment looks
+// like and therefore exercises the defaultClientMappings fallback.
+func newProcessorForTest(t *testing.T, tp *fakeTokenProvider, mappingsBase string, clientMappings ...ClientMapping) *TokenExchangeActivityProcessor {
 	t.Helper()
 	tokenFile := filepath.Join(t.TempDir(), "token")
 	require.NoError(t, os.WriteFile(tokenFile, []byte("workload-token"), 0o600))
@@ -63,6 +67,7 @@ func newProcessorForTest(t *testing.T, tp *fakeTokenProvider, mappingsBase strin
 		TokenFilePath:           tokenFile,
 		Audience:                "test-audience",
 		ServiceAccountNamespace: "test-ns",
+		ClientMappings:          clientMappings,
 	})
 }
 
@@ -117,7 +122,7 @@ func TestProcessDeploy_UsesConfiguredNamespace(t *testing.T) {
 }
 
 // TestProcessDeploy_MapsPerServiceAccountScopes asserts that each workload ServiceAccount gets the
-// scopes its vaultServiceAccounts entry declares, rather than one scope set shared by all of them:
+// scopes its defaultClientMappings entry declares, rather than one scope set shared by all of them:
 // every workload needs the vault read scope, and the control plane additionally needs the signaling
 // scope to authorize DPS exchanges with the data plane.
 func TestProcessDeploy_MapsPerServiceAccountScopes(t *testing.T) {
@@ -162,4 +167,65 @@ func TestProcessDeploy_FailsWhenScopeHasNoMapping(t *testing.T) {
 	require.Error(t, result.Error)
 	assert.Contains(t, result.Error.Error(), "token exchange")
 	assert.Equal(t, strings.Join(agentScopes, " "), tp.requestedScopes[0])
+}
+
+// TestProcessDeploy_ConfiguredClientMappingsReplaceDefaults asserts that a configured client mapping
+// list fully replaces the built-in defaults, so an operator can rename, re-scope or drop a built-in
+// workload. The cfm-agents mapping is not part of that list and must still be created.
+func TestProcessDeploy_ConfiguredClientMappingsReplaceDefaults(t *testing.T) {
+	scopesByIdentifier := map[string][]string{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var rm resourceMapping
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&rm))
+		scopesByIdentifier[rm.ClientIdentifier] = rm.Scopes
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	tp := &fakeTokenProvider{token: stubToken()}
+	processor := newProcessorForTest(t, tp, server.URL,
+		ClientMapping{Name: "custom-cp", Scopes: []string{"read", "signaling"}},
+		ClientMapping{Name: "custom-ih", Scopes: []string{"read"}},
+	)
+
+	result := processor.ProcessDeploy(newDeployContext())
+
+	require.EqualValues(t, api.ActivityResultComplete, result.Result, "expected deploy to complete, got error: %v", result.Error)
+	assert.Equal(t, map[string][]string{
+		"system:serviceaccount:test-ns:cfm-agents": agentScopes,
+		"system:serviceaccount:test-ns:custom-cp":  {"read", "signaling"},
+		"system:serviceaccount:test-ns:custom-ih":  {"read"},
+	}, scopesByIdentifier, "configured client mappings should replace the defaults entirely")
+}
+
+// TestProcessDispose_DeletesConfiguredClientMappings asserts that dispose tears down exactly the
+// mappings deploy created, so a configured list does not leak resource mappings in jwtlet.
+func TestProcessDispose_DeletesConfiguredClientMappings(t *testing.T) {
+	var deleted []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			deleted = append(deleted, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	tp := &fakeTokenProvider{token: stubToken()}
+	processor := newProcessorForTest(t, tp, server.URL,
+		ClientMapping{Name: "custom-cp", Scopes: []string{"read"}},
+	)
+
+	ctx := newDeployContext()
+	require.EqualValues(t, api.ActivityResultComplete, processor.ProcessDeploy(ctx).Result)
+
+	participantContextID, ok := ctx.Value(participantContextIDKey)
+	require.True(t, ok)
+
+	result := processor.ProcessDispose(ctx)
+
+	require.EqualValues(t, api.ActivityResultComplete, result.Result, "expected dispose to complete, got error: %v", result.Error)
+	assert.Equal(t, []string{
+		fmt.Sprintf("/api/v1/mappings/system:serviceaccount:test-ns:cfm-agents/%v", participantContextID),
+		fmt.Sprintf("/api/v1/mappings/system:serviceaccount:test-ns:custom-cp/%v", participantContextID),
+	}, deleted)
 }
