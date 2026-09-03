@@ -65,7 +65,7 @@ func (i HttpApiClient) QueryCredentialsByType(ctx context.Context, holderID stri
 		return nil, fmt.Errorf("failed to get API access token: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/v1beta/participants/%s/credentials/query", i.BaseURL, i.IssuerID)
+	url := fmt.Sprintf("%s/v1/participants/%s/credentials/query", i.BaseURL, i.IssuerID)
 	body := common.NewQuerySpec(common.WithFilterCriteria(
 		common.Criterion{
 			OperandLeft:  "verifiableCredential.credential.type",
@@ -119,7 +119,7 @@ func (i HttpApiClient) DeleteHolder(ctx context.Context, participantContextID st
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/v1beta/participants/%s/holders/%s", i.BaseURL, i.IssuerID, holderID)
+	url := fmt.Sprintf("%s/v1/participants/%s/holders/%s", i.BaseURL, i.IssuerID, holderID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return err
@@ -163,7 +163,7 @@ func (i HttpApiClient) CreateHolder(ctx context.Context, participantContextID st
 		return fmt.Errorf("error marshalling payload: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/v1beta/participants/%s/holders", i.BaseURL, i.IssuerID)
+	url := fmt.Sprintf("%s/v1/participants/%s/holders", i.BaseURL, i.IssuerID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(payload))
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
@@ -193,7 +193,7 @@ func (i HttpApiClient) RevokeCredential(ctx context.Context, participantContextI
 	if err != nil {
 		return err
 	}
-	url := fmt.Sprintf("%s/v1beta/participants/%s/credentials/%s/revoke", i.BaseURL, participantContextID, credentialID)
+	url := fmt.Sprintf("%s/v1/participants/%s/credentials/%s/revoke", i.BaseURL, participantContextID, credentialID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
 	if err != nil {
 		return err

@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	CreateParticipantURL          = "/v1beta/participants"
+	CreateParticipantURL          = "/v1/participants"
 	CredentialRequestStateCreated = "CREATED"
 	CredentialRequestStateIssued  = "ISSUED"
 	CredentialRequestStateError   = "ERROR"
@@ -58,7 +58,7 @@ func (a HttpIdentityAPIClient) DeleteParticipantContext(ctx context.Context, par
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/v1beta/participants/%s", a.BaseURL, participantContextID)
+	url := fmt.Sprintf("%s/v1/participants/%s", a.BaseURL, participantContextID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return err
@@ -87,7 +87,7 @@ func (a HttpIdentityAPIClient) QueryCredentialByType(ctx context.Context, partic
 		return nil, fmt.Errorf("failed to get API access token: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/v1beta/participants/%s/credentials?type=%s", a.BaseURL, participantContextID, credentialType)
+	url := fmt.Sprintf("%s/v1/participants/%s/credentials?type=%s", a.BaseURL, participantContextID, credentialType)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -126,7 +126,7 @@ func (a HttpIdentityAPIClient) RequestCredentials(ctx context.Context, participa
 		return "", err
 	}
 
-	url := fmt.Sprintf("%s/v1beta/participants/%s/credentials/request", a.BaseURL, participantContextID)
+	url := fmt.Sprintf("%s/v1/participants/%s/credentials/request", a.BaseURL, participantContextID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(payload))
 	if err != nil {
 		return "", err
@@ -158,7 +158,7 @@ func (a HttpIdentityAPIClient) GetCredentialRequestState(ctx context.Context, pa
 		return "", fmt.Errorf("failed to get API access token: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/v1beta/participants/%s/credentials/request/%s", a.BaseURL, participantContextID, credentialRequestID)
+	url := fmt.Sprintf("%s/v1/participants/%s/credentials/request/%s", a.BaseURL, participantContextID, credentialRequestID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return "", err
