@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	CreateParticipantURL                                       = "/v5beta/participants"
+	CreateParticipantURL                                       = "/v5/participants"
 	applicationJSON                                            = "application/json"
 	ParticipantContextStateCreated     ParticipantContextState = "CREATED"
 	ParticipantContextStateActivated   ParticipantContextState = "ACTIVATED"
@@ -233,7 +233,7 @@ func (h HttpManagementAPIClient) PatchConfig(ctx context.Context, participantCon
 }
 
 // RegisterDataPlane registers a data-plane instance with the control plane for the given participant
-// context via PUT /v5beta/participants/{participantContextID}/dataplanes.
+// context via PUT /v5/participants/{participantContextID}/dataplanes.
 func (h HttpManagementAPIClient) RegisterDataPlane(ctx context.Context, participantContextID string, registration DataPlaneRegistration) error {
 	accessToken, err := h.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
 	if err != nil {
@@ -267,7 +267,7 @@ func (h HttpManagementAPIClient) RegisterDataPlane(ctx context.Context, particip
 }
 
 // UnregisterDataPlane removes a previously registered data-plane instance from the control plane via
-// DELETE /v5beta/participants/{participantContextID}/dataplanes/{dataPlaneID}.
+// DELETE /v5/participants/{participantContextID}/dataplanes/{dataPlaneID}.
 func (h HttpManagementAPIClient) UnregisterDataPlane(ctx context.Context, participantContextID string, dataPlaneID string) error {
 	accessToken, err := h.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
 	if err != nil {
@@ -300,7 +300,7 @@ func (h HttpManagementAPIClient) UnregisterDataPlane(ctx context.Context, partic
 }
 
 // AssociateProfiles associates the given dataspace profiles with the participant context via
-// PUT /v5beta/participants/{participantContextID}/profiles.
+// PUT /v5/participants/{participantContextID}/profiles.
 func (h HttpManagementAPIClient) AssociateProfiles(ctx context.Context, participantContextID string, profiles []string) error {
 	accessToken, err := h.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
 	if err != nil {
