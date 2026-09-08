@@ -91,7 +91,7 @@ func (p OnboardingActivityProcessor) ProcessDispose(ctx api.ActivityContext) api
 
 		if len(credentials) == 0 {
 			p.Monitor.Infof("Rollback: could not revoke credentials of type '%s': 0 found for participant context '%s'", credentialType, participantContextID)
-			return api.ActivityResult{Result: api.ActivityResultComplete}
+			continue
 		}
 
 		// for each credential, send a revocation request
