@@ -362,18 +362,44 @@ func TestDisposeProfile(t *testing.T) {
 		service := newTestParticipantService()
 		mockClient := new(mockProvisionClient)
 
+		credentialSpecs := []model.CredentialSpec{
+			{
+				Id:              "test-id",
+				Type:            "test-type",
+				Issuer:          "test-issuer",
+				Format:          "test-format",
+				ParticipantRole: "test-role",
+			},
+			{
+				Id:     "test-id-2",
+				Type:   "test-type-2",
+				Issuer: "test-issuer-2",
+				Format: "test-format-2",
+				//no participant role, this should be default
+			},
+		}
+
 		// Setup mock to accept dispose manifest
 		mockClient.On("Send", ctx, mock.MatchedBy(func(manifest model.OrchestrationManifest) bool {
 			vpaManifest := manifest.Payload[model.VPAData].([]model.VPAManifest)[0]
 			assert.Equal(t, "cell-1", vpaManifest.CellID)
 			assert.Equal(t, "external-id", vpaManifest.ExternalCellID)
+
+			credData := manifest.Payload[model.CredentialData].([]model.CredentialSpec)
+			assert.ElementsMatch(t, credentialSpecs, credData)
 			return manifest.OrchestrationType == model.VPADisposeType
 		})).Return(nil)
 
 		service.provisionClient = mockClient
 
+		ds := newTestDataspaceProfile("dataspace-1")
+		ds.DataspaceSpec.CredentialSpecs = credentialSpecs
+		_, err := service.dataspaceStore.Create(ctx, ds)
+		require.NoError(t, err)
+
 		// Create a deployed participant and mark it as active
 		profile := newTestParticipantProfile("tenant-1", "participant-1")
+		profile.ParticipantRoles = map[string][]string{"dataspace-1": {"test-role"}}
 		profile.Properties[model.VPAStateData] = map[string]any{"state": "deployed"}
 		profile.VPAs[0].State = api.DeploymentStateActive
 
@@ -446,6 +472,22 @@ func TestDisposeProfile(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("dispose profile without dataspace profiles fails", func(t *testing.T) {
+		service := newTestParticipantService()
+		// Do not seed the dataspace store - credential specs cannot be regenerated
+		profile := newTestParticipantProfile("tenant-1", "participant-1")
+		profile.Properties[model.VPAStateData] = map[string]any{"state": "deployed"}
+		profile.VPAs[0].State = api.DeploymentStateActive
+
+		createdProfile, err := service.participantStore.Create(ctx, profile)
+		require.NoError(t, err)
+
+		err = service.DisposeProfile(ctx, "tenant-1", createdProfile.ID)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no dataspace profiles found")
+	})
+
 	t.Run("dispose profile handles provision client error", func(t *testing.T) {
 		service := newTestParticipantService()
 		mockClient := new(mockProvisionClient)
@@ -456,6 +498,10 @@ func TestDisposeProfile(t *testing.T) {
 		})).Return(assert.AnError)
 
 		service.provisionClient = mockClient
+
+		ds := newTestDataspaceProfile("dataspace-1")
+		_, err := service.dataspaceStore.Create(ctx, ds)
+		require.NoError(t, err)
 
 		// Create a deployed participant
 		profile := newTestParticipantProfile("tenant-1", "participant-1")
@@ -618,12 +664,7 @@ func TestGetFilteredProfiles(t *testing.T) {
 		_, err = service.dataspaceStore.Create(ctx, profile2)
 		require.NoError(t, err)
 
-		deployment := &api.NewParticipantProfileDeployment{
-			Identifier:          "participant-identifier",
-			DataspaceProfileIDs: []string{}, // Empty list
-		}
-
-		result, err := service.getFilteredProfiles(ctx, deployment)
+		result, err := service.getFilteredProfiles(ctx, []string{})
 
 		require.NoError(t, err)
 		assert.Equal(t, 2, len(result))
@@ -644,12 +685,7 @@ func TestGetFilteredProfiles(t *testing.T) {
 		_, err = service.dataspaceStore.Create(ctx, profile3)
 		require.NoError(t, err)
 
-		deployment := &api.NewParticipantProfileDeployment{
-			Identifier:          "participant-identifier",
-			DataspaceProfileIDs: []string{"ds-1", "ds-3"}, // Select specific profiles
-		}
-
-		result, err := service.getFilteredProfiles(ctx, deployment)
+		result, err := service.getFilteredProfiles(ctx, []string{"ds-1", "ds-3"})
 
 		require.NoError(t, err)
 		assert.Equal(t, 2, len(result))
@@ -666,12 +702,7 @@ func TestGetFilteredProfiles(t *testing.T) {
 	t.Run("returns error when no profiles available", func(t *testing.T) {
 		service := newTestParticipantService()
 
-		deployment := &api.NewParticipantProfileDeployment{
-			Identifier:          "participant-identifier",
-			DataspaceProfileIDs: []string{},
-		}
-
-		result, err := service.getFilteredProfiles(ctx, deployment)
+		result, err := service.getFilteredProfiles(ctx, []string{})
 
 		require.Error(t, err)
 		assert.Nil(t, result)
@@ -686,12 +717,7 @@ func TestGetFilteredProfiles(t *testing.T) {
 		_, err := service.dataspaceStore.Create(ctx, profile1)
 		require.NoError(t, err)
 
-		deployment := &api.NewParticipantProfileDeployment{
-			Identifier:          "participant-identifier",
-			DataspaceProfileIDs: []string{"non-existent-id"}, // Request non-existent profile
-		}
-
-		result, err := service.getFilteredProfiles(ctx, deployment)
+		result, err := service.getFilteredProfiles(ctx, []string{"non-existent-id"})
 
 		require.Error(t, err)
 		assert.Nil(t, result)
@@ -709,12 +735,7 @@ func TestGetFilteredProfiles(t *testing.T) {
 		_, err = service.dataspaceStore.Create(ctx, profile2)
 		require.NoError(t, err)
 
-		deployment := &api.NewParticipantProfileDeployment{
-			Identifier:          "participant-identifier",
-			DataspaceProfileIDs: []string{"ds-1", "ds-999"}, // One valid, one invalid
-		}
-
-		result, err := service.getFilteredProfiles(ctx, deployment)
+		result, err := service.getFilteredProfiles(ctx, []string{"ds-1", "ds-999"})
 
 		require.NoError(t, err)
 		assert.Equal(t, 1, len(result))
@@ -731,12 +752,7 @@ func TestGetFilteredProfiles(t *testing.T) {
 		_, err := service.dataspaceStore.Create(ctx, profile)
 		require.NoError(t, err)
 
-		deployment := &api.NewParticipantProfileDeployment{
-			Identifier:          "participant-identifier",
-			DataspaceProfileIDs: []string{"ds-1"},
-		}
-
-		result, err := service.getFilteredProfiles(ctx, deployment)
+		result, err := service.getFilteredProfiles(ctx, []string{"ds-1"})
 
 		require.NoError(t, err)
 		assert.Equal(t, 1, len(result))

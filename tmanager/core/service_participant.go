@@ -77,7 +77,7 @@ func (p participantService) DeployProfile(ctx context.Context, tenantID string, 
 			return nil, err
 		}
 
-		dProfiles, err := p.getFilteredProfiles(ctx, deployment)
+		dProfiles, err := p.getFilteredProfiles(ctx, deployment.DataspaceProfileIDs)
 		if err != nil {
 			return nil, err
 		}
@@ -135,19 +135,19 @@ func (p participantService) DeployProfile(ctx context.Context, tenantID string, 
 	})
 }
 
-// getFilteredProfiles filters dProfiles based on deployment.DataspaceProfileIDs
+// getFilteredProfiles filters dProfiles based on the given dataspace profile IDs. All profiles are returned if the ID list is empty.
 func (p participantService) getFilteredProfiles(
 	ctx context.Context,
-	deployment *api.NewParticipantProfileDeployment) ([]api.DataspaceProfile, error) {
+	dataspaceProfileIDs []string) ([]api.DataspaceProfile, error) {
 
 	dProfiles, err := collection.CollectAllDeref(p.dataspaceStore.GetAll(ctx))
 	if err != nil {
 		return nil, err
 	}
 
-	if len(deployment.DataspaceProfileIDs) > 0 {
+	if len(dataspaceProfileIDs) > 0 {
 		profileIDMap := make(map[string]bool)
-		for _, id := range deployment.DataspaceProfileIDs {
+		for _, id := range dataspaceProfileIDs {
 			profileIDMap[id] = true
 		}
 		filteredProfiles := make([]api.DataspaceProfile, 0)
@@ -187,6 +187,11 @@ func (p participantService) DisposeProfile(ctx context.Context, tenantID string,
 			return fmt.Errorf("profile is not deployed or is missing state data: %s", participantID)
 		}
 
+		dProfiles, err := p.getFilteredProfiles(c, profile.DataspaceProfileIDs)
+		if err != nil {
+			return err
+		}
+
 		oManifest := model.OrchestrationManifest{
 			ID:                uuid.New().String(),
 			CorrelationID:     participantID,
@@ -213,6 +218,7 @@ func (p participantService) DisposeProfile(ctx context.Context, tenantID string,
 		}
 
 		oManifest.Payload[model.VPAData] = vpaManifests
+		oManifest.Payload[model.CredentialData] = generateCredentialSpecs(profile.ParticipantRoles, dProfiles)
 
 		err = p.participantStore.Update(c, profile)
 		if err != nil {
