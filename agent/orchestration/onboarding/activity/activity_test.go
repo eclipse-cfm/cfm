@@ -436,6 +436,61 @@ func TestOnboardingActivityProcessor_ProcessDispose_NoCredentials(t *testing.T) 
 	assert.NoError(t, result.Error)
 }
 
+func TestOnboardingActivityProcessor_ProcessDispose_FirstTypeWithoutCredentials(t *testing.T) {
+	revokedIDs := make([]string, 0)
+	processor := OnboardingActivityProcessor{
+		Monitor: system.NoopMonitor{},
+		IssuerServiceApiClient: MockIssuerServiceApiClient{
+			credentialsByType: map[string][]issuerservice.IssuerCredentialResourceDto{
+				"type-2": {
+					{
+						ID:                   "test-credential-id",
+						ParticipantContextID: "test-participant",
+						CredentialFormat:     common.CredentialFormat_VCDM20_COSE,
+						VerifiableCredential: common.VerifiableCredential{ID: "cred-2"},
+					},
+				},
+			},
+			revokedIDs: &revokedIDs,
+		},
+	}
+
+	var processingData = map[string]any{
+		"participantContextId": "test-participant",
+		"cfm.vpa.credentials": []any{
+			map[string]string{
+				"id":     "id-1",
+				"format": "format",
+				"issuer": "issuer",
+				"type":   "type-1",
+			},
+			map[string]string{
+				"id":     "id-2",
+				"format": "format",
+				"issuer": "issuer",
+				"type":   "type-2",
+			},
+		},
+	}
+
+	ctx := context.Background()
+	outputData := make(map[string]any)
+
+	activity := api.Activity{
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DisposeDiscriminator,
+	}
+
+	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
+
+	result := processor.ProcessDispose(activityContext)
+
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
+	assert.NoError(t, result.Error)
+	assert.Equal(t, []string{"cred-2"}, revokedIDs, "credentials of later types must still be revoked when an earlier type has none")
+}
+
 type MockIdentityHubClient struct {
 	expectedError       error
 	expectedState       string
@@ -467,9 +522,14 @@ func (m MockIdentityHubClient) GetCredentialRequestState(context.Context, string
 type MockIssuerServiceApiClient struct {
 	expectedError       error
 	expectedCredentials []issuerservice.IssuerCredentialResourceDto
+	credentialsByType   map[string][]issuerservice.IssuerCredentialResourceDto
+	revokedIDs          *[]string
 }
 
 func (m MockIssuerServiceApiClient) QueryCredentialsByType(ctx context.Context, participantContextID string, credentialType string) ([]issuerservice.IssuerCredentialResourceDto, error) {
+	if m.credentialsByType != nil {
+		return m.credentialsByType[credentialType], nil
+	}
 	return m.expectedCredentials, nil
 
 }
@@ -484,5 +544,8 @@ func (m MockIssuerServiceApiClient) CreateHolder(ctx context.Context, participan
 }
 
 func (m MockIssuerServiceApiClient) RevokeCredential(ctx context.Context, participantContextID string, credentialID string) error {
+	if m.revokedIDs != nil {
+		*m.revokedIDs = append(*m.revokedIDs, credentialID)
+	}
 	return m.expectedError
 }
