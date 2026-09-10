@@ -10,7 +10,7 @@ replace (
 )
 
 require (
-	github.com/XSAM/otelsql v0.43.0
+	github.com/XSAM/otelsql v0.44.0
 	github.com/antlr4-go/antlr/v4 v4.13.1
 	github.com/coreos/go-oidc/v3 v3.20.0
 	github.com/go-chi/chi/v5 v5.3.1
