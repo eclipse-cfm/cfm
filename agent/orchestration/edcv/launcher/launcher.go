@@ -66,6 +66,7 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 					BaseURL:       cpURL,
 					TokenProvider: provider,
 					HttpClient:    &httpClient,
+					Monitor:       ctx.Monitor,
 				},
 			})
 		},
