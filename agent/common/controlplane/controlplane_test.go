@@ -21,12 +21,82 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/eclipse-cfm/cfm/common/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+// shrinkPatchBackoffs makes the patch-verification retries near-instant for the duration of a test.
+func shrinkPatchBackoffs(t *testing.T) {
+	original := patchConfigBackoffs
+	patchConfigBackoffs = []time.Duration{time.Millisecond, time.Millisecond, time.Millisecond, time.Millisecond}
+	t.Cleanup(func() { patchConfigBackoffs = original })
+}
+
+// configFake is a stateful stand-in for the control plane's participant-config endpoints: PATCH
+// merges into the stored entries (unless told to lose the write), GET serves them back. Private
+// entries are served with scrambled values, like the real control plane returns them encrypted.
+type configFake struct {
+	mu             sync.Mutex
+	entries        map[string]string
+	privateEntries map[string]string
+	patchCount     int
+	// losePatches drops the effect (but not the 204) of the first N PATCH requests — the
+	// lost-update behavior observed under concurrent merges.
+	losePatches int
+}
+
+func newConfigFake(losePatches int) *configFake {
+	return &configFake{entries: map[string]string{}, privateEntries: map[string]string{}, losePatches: losePatches}
+}
+
+func (f *configFake) handler(t *testing.T, participant string) http.HandlerFunc {
+	path := CreateParticipantURL + "/" + participant + "/config"
+	return func(w http.ResponseWriter, r *http.Request) {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		switch {
+		case r.URL.Path == path && r.Method == http.MethodPatch:
+			f.patchCount++
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			var data map[string]any
+			require.NoError(t, json.Unmarshal(body, &data))
+			if f.patchCount > f.losePatches {
+				merge(f.entries, data["entries"])
+				merge(f.privateEntries, data["privateEntries"])
+			}
+			w.WriteHeader(http.StatusNoContent)
+		case r.URL.Path == path && r.Method == http.MethodGet:
+			scrambled := map[string]string{}
+			for k := range f.privateEntries {
+				scrambled[k] = "encrypted:" + k
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"participantContextId": participant,
+				"entries":              f.entries,
+				"privateEntries":       scrambled,
+			})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}
+}
+
+func merge(target map[string]string, raw any) {
+	if object, ok := raw.(map[string]any); ok {
+		for k, v := range object {
+			if s, ok := v.(string); ok {
+				target[k] = s
+			}
+		}
+	}
+}
 
 func TestParticipantContextConfig_SerDes(t *testing.T) {
 	orig := ParticipantContextConfig{
@@ -358,24 +428,8 @@ func TestDeleteParticipant_ServerError(t *testing.T) {
 }
 
 func TestPatchConfig(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == CreateParticipantURL+"/test-participant/config" && r.Method == http.MethodPatch {
-			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			var data map[string]any
-			require.NoError(t, json.Unmarshal(body, &data))
-
-			entries, ok := data["entries"].(map[string]any)
-			require.Truef(t, ok, "expected entries object, got %#v", data["entries"])
-			require.Equal(t, "signature", entries["edc.iam.sts.type"])
-			require.Equal(t, "priv-key-alias", entries["edc.iam.sts.signature.keyname"])
-			require.Equal(t, "key-1", entries["edc.iam.sts.signature.kid"])
-
-			w.WriteHeader(http.StatusNoContent)
-		} else {
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
+	fake := newConfigFake(0)
+	server := httptest.NewServer(fake.handler(t, "test-participant"))
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
@@ -396,6 +450,107 @@ func TestPatchConfig(t *testing.T) {
 	}
 
 	require.NoError(t, client.PatchConfig(t.Context(), "test-participant", config))
+
+	// applied, verified, and no retry was needed
+	require.Equal(t, 1, fake.patchCount)
+	require.Equal(t, "signature", fake.entries["edc.iam.sts.type"])
+	require.Equal(t, "priv-key-alias", fake.entries["edc.iam.sts.signature.keyname"])
+	require.Equal(t, "key-1", fake.entries["edc.iam.sts.signature.kid"])
+}
+
+func TestPatchConfig_RepatchesALostWrite(t *testing.T) {
+	// The lost-update defense: the control plane merge has been observed to drop one writer's
+	// entries under concurrency while answering 2xx. The verification read must detect the loss
+	// and re-patch until the entries are visible.
+	shrinkPatchBackoffs(t)
+	fake := newConfigFake(1)
+	server := httptest.NewServer(fake.handler(t, "test-participant"))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
+	client := HttpManagementAPIClient{BaseURL: server.URL, TokenProvider: tp, HttpClient: &http.Client{}}
+
+	config := ParticipantContextConfig{
+		ParticipantContextID: "test-participant",
+		Entries:              map[string]string{"edc.iam.sts.type": "signature"},
+		SecretEntries:        map[string]string{"edc.vault.hashicorp.config": "{}"},
+	}
+
+	require.NoError(t, client.PatchConfig(t.Context(), "test-participant", config))
+	require.Equal(t, 2, fake.patchCount)
+	require.Equal(t, "signature", fake.entries["edc.iam.sts.type"])
+}
+
+func TestPatchConfig_FailsWhenTheWriteNeverSticks(t *testing.T) {
+	// A write that never becomes visible must surface as an ERROR, never as silent success — a
+	// participant context without its config entries is permanently broken.
+	shrinkPatchBackoffs(t)
+	fake := newConfigFake(1000)
+	server := httptest.NewServer(fake.handler(t, "test-participant"))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
+	client := HttpManagementAPIClient{BaseURL: server.URL, TokenProvider: tp, HttpClient: &http.Client{}}
+
+	config := ParticipantContextConfig{
+		ParticipantContextID: "test-participant",
+		Entries:              map[string]string{"edc.iam.sts.type": "signature"},
+	}
+
+	err := client.PatchConfig(t.Context(), "test-participant", config)
+	require.ErrorContains(t, err, "not visible")
+	require.ErrorContains(t, err, "entries[edc.iam.sts.type]")
+	require.Equal(t, len(patchConfigBackoffs)+1, fake.patchCount)
+}
+
+func TestPatchConfig_VerifiesPrivateEntriesByKeyOnly(t *testing.T) {
+	// The control plane returns private entries encrypted; their values cannot be compared, only
+	// their presence — an encrypted value must not be mistaken for a lost write.
+	fake := newConfigFake(0)
+	server := httptest.NewServer(fake.handler(t, "test-participant"))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
+	client := HttpManagementAPIClient{BaseURL: server.URL, TokenProvider: tp, HttpClient: &http.Client{}}
+
+	config := ParticipantContextConfig{
+		ParticipantContextID: "test-participant",
+		SecretEntries:        map[string]string{"edc.vault.hashicorp.config": `{"vault":"config"}`},
+	}
+
+	require.NoError(t, client.PatchConfig(t.Context(), "test-participant", config))
+	require.Equal(t, 1, fake.patchCount)
+}
+
+func TestGetConfig_ParsesPlainAndJsonLdShapes(t *testing.T) {
+	responses := []string{
+		// plain terms, plain objects
+		`{"participantContextId":"p1","entries":{"k1":"v1"},"privateEntries":{"s1":"enc"}}`,
+		// expanded IRIs with JSON-literal wrappers
+		`{"@type":"ParticipantContextConfig",
+		  "https://w3id.org/edc/v0.0.1/ns/entries":{"@value":{"k1":"v1"},"@type":"@json"},
+		  "https://w3id.org/edc/v0.0.1/ns/privateEntries":{"@value":{"s1":"enc"},"@type":"@json"}}`,
+	}
+	for i, response := range responses {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodGet, r.Method)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(response))
+		}))
+
+		tp := mocks.NewMockTokenProvider(t)
+		tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
+		client := HttpManagementAPIClient{BaseURL: server.URL, TokenProvider: tp, HttpClient: &http.Client{}}
+
+		config, err := client.GetConfig(t.Context(), "p1")
+		require.NoError(t, err, "response shape %d", i)
+		require.Equal(t, map[string]string{"k1": "v1"}, config.Entries, "response shape %d", i)
+		require.Equal(t, map[string]string{"s1": "enc"}, config.SecretEntries, "response shape %d", i)
+		server.Close()
+	}
 }
 
 func TestPatchConfig_AuthError(t *testing.T) {

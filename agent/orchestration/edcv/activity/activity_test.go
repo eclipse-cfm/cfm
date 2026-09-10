@@ -397,6 +397,10 @@ func (m MockManagementApiClient) PatchConfig(context.Context, string, controlpla
 	return m.expectedConfigError
 }
 
+func (m MockManagementApiClient) GetConfig(context.Context, string) (controlplane.ParticipantContextConfig, error) {
+	return controlplane.ParticipantContextConfig{}, m.expectedConfigError
+}
+
 func (m MockManagementApiClient) AssociateProfiles(_ context.Context, _ string, profiles []string) error {
 	if m.expectedProfileError != nil {
 		return m.expectedProfileError

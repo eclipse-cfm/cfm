@@ -21,8 +21,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
+	"strings"
+	"time"
 
 	vault "github.com/eclipse-cfm/cfm/agent/common/vault"
+	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/common/token"
 )
 
@@ -79,7 +83,13 @@ type ParticipantContext struct {
 
 type ManagementAPIClient interface {
 	CreateParticipantContext(ctx context.Context, manifest ParticipantContext) error
+	// PatchConfig merges the given entries into the participant context config and VERIFIES they
+	// are visible afterwards, re-patching if not (see HttpManagementAPIClient.PatchConfig).
 	PatchConfig(ctx context.Context, participantContextID string, config ParticipantContextConfig) error
+	// GetConfig reads the participant context config back from the control plane. Values of
+	// private entries are returned as stored (encrypted), so only their keys are meaningful to
+	// callers.
+	GetConfig(ctx context.Context, participantContextID string) (ParticipantContextConfig, error)
 	DeleteConfig(ctx context.Context, participantContextID string) error
 	DeleteParticipantContext(ctx context.Context, participantContextID string) error
 	// AssociateProfiles associates the given dataspace profiles with the participant context in the
@@ -114,7 +124,14 @@ type HttpManagementAPIClient struct {
 	BaseURL       string
 	TokenProvider token.TokenProvider
 	HttpClient    *http.Client
+	// Monitor, when set, receives a warning for every patch-verification retry — the signal that
+	// a concurrent config write was lost and healed. Optional; nil disables the logging only.
+	Monitor system.LogMonitor
 }
+
+// patchConfigBackoffs are the waits between patch-verification attempts (attempts = len+1). A
+// package variable so tests can shrink them.
+var patchConfigBackoffs = []time.Duration{100 * time.Millisecond, 250 * time.Millisecond, 500 * time.Millisecond, time.Second}
 
 func (h HttpManagementAPIClient) DeleteConfig(ctx context.Context, participantContextID string) error {
 	// fixme: there is no dedicated delete endpoint
@@ -192,7 +209,46 @@ func (h HttpManagementAPIClient) CreateParticipantContext(ctx context.Context, m
 	return nil
 }
 
+// PatchConfig merges the given entries into the participant context config and verifies with a
+// read-back that every entry is actually visible, re-patching (bounded, with backoff) when it is
+// not. The verification exists because several agents patch the SAME config concurrently during
+// provisioning (the edcv agent writes identity/vault entries, the key-management agent writes the
+// STS signature entries within milliseconds of each other), and the control plane's merge has
+// been observed to lose one side's entries under concurrency — leaving the participant context
+// permanently broken (e.g. "No setting found for key edc.iam.sts.oauth.token.url" on every DSP
+// dispatch) while both writers had reported success. Each writer verifying and re-merging its OWN
+// entries converges to the union regardless of which write was lost. Public entry values are
+// compared verbatim; private entries are verified by key presence only (the control plane stores
+// and returns them encrypted).
 func (h HttpManagementAPIClient) PatchConfig(ctx context.Context, participantContextID string, config ParticipantContextConfig) error {
+	var missing []string
+	for attempt := 1; ; attempt++ {
+		if err := h.patchConfigOnce(ctx, participantContextID, config); err != nil {
+			return err
+		}
+		applied, err := h.GetConfig(ctx, participantContextID)
+		if err != nil {
+			missing = []string{fmt.Sprintf("(verification read failed: %s)", err)}
+		} else if missing = missingConfigKeys(config, applied); len(missing) == 0 {
+			return nil
+		}
+		if attempt > len(patchConfigBackoffs) {
+			return fmt.Errorf("participant config patch for '%s' is not visible after %d attempts — a concurrent config write may keep getting lost; missing or mismatched: %s",
+				participantContextID, attempt, strings.Join(missing, ", "))
+		}
+		if h.Monitor != nil {
+			h.Monitor.Warnf("Participant config patch for '%s' is not (fully) visible after attempt %d (missing: %s) — re-patching",
+				participantContextID, attempt, strings.Join(missing, ", "))
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(patchConfigBackoffs[attempt-1]):
+		}
+	}
+}
+
+func (h HttpManagementAPIClient) patchConfigOnce(ctx context.Context, participantContextID string, config ParticipantContextConfig) error {
 	accessToken, err := h.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
@@ -230,6 +286,100 @@ func (h HttpManagementAPIClient) PatchConfig(ctx context.Context, participantCon
 		return fmt.Errorf("failed to patch participant context config on control plane: received status code %d, body: %s", resp.StatusCode, string(body))
 	}
 	return nil
+}
+
+// GetConfig reads the participant context config via GET /v5/participants/{id}/config. The
+// response is the management API's JSON-LD rendering; the entry maps are extracted tolerantly
+// (plain terms or expanded IRIs, with or without a JSON-literal "@value" wrapper) so this does
+// not depend on the server's compaction behavior.
+func (h HttpManagementAPIClient) GetConfig(ctx context.Context, participantContextID string) (ParticipantContextConfig, error) {
+	accessToken, err := h.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
+	if err != nil {
+		return ParticipantContextConfig{}, fmt.Errorf("failed to get API access token: %w", err)
+	}
+
+	url := fmt.Sprintf("%s%s/%s/config", h.BaseURL, CreateParticipantURL, participantContextID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return ParticipantContextConfig{}, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	resp, err := h.HttpClient.Do(req)
+	if err != nil {
+		return ParticipantContextConfig{}, fmt.Errorf("failed to read participant context config from control plane: %w", err)
+	}
+	defer h.closeResponse(resp)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ParticipantContextConfig{}, err
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
+		return ParticipantContextConfig{}, fmt.Errorf("failed to read participant context config from control plane: received status code %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	var doc map[string]any
+	if err := json.Unmarshal(body, &doc); err != nil {
+		return ParticipantContextConfig{}, fmt.Errorf("failed to parse participant context config response: %w", err)
+	}
+	return ParticipantContextConfig{
+		ParticipantContextID: participantContextID,
+		Entries:              extractConfigEntries(doc, "entries"),
+		SecretEntries:        extractConfigEntries(doc, "privateEntries"),
+	}, nil
+}
+
+// missingConfigKeys lists the entries of want that got does not carry: public entries must match
+// key AND value, private entries only the key (their values come back encrypted). Sorted for
+// stable messages.
+func missingConfigKeys(want ParticipantContextConfig, got ParticipantContextConfig) []string {
+	var missing []string
+	for key, value := range want.Entries {
+		if got.Entries[key] != value {
+			missing = append(missing, "entries["+key+"]")
+		}
+	}
+	for key := range want.SecretEntries {
+		if _, ok := got.SecretEntries[key]; !ok {
+			missing = append(missing, "privateEntries["+key+"]")
+		}
+	}
+	sort.Strings(missing)
+	return missing
+}
+
+// extractConfigEntries pulls a string map out of a JSON-LD-ish document: the property is matched
+// by its local name (plain term, or IRI suffix after '/' or '#'), and a JSON-literal wrapper
+// ({"@value": {...}}) is unwrapped when present.
+func extractConfigEntries(doc map[string]any, term string) map[string]string {
+	entries := map[string]string{}
+	for key, value := range doc {
+		if localName(key) != term {
+			continue
+		}
+		object, ok := value.(map[string]any)
+		if !ok {
+			continue
+		}
+		if wrapped, ok := object["@value"].(map[string]any); ok {
+			object = wrapped
+		}
+		for entryKey, entryValue := range object {
+			if s, ok := entryValue.(string); ok {
+				entries[entryKey] = s
+			} else {
+				entries[entryKey] = fmt.Sprintf("%v", entryValue)
+			}
+		}
+	}
+	return entries
+}
+
+func localName(iriOrTerm string) string {
+	if idx := strings.LastIndexAny(iriOrTerm, "/#"); idx >= 0 {
+		return iriOrTerm[idx+1:]
+	}
+	return iriOrTerm
 }
 
 // RegisterDataPlane registers a data-plane instance with the control plane for the given participant
