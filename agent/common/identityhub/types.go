@@ -123,6 +123,5 @@ type CredentialType struct {
 
 type CredentialRequest struct {
 	IssuerDID   string           `json:"issuerDid" validate:"required"`
-	HolderPID   string           `json:"holderPid" validate:"required"`
 	Credentials []CredentialType `json:"credentials" validate:"required"`
 }

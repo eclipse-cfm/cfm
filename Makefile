@@ -180,7 +180,7 @@ clean:
 #==============================================================================
 
 install-mockery:
-	go install github.com/vektra/mockery/v2@latest
+	go install github.com/vektra/mockery/v2@v2.53.7
 
 install-gotestsum:
 	go install gotest.tools/gotestsum@latest

@@ -180,3 +180,20 @@ func TestHttpIdentityAPIClient_DeleteParticipantContext_NotFound(t *testing.T) {
 	err := client.DeleteParticipantContext(t.Context(), "test")
 	require.ErrorContains(t, err, "participant context test not found")
 }
+
+func TestHolderPIDFromLocation(t *testing.T) {
+	holderPID, err := HolderPIDFromLocation("v1/participants/participant-1/credentials/request/holder-123")
+	require.NoError(t, err)
+	require.Equal(t, "holder-123", holderPID)
+
+	holderPID, err = HolderPIDFromLocation("http://identityhub/api/identity/v1/participants/participant-1/credentials/request/holder-123")
+	require.NoError(t, err)
+	require.Equal(t, "holder-123", holderPID)
+}
+
+func TestHolderPIDFromLocation_Invalid(t *testing.T) {
+	for _, location := range []string{"", "/", "v1/participants/participant-1/credentials/request", "http://[::1"} {
+		_, err := HolderPIDFromLocation(location)
+		require.Error(t, err, location)
+	}
+}

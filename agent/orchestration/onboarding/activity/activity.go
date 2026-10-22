@@ -21,7 +21,6 @@ import (
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
-	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -167,14 +166,16 @@ func (p OnboardingActivityProcessor) processNewRequest(ctx api.ActivityContext, 
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("multiple issuers not supported yet")}
 	}
 
-	holderPid := uuid.New().String()
 	cr := identityhub.CredentialRequest{
 		IssuerDID:   issuer,
-		HolderPID:   holderPid,
 		Credentials: credentials,
 	}
-	// make credential request
+	// make credential request, IdentityHub assigns the holderPid and returns it at the end of the location
 	location, err := p.IdentityApiClient.RequestCredentials(ctx.Context(), credentialRequest.ParticipantContextID, cr)
+	if err != nil {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error requesting credentials: %w", err)}
+	}
+	holderPid, err := identityhub.HolderPIDFromLocation(location)
 	if err != nil {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error requesting credentials: %w", err)}
 	}
