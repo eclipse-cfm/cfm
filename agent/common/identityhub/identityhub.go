@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"path"
 
 	"github.com/eclipse-cfm/cfm/agent/common"
 	"github.com/eclipse-cfm/cfm/common/token"
@@ -150,6 +152,20 @@ func (a HttpIdentityAPIClient) RequestCredentials(ctx context.Context, participa
 	location := resp.Header.Get("Location")
 
 	return location, nil
+}
+
+// HolderPIDFromLocation extracts the holderPid that IdentityHub assigned to a credential request from the Location
+// header returned on its creation, which ends with ".../credentials/request/{holderPid}".
+func HolderPIDFromLocation(location string) (string, error) {
+	u, err := url.Parse(location)
+	if err != nil {
+		return "", fmt.Errorf("invalid credential request location '%s': %w", location, err)
+	}
+	holderPID := path.Base(u.Path)
+	if holderPID == "" || holderPID == "." || holderPID == "/" || holderPID == "request" {
+		return "", fmt.Errorf("credential request location '%s' does not contain a holderPid", location)
+	}
+	return holderPID, nil
 }
 
 func (a HttpIdentityAPIClient) GetCredentialRequestState(ctx context.Context, participantContextID string, credentialRequestID string) (string, error) {

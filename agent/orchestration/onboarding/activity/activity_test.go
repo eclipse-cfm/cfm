@@ -64,7 +64,7 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenNewRequest(t *testing.T) 
 
 	assert.Equal(t, ih.expectedURL, activityContext.Values()["credentialRequest"])
 	assert.Equal(t, "test-participant", activityContext.Values()["participantContextId"])
-	assert.Contains(t, activityContext.Values(), "holderPid")
+	assert.Equal(t, "123", activityContext.Values()["holderPid"])
 }
 
 func TestOnboardingActivityProcessor_ProcessDeploy_WhenNewRequestError(t *testing.T) {

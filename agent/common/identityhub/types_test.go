@@ -53,7 +53,6 @@ func TestParticipantManifest_Serialization(t *testing.T) {
 func TestCredentialRequest_Serialization(t *testing.T) {
 	cr := CredentialRequest{
 		IssuerDID: "did:example:issuer",
-		HolderPID: "holder-123",
 		Credentials: []CredentialType{
 			{
 				Format:                 "ldp",
@@ -73,12 +72,17 @@ func TestCredentialRequest_Serialization(t *testing.T) {
 }
 
 func TestCredentialRequest_Deserialization(t *testing.T) {
-	jsonString := `{"issuerDid": "did:example:issuer", "holderPid": "holder-123", "credentials": [{"format": "ldp", "type": "VerifiableCredential", "id": "cred-1"}]}`
+	jsonString := `{"issuerDid": "did:example:issuer", "credentials": [{"format": "ldp", "type": "VerifiableCredential", "id": "cred-1"}]}`
 
 	request := CredentialRequest{}
 	err := json.Unmarshal([]byte(jsonString), &request)
 	require.NoError(t, err)
 	require.Equal(t, "did:example:issuer", request.IssuerDID)
-	require.Equal(t, "holder-123", request.HolderPID)
 	require.Len(t, request.Credentials, 1)
+}
+
+func TestCredentialRequest_Serialization_OmitsHolderPid(t *testing.T) {
+	data, err := json.Marshal(CredentialRequest{IssuerDID: "did:example:issuer"})
+	require.NoError(t, err)
+	require.NotContains(t, string(data), "holderPid")
 }
