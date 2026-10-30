@@ -67,7 +67,7 @@ func Launch(shutdown <-chan struct{}) {
 		panic(fmt.Errorf("error launching Tenant Manager: %w", err))
 	}
 
-	natsAuth, err := natsclient.AuthFromConfig(vConfig)
+	natsAuth, err := natsclient.AuthFromConfig(vConfig, mode)
 	if err != nil {
 		panic(fmt.Errorf("error launching Tenant Manager: %w", err))
 	}
@@ -85,7 +85,7 @@ func Launch(shutdown <-chan struct{}) {
 		assembler.Register(&memorystore.InMemoryServiceAssembly{})
 	}
 
-	assembler.Register(natsprovision.NewNatsOrchestrationServiceAssembly(natsclient.ClientConfig{URL: uri, Bucket: bucketValue, Auth: natsAuth}, streamValue))
+	assembler.Register(natsprovision.NewNatsOrchestrationServiceAssembly(natsclient.ClientConfig{URL: uri, Bucket: bucketValue, Auth: natsAuth, TLS: natsclient.TLSFromConfig(vConfig)}, streamValue))
 	if err := runtime.SetupTelemetry("cfm.tmanager", shutdown); err != nil {
 		logMonitor.Warnf("Error setting up telemetry: %s. Traces and metrics will not be available.", err.Error())
 	}

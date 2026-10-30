@@ -46,9 +46,16 @@ func Test_VerifyE2E(t *testing.T) {
 
 	client := launchPlatformWithAgent(t, nt.URI, dsn)
 
+	verifyDeployAndDispose(t, client)
+}
+
+// verifyDeployAndDispose deploys a participant profile, verifies that all VPAs become active and returned agent state,
+// then disposes the profile and verifies that all VPAs are disposed.
+func verifyDeployAndDispose(t *testing.T, client *e2efixtures.ApiClient) {
+	waitTManager(t, client)
 	waitPManager(t, client)
 
-	err = e2efixtures.CreateTestActivityDefinition(client)
+	err := e2efixtures.CreateTestActivityDefinition(client)
 	require.NoError(t, err)
 
 	err = e2efixtures.CreateTestOrchestrationDefinitions(client)

@@ -79,6 +79,7 @@ func setupAgentEnv(t *testing.T, prefix, uri string) {
 	// viper uppercases the env prefix and key, so the environment variables must be uppercase.
 	p := strings.ToUpper(prefix)
 	t.Setenv(p+"_URI", uri)
+	t.Setenv(p+"_NATS_AUTH_ALLOWANONYMOUS", "true")
 	t.Setenv(p+"_BUCKET", bucket)
 	t.Setenv(p+"_STREAM", streamName)
 }

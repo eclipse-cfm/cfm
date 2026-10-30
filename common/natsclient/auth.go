@@ -17,6 +17,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/nats-io/nats.go"
 	"github.com/spf13/viper"
 )
@@ -30,6 +31,9 @@ const (
 	AuthTokenKey        = "nats.auth.token"
 	AuthNKeySeedFileKey = "nats.auth.nkeySeedFile"
 	AuthCredsFileKey    = "nats.auth.credsFile"
+	// AuthAllowAnonymousKey must be set to true to connect anonymously in production mode. It exists for local
+	// setups and tests that run the production binaries against an unsecured broker.
+	AuthAllowAnonymousKey = "nats.auth.allowAnonymous"
 )
 
 // Supported values for AuthMethodKey.
@@ -106,12 +110,17 @@ func (a CredentialsAuth) Options() ([]nats.Option, error) {
 }
 
 // AuthFromConfig resolves the AuthStrategy from configuration. It returns nil when no authentication is configured
-// (AuthMethodKey unset or "none"), which preserves anonymous connections. Value validation is deferred to
-// AuthStrategy.Options so that all strategies report configuration errors uniformly.
-func AuthFromConfig(v *viper.Viper) (AuthStrategy, error) {
+// (AuthMethodKey unset or "none"), which results in an anonymous connection. Anonymous connections are refused in
+// production mode unless AuthAllowAnonymousKey is explicitly enabled, since every message on the bus is trusted. Value
+// validation is deferred to AuthStrategy.Options so that all strategies report configuration errors uniformly.
+func AuthFromConfig(v *viper.Viper, mode system.RuntimeMode) (AuthStrategy, error) {
 	method := strings.ToLower(v.GetString(AuthMethodKey))
 	switch method {
 	case "", AuthMethodNone:
+		if mode == system.ProductionMode && !v.GetBool(AuthAllowAnonymousKey) {
+			return nil, fmt.Errorf("anonymous NATS connections are not allowed in production mode: set %s to one of %s, %s, %s or %s, or set %s to true",
+				AuthMethodKey, AuthMethodUserInfo, AuthMethodToken, AuthMethodNKey, AuthMethodCredentials, AuthAllowAnonymousKey)
+		}
 		return nil, nil
 	case AuthMethodUserInfo:
 		return UserInfoAuth{Username: v.GetString(AuthUsernameKey), Password: v.GetString(AuthPasswordKey)}, nil

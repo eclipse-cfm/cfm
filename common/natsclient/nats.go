@@ -47,10 +47,12 @@ type ClientConfig struct {
 	Bucket string
 	// Auth supplies the authentication mechanism; nil connects anonymously.
 	Auth AuthStrategy
+	// TLS enables TLS, and mutual TLS when a client certificate is set; nil uses the transport implied by URL.
+	TLS *TLSConfig
 }
 
 // NewNatsClient creates and returns a new NatsClient instance connected according to the given config. Default
-// connection resilience options are always applied; authentication options derived from cfg.Auth and any extra
+// connection resilience options are always applied; TLS and authentication options derived from cfg.TLS and cfg.Auth and any extra
 // options are appended after them and take precedence.
 // Returns an error if the Connection to NATS or JetStream initialization fails.
 func NewNatsClient(cfg ClientConfig, extra ...nats.Option) (*NatsClient, error) {
@@ -60,6 +62,13 @@ func NewNatsClient(cfg ClientConfig, extra ...nats.Option) (*NatsClient, error) 
 		nats.ReconnectWait(time.Second),
 		nats.RetryOnFailedConnect(true),
 		nats.MaxReconnects(forever),
+	}
+	if cfg.TLS != nil {
+		tlsOptions, err := cfg.TLS.Options()
+		if err != nil {
+			return nil, fmt.Errorf("failed to configure NATS TLS: %w", err)
+		}
+		options = append(options, tlsOptions...)
 	}
 	if cfg.Auth != nil {
 		authOptions, err := cfg.Auth.Options()

@@ -103,7 +103,7 @@ func Test_LaunchAgent_WithoutAssemblyProvider(t *testing.T) {
 	}
 
 	// Verify config doesn't require AssemblyProvider
-	cfg := loadAgentConfig(config.AgentName, config.ConfigPrefix)
+	cfg := loadAgentConfig(config.AgentName, config.ConfigPrefix, system.DevelopmentMode)
 	require.NotNil(t, cfg)
 
 	// Verify the code path handles nil AssemblyProvider
@@ -123,7 +123,7 @@ func Test_loadAgentConfig_MissingRequiredParams(t *testing.T) {
 
 	// Verify that missing required params causes panic
 	require.Panics(t, func() {
-		loadAgentConfig("TestAgent", "testagent")
+		loadAgentConfig("TestAgent", "testagent", system.DevelopmentMode)
 	}, "loadAgentConfig should panic when required parameters are missing")
 }
 

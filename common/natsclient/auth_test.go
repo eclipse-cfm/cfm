@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/nats-io/nkeys"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
@@ -111,7 +112,7 @@ func TestAuthFromConfig(t *testing.T) {
 			for key, value := range tt.settings {
 				v.Set(key, value)
 			}
-			auth, err := AuthFromConfig(v)
+			auth, err := AuthFromConfig(v, system.DevelopmentMode)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, auth)
 		})
@@ -121,8 +122,46 @@ func TestAuthFromConfig(t *testing.T) {
 func TestAuthFromConfig_UnsupportedMethod(t *testing.T) {
 	v := viper.New()
 	v.Set(AuthMethodKey, "kerberos")
-	_, err := AuthFromConfig(v)
+	_, err := AuthFromConfig(v, system.DevelopmentMode)
 	assert.ErrorContains(t, err, `unsupported NATS authentication method "kerberos"`)
+}
+
+func TestAuthFromConfig_ProductionMode(t *testing.T) {
+	t.Run("unset is refused", func(t *testing.T) {
+		_, err := AuthFromConfig(viper.New(), system.ProductionMode)
+		assert.ErrorContains(t, err, "anonymous NATS connections are not allowed in production mode")
+	})
+
+	t.Run("none is refused", func(t *testing.T) {
+		v := viper.New()
+		v.Set(AuthMethodKey, AuthMethodNone)
+		_, err := AuthFromConfig(v, system.ProductionMode)
+		assert.ErrorContains(t, err, AuthAllowAnonymousKey)
+	})
+
+	t.Run("none is allowed when explicitly enabled", func(t *testing.T) {
+		v := viper.New()
+		v.Set(AuthMethodKey, AuthMethodNone)
+		v.Set(AuthAllowAnonymousKey, true)
+		auth, err := AuthFromConfig(v, system.ProductionMode)
+		require.NoError(t, err)
+		assert.Nil(t, auth)
+	})
+
+	t.Run("authenticated method is accepted", func(t *testing.T) {
+		v := viper.New()
+		v.Set(AuthMethodKey, AuthMethodToken)
+		v.Set(AuthTokenKey, "s3cret")
+		auth, err := AuthFromConfig(v, system.ProductionMode)
+		require.NoError(t, err)
+		assert.Equal(t, TokenAuth{Token: "s3cret"}, auth)
+	})
+
+	t.Run("debug mode allows anonymous", func(t *testing.T) {
+		auth, err := AuthFromConfig(viper.New(), system.DebugMode)
+		require.NoError(t, err)
+		assert.Nil(t, auth)
+	})
 }
 
 // writeNKeySeedFile generates a user NKey pair and writes the seed to a temp file, returning its path.

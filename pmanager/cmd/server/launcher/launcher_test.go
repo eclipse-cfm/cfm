@@ -45,6 +45,7 @@ func TestTestAgent_Integration(t *testing.T) {
 
 	// Required agent config
 	t.Setenv("PM_URI", nt.URI)
+	t.Setenv("PM_NATS_AUTH_ALLOWANONYMOUS", "true")
 	t.Setenv("PM_BUCKET", "cfm-bucket")
 	t.Setenv("PM_STREAM", streamName)
 	t.Setenv("PM_HTTPPORT", strconv.Itoa(fixtures.GetRandomPort(t)))

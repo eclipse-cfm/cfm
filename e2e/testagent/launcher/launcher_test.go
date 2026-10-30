@@ -67,6 +67,7 @@ func TestTestAgent_Integration(t *testing.T) {
 	// Required agent config
 	fixtures.IsolateConfig(t)
 	t.Setenv("TESTAGENT_URI", nt.URI)
+	t.Setenv("TESTAGENT_NATS_AUTH_ALLOWANONYMOUS", "true")
 	t.Setenv("TESTAGENT_BUCKET", "cfm-bucket")
 	t.Setenv("TESTAGENT_STREAM", streamName)
 

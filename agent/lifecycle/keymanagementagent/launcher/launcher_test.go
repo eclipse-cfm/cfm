@@ -47,6 +47,7 @@ func TestKeyManagementAgent_Integration(t *testing.T) {
 	fixtures.IsolateConfig(t)
 
 	t.Setenv("KMAGENT_URI", nt.URI)
+	t.Setenv("KMAGENT_NATS_AUTH_ALLOWANONYMOUS", "true")
 	t.Setenv("KMAGENT_BUCKET", bucket)
 	t.Setenv("KMAGENT_STREAM", streamName)
 	t.Setenv("KMAGENT_SIGLET_MANAGEMENT_URL", "https://example.com/api/siglet")

@@ -44,6 +44,9 @@ type OrchestrationManifest struct {
 	CorrelationID     string            `json:"correlationId" validate:"required"`
 	OrchestrationType OrchestrationType `json:"orchestrationType" validate:"required"`
 	Payload           map[string]any    `json:"payload,omitempty"`
+	// CompensatedManifestID is set by the Provision Manager when it starts this orchestration to compensate a failed
+	// one. It is never read from serialized manifests, so external callers cannot claim to compensate an orchestration.
+	CompensatedManifestID string `json:"-"`
 }
 
 // OrchestrationResponse returned when a system deployment completes.
@@ -55,6 +58,8 @@ type OrchestrationResponse struct {
 	Success           bool              `json:"success"`
 	ErrorDetail       string            `json:"errorDetail,omitempty"`
 	Properties        map[string]any    `json:"properties"`
+	// CompensatedManifestID references the failed orchestration this orchestration compensated, if any.
+	CompensatedManifestID string `json:"compensatedManifestId,omitempty"`
 }
 
 // VPAManifest represents the configuration details for a VPA deployment.

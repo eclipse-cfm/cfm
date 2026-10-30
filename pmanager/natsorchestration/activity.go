@@ -322,12 +322,13 @@ func (e *NatsActivityExecutor) handleOrchestrationCompletion(
 
 func (e *NatsActivityExecutor) publishResponse(activityContext api.ActivityContext, orchestration api.Orchestration) error {
 	response := &model.OrchestrationResponse{
-		ID:                uuid.New().String(),
-		ManifestID:        orchestration.ID,
-		CorrelationID:     orchestration.CorrelationID,
-		Success:           orchestration.State != api.OrchestrationStateErrored,
-		OrchestrationType: orchestration.OrchestrationType,
-		Properties:        orchestration.OutputData,
+		ID:                    uuid.New().String(),
+		ManifestID:            orchestration.ID,
+		CorrelationID:         orchestration.CorrelationID,
+		Success:               orchestration.State != api.OrchestrationStateErrored,
+		OrchestrationType:     orchestration.OrchestrationType,
+		Properties:            orchestration.OutputData,
+		CompensatedManifestID: orchestration.CompensatedOrchestrationID,
 	}
 	ser, err := json.Marshal(response)
 	if err != nil {

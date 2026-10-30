@@ -35,6 +35,15 @@ const (
 )
 
 func launchPlatformWithAgent(t *testing.T, natsURI string, pgDsn string) *e2efixtures.ApiClient {
+	return launchPlatformWithAgentEnv(t, natsURI, pgDsn, nil)
+}
+
+// launchPlatformWithAgentEnv launches the platform and test agent with additional environment variables, e.g. NATS
+// credentials for each component. The variables are restored when the test completes.
+func launchPlatformWithAgentEnv(t *testing.T, natsURI string, pgDsn string, env map[string]string) *e2efixtures.ApiClient {
+	for key, value := range env {
+		t.Setenv(key, value)
+	}
 	shutdownChannel, client := launchPlatform(t, natsURI, pgDsn)
 	go func() {
 		testLauncher.Launch(shutdownChannel)
@@ -49,6 +58,7 @@ func launchPlatform(t *testing.T, natsURI string, pgDsn string) (chan struct{}, 
 	_ = os.Setenv("TM_POSTGRES", "true")
 	_ = os.Setenv("TM_DSN", pgDsn)
 	_ = os.Setenv("TM_URI", natsURI)
+	_ = os.Setenv("TM_NATS_AUTH_ALLOWANONYMOUS", "true")
 	_ = os.Setenv("TM_BUCKET", cfmBucket)
 	_ = os.Setenv("TM_STREAM", streamName)
 	_ = os.Setenv("TM_AUTH_ENABLED", "false")
@@ -56,11 +66,13 @@ func launchPlatform(t *testing.T, natsURI string, pgDsn string) (chan struct{}, 
 	_ = os.Setenv("PM_POSTGRES", "true")
 	_ = os.Setenv("PM_DSN", pgDsn)
 	_ = os.Setenv("PM_URI", natsURI)
+	_ = os.Setenv("PM_NATS_AUTH_ALLOWANONYMOUS", "true")
 	_ = os.Setenv("PM_BUCKET", cfmBucket)
 	_ = os.Setenv("PM_STREAM", streamName)
 	_ = os.Setenv("PM_AUTH_ENABLED", "false")
 
 	_ = os.Setenv("TESTAGENT_URI", natsURI)
+	_ = os.Setenv("TESTAGENT_NATS_AUTH_ALLOWANONYMOUS", "true")
 	_ = os.Setenv("TESTAGENT_BUCKET", cfmBucket)
 	_ = os.Setenv("TESTAGENT_STREAM", streamName)
 
@@ -85,11 +97,13 @@ func waitTManager(t *testing.T, client *e2efixtures.ApiClient) {
 	var err error
 	for start := time.Now(); time.Since(start) < 5*time.Second; {
 		// Wait until a tenant can be created
-		if tenant, err := e2efixtures.CreateTenant(client, map[string]any{"group": "suppliers"}); err == nil {
+		tenant, createErr := e2efixtures.CreateTenant(client, map[string]any{"group": "suppliers"})
+		if err = createErr; err == nil {
 			err = client.DeleteToTManager(fmt.Sprintf("tenants/%s", tenant.ID))
 			require.NoError(t, err)
 			break
 		}
+		time.Sleep(100 * time.Millisecond)
 	}
 	require.NoError(t, err)
 }
@@ -106,20 +120,24 @@ func waitPManager(t *testing.T, client *e2efixtures.ApiClient) {
 			require.NoError(t, err)
 			break
 		}
+		time.Sleep(100 * time.Millisecond)
 	}
 	require.NoError(t, err)
 }
 
 func cleanup() {
 	_ = os.Unsetenv("TM_URI")
+	_ = os.Unsetenv("TM_NATS_AUTH_ALLOWANONYMOUS")
 	_ = os.Unsetenv("TM_BUCKET")
 	_ = os.Unsetenv("TM_STREAM")
 
 	_ = os.Unsetenv("PM_URI")
+	_ = os.Unsetenv("PM_NATS_AUTH_ALLOWANONYMOUS")
 	_ = os.Unsetenv("PM_BUCKET")
 	_ = os.Unsetenv("PM_STREAM")
 
 	_ = os.Unsetenv("TESTAGENT_URI")
+	_ = os.Unsetenv("TESTAGENT_NATS_AUTH_ALLOWANONYMOUS")
 	_ = os.Unsetenv("TESTAGENT_BUCKET")
 	_ = os.Unsetenv("TESTAGENT_STREAM")
 

@@ -175,3 +175,18 @@ func TestModelTypeValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestOrchestrationManifest_CompensatedManifestIDNotDeserialized(t *testing.T) {
+	var manifest OrchestrationManifest
+	err := json.Unmarshal([]byte(`{"id":"m1","correlationId":"c1","orchestrationType":"t","compensatedManifestId":"other"}`), &manifest)
+	require.NoError(t, err)
+	assert.Empty(t, manifest.CompensatedManifestID)
+}
+
+func TestOrchestrationResponse_CompensatedManifestIDRoundTrip(t *testing.T) {
+	data, err := json.Marshal(OrchestrationResponse{ID: "r1", ManifestID: "m2", CompensatedManifestID: "m1"})
+	require.NoError(t, err)
+	var response OrchestrationResponse
+	require.NoError(t, json.Unmarshal(data, &response))
+	assert.Equal(t, "m1", response.CompensatedManifestID)
+}

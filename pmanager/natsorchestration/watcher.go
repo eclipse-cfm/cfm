@@ -139,10 +139,11 @@ func (w *OrchestrationIndexWatcher) startCompensationOrchestration(ctx context.C
 	correlationID := orchestration.CorrelationID //eg. participant profile id, etc.
 	pData := orchestration.ProcessingData        // stuff for the VPAs
 	manifest := model.OrchestrationManifest{
-		ID:                uuid.NewString(),
-		CorrelationID:     correlationID,
-		OrchestrationType: model.VPADisposeType,
-		Payload:           pData,
+		ID:                    uuid.NewString(),
+		CorrelationID:         correlationID,
+		OrchestrationType:     model.VPADisposeType,
+		Payload:               pData,
+		CompensatedManifestID: orchestration.ID,
 	}
 	compensation, err := w.provisionManager.Start(ctx, &manifest)
 	if err != nil {
