@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -85,7 +86,8 @@ func (n *RetriableMessageProcessor[T]) ProcessLoop(ctx context.Context, consumer
 	}
 }
 
-func (n *RetriableMessageProcessor[T]) ProcessMessage(ctx context.Context, message jetstream.Msg) error {
+func (n *RetriableMessageProcessor[T]) ProcessMessage(ctx context.Context, message jetstream.Msg) (err error) {
+	defer TermOnPanic(message, n.Monitor, &err)
 	initNatsMetrics()
 	start := time.Now()
 	subject := message.Subject()
@@ -145,6 +147,23 @@ func (n *RetriableMessageProcessor[T]) ProcessMessage(ctx context.Context, messa
 		span.RecordError(resultErr)
 		natsMsgErrors.Add(ctx, 1, metric.WithAttributes(attribute.String("messaging.destination", subject)))
 		return fmt.Errorf("fatal failure when dispatching message: %w", resultErr)
+	}
+}
+
+// TermOnPanic recovers from a panic raised while processing a message, so that a single message cannot take down the
+// process. The message is terminated rather than NAKed, since redelivering it would most likely panic again. It must be
+// deferred directly by the function that processes the message, and reports the panic through err.
+func TermOnPanic(message jetstream.Msg, monitor system.LogMonitor, err *error) {
+	p := recover()
+	if p == nil {
+		return
+	}
+	if monitor != nil {
+		monitor.Severef("Recovered from panic while processing message on %s: %v\n%s", message.Subject(), p, debug.Stack())
+	}
+	*err = fmt.Errorf("panic while processing message: %v", p)
+	if termErr := message.Term(); termErr != nil {
+		*err = errors.Join(*err, fmt.Errorf("failed to TERM message: %w", termErr))
 	}
 }
 

@@ -106,7 +106,8 @@ func (e *NatsActivityExecutor) processLoop(ctx context.Context, consumer jetstre
 // orchestration can proceed, and the original message is acknowledged.
 //
 // Returns an error if message processing fails.
-func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetstream.Msg) error {
+func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetstream.Msg) (err error) {
+	defer natsclient.TermOnPanic(message, e.Monitor, &err)
 
 	var oMessage api.ActivityMessage
 	if err := json.Unmarshal(message.Data(), &oMessage); err != nil {
