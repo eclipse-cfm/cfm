@@ -43,6 +43,14 @@ func SetupNatsContainer(ctx context.Context, bucket string) (*NatsTestContainer,
 // block (raw NATS server config syntax, e.g. `authorization { token: "s3cret" }`) and connects a client using the
 // given auth strategy. An empty block and nil strategy yield an unauthenticated setup.
 func SetupNatsContainerWithAuth(ctx context.Context, bucket string, authorizationBlock string, auth natsclient.AuthStrategy) (*NatsTestContainer, error) {
+	return SetupNatsContainerWithConfig(ctx, bucket, authorizationBlock, nil, natsclient.ClientConfig{Auth: auth})
+}
+
+// SetupNatsContainerWithConfig starts a NATS container whose server configuration includes the given block (raw NATS
+// server config syntax, e.g. authorization or tls blocks). The files map container paths to file contents that are
+// copied into the container before it starts, e.g. certificates referenced by the block. The client connects with
+// clientConfig; its URL and Bucket fields are populated by the fixture.
+func SetupNatsContainerWithConfig(ctx context.Context, bucket string, serverBlock string, files map[string][]byte, clientConfig natsclient.ClientConfig) (*NatsTestContainer, error) {
 	// Create NATS configuration
 	natsConfig := fmt.Sprintf(`
 		# Basic server configuration
@@ -61,7 +69,7 @@ func SetupNatsContainerWithAuth(ctx context.Context, bucket string, authorizatio
 		trace: true
 
 		%s
-		`, authorizationBlock)
+		`, serverBlock)
 
 	// Create temporary config file
 	tmpDir, err := os.MkdirTemp("", "nats-config-*")
@@ -75,6 +83,25 @@ func SetupNatsContainerWithAuth(ctx context.Context, bucket string, authorizatio
 		return nil, fmt.Errorf("failed to write config file: %w", err)
 	}
 
+	containerFiles := []testcontainers.ContainerFile{
+		{
+			HostFilePath:      configFile,
+			ContainerFilePath: "/etc/nats/nats.conf",
+			FileMode:          0644,
+		},
+	}
+	for containerPath, content := range files {
+		hostPath := filepath.Join(tmpDir, filepath.Base(containerPath))
+		if err := os.WriteFile(hostPath, content, 0644); err != nil {
+			return nil, fmt.Errorf("failed to write container file %s: %w", containerPath, err)
+		}
+		containerFiles = append(containerFiles, testcontainers.ContainerFile{
+			HostFilePath:      hostPath,
+			ContainerFilePath: containerPath,
+			FileMode:          0644,
+		})
+	}
+
 	req := testcontainers.ContainerRequest{
 		Image:        natsImage,
 		ExposedPorts: []string{"4222/tcp"},
@@ -82,14 +109,8 @@ func SetupNatsContainerWithAuth(ctx context.Context, bucket string, authorizatio
 			wait.ForExposedPort(),
 			wait.ForLog(".*Server is ready.*").AsRegexp(),
 		),
-		Files: []testcontainers.ContainerFile{
-			{
-				HostFilePath:      configFile,
-				ContainerFilePath: "/etc/nats/nats.conf",
-				FileMode:          0644,
-			},
-		},
-		Cmd: []string{"-c", "/etc/nats/nats.conf"},
+		Files: containerFiles,
+		Cmd:   []string{"-c", "/etc/nats/nats.conf"},
 		Tmpfs: map[string]string{
 			"/tmp/jetstream": "size=1G", // Provide storage space
 		},
@@ -115,7 +136,9 @@ func SetupNatsContainerWithAuth(ctx context.Context, bucket string, authorizatio
 
 	uri := fmt.Sprintf("nats://%s:%s", hostIP, mappedPort.Port())
 
-	natsClient, err := natsclient.NewNatsClient(natsclient.ClientConfig{URL: uri, Bucket: bucket, Auth: auth})
+	clientConfig.URL = uri
+	clientConfig.Bucket = bucket
+	natsClient, err := natsclient.NewNatsClient(clientConfig)
 	if err != nil {
 		// terminate the container so failed connection attempts (e.g. negative auth tests) do not leak containers
 		_ = container.Terminate(ctx)

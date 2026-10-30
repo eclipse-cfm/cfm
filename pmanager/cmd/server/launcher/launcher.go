@@ -84,7 +84,7 @@ func Launch(shutdown <-chan struct{}) {
 		assembler.Register(&memorystore.MemoryStoreServiceAssembly{})
 	}
 
-	assembler.Register(natsorchestration.NewOrchestratorServiceAssembly(natsclient.ClientConfig{URL: uri, Bucket: bucketValue, Auth: natsAuth}, streamValue))
+	assembler.Register(natsorchestration.NewOrchestratorServiceAssembly(natsclient.ClientConfig{URL: uri, Bucket: bucketValue, Auth: natsAuth, TLS: natsclient.TLSFromConfig(vConfig)}, streamValue))
 	assembler.Register(natsprovision.NewProvisionServiceAssembly(streamValue))
 	assembler.Register(&core.PMCoreServiceAssembly{})
 

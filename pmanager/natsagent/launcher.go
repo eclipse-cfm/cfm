@@ -116,7 +116,7 @@ func loadAgentConfig(name string, configPrefix string, mode system.RuntimeMode) 
 
 	return &agentConfig{
 		Name:         name,
-		ClientConfig: natsclient.ClientConfig{URL: uri, Bucket: bucketValue, Auth: auth},
+		ClientConfig: natsclient.ClientConfig{URL: uri, Bucket: bucketValue, Auth: auth, TLS: natsclient.TLSFromConfig(vConfig)},
 		StreamName:   streamValue,
 		VConfig:      vConfig,
 	}
