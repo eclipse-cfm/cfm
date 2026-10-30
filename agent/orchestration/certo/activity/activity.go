@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/eclipse-cfm/cfm/common/model"
@@ -143,7 +144,7 @@ func (p CertoActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.Acti
 	}
 
 	// --- invoke DELETE endpoint on Certo's API ----
-	rq, err := http.NewRequestWithContext(ctx.Context(), "POST", p.CertoURL+"/management/v1/participant-contexts", nil)
+	rq, err := http.NewRequestWithContext(ctx.Context(), http.MethodDelete, p.CertoURL+"/management/v1/participant-contexts/"+url.PathEscape(data.ParticipantContextId), nil)
 	if err != nil {
 		span.RecordError(err)
 		p.Monitor.Warnf("error creating request: %v", err)
@@ -157,7 +158,11 @@ func (p CertoActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.Acti
 		return api.ActivityResult{Result: api.ActivityResultComplete}
 	}
 	defer response.Body.Close()
-	if response.StatusCode != http.StatusCreated {
+	if response.StatusCode == http.StatusNotFound {
+		p.Monitor.Infof("Certo participant context '%s' does not exist, nothing to dispose", data.ParticipantContextId)
+		return api.ActivityResult{Result: api.ActivityResultComplete}
+	}
+	if response.StatusCode != http.StatusNoContent {
 		errorBody, _ := io.ReadAll(response.Body)
 		p.Monitor.Warnf("failed to delete participant context on Certo: received status code %d, body: %s", response.StatusCode, string(errorBody))
 		return api.ActivityResult{Result: api.ActivityResultComplete}

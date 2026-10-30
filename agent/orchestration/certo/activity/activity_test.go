@@ -162,20 +162,38 @@ func TestCertoActivityProcessor_ProcessDeploy_MissingParticipantContextID(t *tes
 	assert.Contains(t, result.Error.Error(), "error processing Certo activity")
 }
 
-func TestCertoActivityProcessor_ProcessDispose_Success(t *testing.T) {
-	server := newCertoServer(t)
-	processor := NewProcessor(validConfig(server.URL))
+func TestCertoActivityProcessor_ProcessDispose(t *testing.T) {
+	tests := []struct {
+		name   string
+		status int
+	}{
+		{"deleted", http.StatusNoContent},
+		{"already gone", http.StatusNotFound},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var method, path string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				method, path = r.Method, r.URL.Path
+				w.WriteHeader(tt.status)
+			}))
+			t.Cleanup(server.Close)
+			processor := NewProcessor(validConfig(server.URL))
 
-	activityContext := api.NewActivityContext(context.Background(), "orch-4", api.Activity{
-		ID:            "activity-3",
-		Type:          "certo",
-		Discriminator: api.DisposeDiscriminator,
-	}, copyOf(processingData), make(map[string]any))
+			activityContext := api.NewActivityContext(context.Background(), "orch-4", api.Activity{
+				ID:            "activity-3",
+				Type:          "certo",
+				Discriminator: api.DisposeDiscriminator,
+			}, copyOf(processingData), make(map[string]any))
 
-	result := processor.ProcessDispose(activityContext)
+			result := processor.ProcessDispose(activityContext)
 
-	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
-	assert.NoError(t, result.Error)
+			assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
+			assert.NoError(t, result.Error)
+			assert.Equal(t, http.MethodDelete, method)
+			assert.Equal(t, "/management/v1/participant-contexts/client-456", path)
+		})
+	}
 }
 
 // --- mocks ---
