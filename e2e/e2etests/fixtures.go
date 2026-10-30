@@ -35,6 +35,15 @@ const (
 )
 
 func launchPlatformWithAgent(t *testing.T, natsURI string, pgDsn string) *e2efixtures.ApiClient {
+	return launchPlatformWithAgentEnv(t, natsURI, pgDsn, nil)
+}
+
+// launchPlatformWithAgentEnv launches the platform and test agent with additional environment variables, e.g. NATS
+// credentials for each component. The variables are restored when the test completes.
+func launchPlatformWithAgentEnv(t *testing.T, natsURI string, pgDsn string, env map[string]string) *e2efixtures.ApiClient {
+	for key, value := range env {
+		t.Setenv(key, value)
+	}
 	shutdownChannel, client := launchPlatform(t, natsURI, pgDsn)
 	go func() {
 		testLauncher.Launch(shutdownChannel)
