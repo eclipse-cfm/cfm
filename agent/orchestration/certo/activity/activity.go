@@ -44,6 +44,8 @@ type certoData struct {
 	ParticipantContextId string `json:"participantContextId" validate:"required"`
 }
 
+const dataspaceIdentifierKey = "dataspaceIdentifier"
+
 type Config struct {
 	system.LogMonitor
 	token.TokenProvider
@@ -78,7 +80,6 @@ func (p CertoActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.Activ
 		span.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error reading vpa data: %w", err)}
 	}
-	bpn := properties["bpn"]
 
 	exchangedToken, err := p.TokenProvider.GetToken(ctx.Context(), "certo-mgmt-api:write", "sudo")
 	if err != nil {
@@ -87,15 +88,13 @@ func (p CertoActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.Activ
 	}
 
 	body := struct {
-		Bpn                  any    `json:"bpn"`
-		Did                  string `json:"did"`
 		ParticipantContextId string `json:"participantContextId"`
-		Source               string `json:"source"`
+		Did                  string `json:"did"`
+		DataspaceIdentifier  string `json:"dataspaceIdentifier,omitempty"`
 	}{
-		Bpn:                  bpn,
-		Did:                  data.ParticipantID,
 		ParticipantContextId: data.ParticipantContextId,
-		Source:               "example.com/cloudevents/" + data.ParticipantContextId,
+		Did:                  data.ParticipantID,
+		DataspaceIdentifier:  dataspaceIdentifier(properties),
 	}
 
 	jsonBody, err := json.Marshal(body)
@@ -166,4 +165,11 @@ func (p CertoActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.Acti
 
 	p.Monitor.Infof("Certo dispose for participant context '%s' completed", data.ParticipantContextId)
 	return api.ActivityResult{Result: api.ActivityResultComplete}
+}
+
+// dataspaceIdentifier returns the participant's dataspace-assigned identifier from the VPA properties, or an empty
+// string if it is not set, since the identifier is optional in Certo.
+func dataspaceIdentifier(properties map[string]any) string {
+	v, _ := properties[dataspaceIdentifierKey].(string)
+	return v
 }
