@@ -203,7 +203,9 @@ func TestCreateParticipant_BadRequest(t *testing.T) {
 		State:                ParticipantContextStateActivated,
 	}
 
-	require.ErrorContains(t, client.CreateParticipantContext(t.Context(), context), "received status code 400")
+	err := client.CreateParticipantContext(t.Context(), context)
+	require.ErrorContains(t, err, "received status code 400")
+	require.ErrorContains(t, err, "foobar")
 }
 
 func TestCreateParticipant_Conflict(t *testing.T) {
@@ -569,4 +571,46 @@ func TestUnregisterDataPlane_ServerError(t *testing.T) {
 
 	err := client.UnregisterDataPlane(t.Context(), "test-participant", "siglet-1")
 	require.ErrorContains(t, err, "received status code 500")
+}
+
+func TestHttpManagementAPIClient_TransportError(t *testing.T) {
+	// a closed server makes every request fail at the transport level, so the client gets a nil response
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
+	client := HttpManagementAPIClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	tests := map[string]func() error{
+		"CreateParticipantContext": func() error {
+			return client.CreateParticipantContext(t.Context(), ParticipantContext{ParticipantContextID: "test-participant"})
+		},
+		"DeleteParticipantContext": func() error {
+			return client.DeleteParticipantContext(t.Context(), "test-participant")
+		},
+		"PatchConfig": func() error {
+			return client.PatchConfig(t.Context(), "test-participant", ParticipantContextConfig{})
+		},
+		"RegisterDataPlane": func() error {
+			return client.RegisterDataPlane(t.Context(), "test-participant", DataPlaneRegistration{})
+		},
+		"UnregisterDataPlane": func() error {
+			return client.UnregisterDataPlane(t.Context(), "test-participant", "dp-1")
+		},
+		"AssociateProfiles": func() error {
+			return client.AssociateProfiles(t.Context(), "test-participant", []string{"profile"})
+		},
+	}
+	for name, call := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.NotPanics(t, func() {
+				require.Error(t, call())
+			})
+		})
+	}
 }

@@ -234,3 +234,34 @@ func TestHttpApiClient_DeleteKeyMapping_ApiReturnsError(t *testing.T) {
 	err := client.DeleteKeyMapping(t.Context(), "participant-1")
 	require.ErrorContains(t, err, "received status code 400")
 }
+
+func TestHttpApiClient_TransportError(t *testing.T) {
+	// a closed server makes every request fail at the transport level, so the client gets a nil response
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	server.Close()
+
+	client := NewSigletAPIClient(&http.Client{}, newTokenProvider(t), server.URL)
+
+	tests := map[string]func() error{
+		"CreateKeyMapping": func() error {
+			return client.CreateKeyMapping(t.Context(), KeyMapping{ParticipantContextID: "participant-1"})
+		},
+		"UpdateKeyMapping": func() error {
+			return client.UpdateKeyMapping(t.Context(), KeyMapping{ParticipantContextID: "participant-1"})
+		},
+		"GetKeyMapping": func() error {
+			_, err := client.GetKeyMapping(t.Context(), "participant-1")
+			return err
+		},
+		"DeleteKeyMapping": func() error {
+			return client.DeleteKeyMapping(t.Context(), "participant-1")
+		},
+	}
+	for name, call := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.NotPanics(t, func() {
+				require.Error(t, call())
+			})
+		})
+	}
+}

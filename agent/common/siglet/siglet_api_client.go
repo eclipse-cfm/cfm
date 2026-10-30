@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/eclipse-cfm/cfm/common/httpx"
 	"github.com/eclipse-cfm/cfm/common/token"
 )
 
@@ -86,15 +87,11 @@ func (s httpManagementApiClient) CreateKeyMapping(ctx context.Context, mapping K
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := s.httpClient.Do(req)
-	defer func() {
-		// drain and close response body to avoid connection/resource leak
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
-
 	if err != nil {
 		return fmt.Errorf("failed to create Siglet Mapping: %w", err)
 	}
+	defer httpx.DrainAndClose(resp)
+
 	if resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("failed to create Siglet Mapping: received status code %d", resp.StatusCode)
 	}
@@ -123,15 +120,11 @@ func (s httpManagementApiClient) UpdateKeyMapping(ctx context.Context, mapping K
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := s.httpClient.Do(req)
-	defer func() {
-		// drain and close response body to avoid connection/resource leak
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
-
 	if err != nil {
 		return fmt.Errorf("failed to create Siglet Mapping: %w", err)
 	}
+	defer httpx.DrainAndClose(resp)
+
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("failed to create Siglet Mapping: received status code %d", resp.StatusCode)
 	}
@@ -153,15 +146,11 @@ func (s httpManagementApiClient) GetKeyMapping(ctx context.Context, participantC
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := s.httpClient.Do(req)
-	defer func() {
-		// drain and close response body to avoid connection/resource leak
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Siglet Mapping: %w", err)
 	}
+	defer httpx.DrainAndClose(resp)
+
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, nil
 	}
@@ -197,15 +186,10 @@ func (s httpManagementApiClient) DeleteKeyMapping(ctx context.Context, participa
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := s.httpClient.Do(req)
-	defer func() {
-		// drain and close response body to avoid connection/resource leak
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
-
 	if err != nil {
 		return fmt.Errorf("failed to get Siglet Mapping: %w", err)
 	}
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("error deleting Siglet Mapping: received status code %d", resp.StatusCode)
