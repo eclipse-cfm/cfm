@@ -25,6 +25,7 @@ import (
 	"path"
 
 	"github.com/eclipse-cfm/cfm/agent/common"
+	"github.com/eclipse-cfm/cfm/common/httpx"
 	"github.com/eclipse-cfm/cfm/common/token"
 )
 
@@ -70,7 +71,7 @@ func (a HttpIdentityAPIClient) DeleteParticipantContext(ctx context.Context, par
 	if err != nil {
 		return fmt.Errorf("failed to delete participant context on IdentityHub: %w", err)
 	}
-	defer a.closeResponse(resp)
+	defer httpx.DrainAndClose(resp)
 
 	switch resp.StatusCode {
 	case http.StatusNotFound:
@@ -102,7 +103,7 @@ func (a HttpIdentityAPIClient) QueryCredentialByType(ctx context.Context, partic
 	if err != nil {
 		return nil, fmt.Errorf("failed to get credential request state for %s: %w", participantContextID, err)
 	}
-	defer a.closeResponse(resp)
+	defer httpx.DrainAndClose(resp)
 
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
@@ -141,7 +142,7 @@ func (a HttpIdentityAPIClient) RequestCredentials(ctx context.Context, participa
 	if err != nil {
 		return "", fmt.Errorf("failed to create credentials request for %s: %w", participantContextID, err)
 	}
-	defer a.closeResponse(resp)
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
@@ -185,7 +186,7 @@ func (a HttpIdentityAPIClient) GetCredentialRequestState(ctx context.Context, pa
 	if err != nil {
 		return "", fmt.Errorf("failed to get credential request state for %s: %w", participantContextID, err)
 	}
-	defer a.closeResponse(resp)
+	defer httpx.DrainAndClose(resp)
 
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
@@ -272,7 +273,7 @@ func (a HttpIdentityAPIClient) CreateParticipantContext(ctx context.Context, man
 	if err != nil {
 		return fmt.Errorf("failed to create participant context on IdentityHub: %w", err)
 	}
-	defer a.closeResponse(resp)
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)
@@ -280,12 +281,4 @@ func (a HttpIdentityAPIClient) CreateParticipantContext(ctx context.Context, man
 	}
 
 	return nil
-}
-
-func (a HttpIdentityAPIClient) closeResponse(resp *http.Response) {
-	func() {
-		// drain and close response body to avoid connection/resource leak
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
 }

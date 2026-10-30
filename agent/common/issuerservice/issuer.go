@@ -23,6 +23,7 @@ import (
 	"net/http"
 
 	"github.com/eclipse-cfm/cfm/agent/common"
+	"github.com/eclipse-cfm/cfm/common/httpx"
 	"github.com/eclipse-cfm/cfm/common/token"
 )
 
@@ -94,11 +95,7 @@ func (i HttpApiClient) QueryCredentialsByType(ctx context.Context, holderID stri
 		return nil, fmt.Errorf("error querying credentials on IssuerService: %w", err)
 	}
 
-	defer func() {
-		// drain and close response body to avoid connection/resource leak
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
@@ -129,11 +126,7 @@ func (i HttpApiClient) DeleteHolder(ctx context.Context, participantContextID st
 	if err != nil {
 		return fmt.Errorf("failed to delete Holder on IssuerService: %w", err)
 	}
-	defer func() {
-		// drain and close response body to avoid connection/resource leak
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(resp.Body)
@@ -175,11 +168,7 @@ func (i HttpApiClient) CreateHolder(ctx context.Context, participantContextID st
 	if err != nil {
 		return fmt.Errorf("failed to create Holder on IssuerService: %w", err)
 	}
-	defer func() {
-		// drain and close response body to avoid connection/resource leak
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
@@ -204,11 +193,7 @@ func (i HttpApiClient) RevokeCredential(ctx context.Context, participantContextI
 	if err != nil {
 		return fmt.Errorf("failed to revoke credential with ID '%s' for participant context '%s': %w", credentialID, participantContextID, err)
 	}
-	defer func() {
-		// drain and close response body to avoid connection/resource leak
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)

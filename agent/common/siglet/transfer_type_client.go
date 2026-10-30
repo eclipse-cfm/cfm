@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/eclipse-cfm/cfm/common/httpx"
 	"github.com/eclipse-cfm/cfm/common/token"
 )
 
@@ -115,7 +116,7 @@ func (s httpManagementApiClient) CreateTransferTypeMapping(ctx context.Context, 
 	if err != nil {
 		return fmt.Errorf("failed to create Siglet transfer type mapping: %w", err)
 	}
-	defer drainAndClose(resp)
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("failed to create Siglet transfer type mapping: received status code %d", resp.StatusCode)
@@ -141,7 +142,7 @@ func (s httpManagementApiClient) GetTransferTypeMapping(ctx context.Context, par
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Siglet transfer type mapping: %w", err)
 	}
-	defer drainAndClose(resp)
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, nil
@@ -185,7 +186,7 @@ func (s httpManagementApiClient) ReplaceTransferTypeMapping(ctx context.Context,
 	if err != nil {
 		return fmt.Errorf("failed to replace Siglet transfer type mapping: %w", err)
 	}
-	defer drainAndClose(resp)
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("failed to replace Siglet transfer type mapping: received status code %d", resp.StatusCode)
@@ -211,7 +212,7 @@ func (s httpManagementApiClient) DeleteTransferTypeMapping(ctx context.Context, 
 	if err != nil {
 		return fmt.Errorf("failed to delete Siglet transfer type mapping: %w", err)
 	}
-	defer drainAndClose(resp)
+	defer httpx.DrainAndClose(resp)
 
 	// treat an already-absent mapping as success so dispose is idempotent
 	if resp.StatusCode == http.StatusNotFound {
@@ -221,10 +222,4 @@ func (s httpManagementApiClient) DeleteTransferTypeMapping(ctx context.Context, 
 		return fmt.Errorf("error deleting Siglet transfer type mapping: received status code %d", resp.StatusCode)
 	}
 	return nil
-}
-
-// drainAndClose drains and closes the response body to avoid connection/resource leaks.
-func drainAndClose(resp *http.Response) {
-	_, _ = io.Copy(io.Discard, resp.Body)
-	_ = resp.Body.Close()
 }

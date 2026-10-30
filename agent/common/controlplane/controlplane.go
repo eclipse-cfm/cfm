@@ -23,6 +23,7 @@ import (
 	"net/http"
 
 	vault "github.com/eclipse-cfm/cfm/agent/common/vault"
+	"github.com/eclipse-cfm/cfm/common/httpx"
 	"github.com/eclipse-cfm/cfm/common/token"
 )
 
@@ -137,7 +138,7 @@ func (h HttpManagementAPIClient) DeleteParticipantContext(ctx context.Context, p
 	if err != nil {
 		return fmt.Errorf("failed to delete participant context on control plane: %w", err)
 	}
-	defer h.closeResponse(resp)
+	defer httpx.DrainAndClose(resp)
 
 	switch resp.StatusCode {
 	case http.StatusNotFound:
@@ -181,7 +182,7 @@ func (h HttpManagementAPIClient) CreateParticipantContext(ctx context.Context, m
 	if err != nil {
 		return fmt.Errorf("failed to create participant context on control plane: %w", err)
 	}
-	defer h.closeResponse(resp)
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -222,7 +223,7 @@ func (h HttpManagementAPIClient) PatchConfig(ctx context.Context, participantCon
 		return fmt.Errorf("failed to patch participant context config on control plane: %w", err)
 	}
 
-	defer h.closeResponse(resp)
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
 		body, _ := io.ReadAll(resp.Body)
@@ -256,7 +257,7 @@ func (h HttpManagementAPIClient) RegisterDataPlane(ctx context.Context, particip
 		return fmt.Errorf("failed to register data plane on control plane: %w", err)
 	}
 
-	defer h.closeResponse(resp)
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
 		body, _ := io.ReadAll(resp.Body)
@@ -284,7 +285,7 @@ func (h HttpManagementAPIClient) UnregisterDataPlane(ctx context.Context, partic
 		return fmt.Errorf("failed to unregister data plane on control plane: %w", err)
 	}
 
-	defer h.closeResponse(resp)
+	defer httpx.DrainAndClose(resp)
 
 	switch {
 	case resp.StatusCode == http.StatusNotFound:
@@ -329,19 +330,11 @@ func (h HttpManagementAPIClient) AssociateProfiles(ctx context.Context, particip
 		return fmt.Errorf("failed to associate dataspace profiles on control plane: %w", err)
 	}
 
-	defer h.closeResponse(resp)
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to associate dataspace profiles on control plane: received status code %d, body: %s", resp.StatusCode, string(body))
 	}
 	return nil
-}
-
-func (h HttpManagementAPIClient) closeResponse(resp *http.Response) {
-	func() {
-		// drain and close response body to avoid connection/resource leak
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
 }
