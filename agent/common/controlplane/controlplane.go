@@ -134,10 +134,10 @@ func (h HttpManagementAPIClient) DeleteParticipantContext(ctx context.Context, p
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	resp, err := h.HttpClient.Do(req)
-	h.closeResponse(resp)
 	if err != nil {
 		return fmt.Errorf("failed to delete participant context on control plane: %w", err)
 	}
+	defer h.closeResponse(resp)
 
 	switch resp.StatusCode {
 	case http.StatusNotFound:
@@ -181,8 +181,7 @@ func (h HttpManagementAPIClient) CreateParticipantContext(ctx context.Context, m
 	if err != nil {
 		return fmt.Errorf("failed to create participant context on control plane: %w", err)
 	}
-
-	h.closeResponse(resp)
+	defer h.closeResponse(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)

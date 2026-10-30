@@ -197,3 +197,45 @@ func TestHolderPIDFromLocation_Invalid(t *testing.T) {
 		require.Error(t, err, location)
 	}
 }
+
+func TestHttpIdentityAPIClient_TransportError(t *testing.T) {
+	// a closed server makes every request fail at the transport level, so the client gets a nil response
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
+	client := HttpIdentityAPIClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	tests := map[string]func() error{
+		"CreateParticipantContext": func() error {
+			return client.CreateParticipantContext(t.Context(), NewParticipantManifest("test", "did:web:test", "https://example.com/credentials", "https://example.com/dsp", "https://example.com/data"))
+		},
+		"DeleteParticipantContext": func() error {
+			return client.DeleteParticipantContext(t.Context(), "test")
+		},
+		"QueryCredentialByType": func() error {
+			_, err := client.QueryCredentialByType(t.Context(), "test", "MembershipCredential")
+			return err
+		},
+		"RequestCredentials": func() error {
+			_, err := client.RequestCredentials(t.Context(), "test", CredentialRequest{})
+			return err
+		},
+		"GetCredentialRequestState": func() error {
+			_, err := client.GetCredentialRequestState(t.Context(), "test", "request-1")
+			return err
+		},
+	}
+	for name, call := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.NotPanics(t, func() {
+				require.Error(t, call())
+			})
+		})
+	}
+}

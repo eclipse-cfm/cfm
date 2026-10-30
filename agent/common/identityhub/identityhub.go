@@ -67,10 +67,11 @@ func (a HttpIdentityAPIClient) DeleteParticipantContext(ctx context.Context, par
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	resp, err := a.HttpClient.Do(req)
-	defer a.closeResponse(resp)
 	if err != nil {
 		return fmt.Errorf("failed to delete participant context on IdentityHub: %w", err)
 	}
+	defer a.closeResponse(resp)
+
 	switch resp.StatusCode {
 	case http.StatusNotFound:
 		return fmt.Errorf("participant context %s not found in Identity", participantContextID)
@@ -98,11 +99,10 @@ func (a HttpIdentityAPIClient) QueryCredentialByType(ctx context.Context, partic
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := a.HttpClient.Do(req)
-	defer a.closeResponse(resp)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to get credential request state for %s: %w", participantContextID, err)
 	}
+	defer a.closeResponse(resp)
 
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
@@ -138,11 +138,10 @@ func (a HttpIdentityAPIClient) RequestCredentials(ctx context.Context, participa
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := a.HttpClient.Do(req)
-	defer a.closeResponse(resp)
-
 	if err != nil {
 		return "", fmt.Errorf("failed to create credentials request for %s: %w", participantContextID, err)
 	}
+	defer a.closeResponse(resp)
 
 	if resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
@@ -183,11 +182,10 @@ func (a HttpIdentityAPIClient) GetCredentialRequestState(ctx context.Context, pa
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := a.HttpClient.Do(req)
-	defer a.closeResponse(resp)
-
 	if err != nil {
 		return "", fmt.Errorf("failed to get credential request state for %s: %w", participantContextID, err)
 	}
+	defer a.closeResponse(resp)
 
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
