@@ -67,6 +67,7 @@ func Test_VerifyAutoCompensation(t *testing.T) {
 		})
 	}()
 
+	waitTManager(t, client)
 	waitPManager(t, client)
 
 	err = e2efixtures.CreateTestActivityDefinition(client)
@@ -176,6 +177,7 @@ func Test_VerifyAutoCompensation_NoCompensationOrchestration(t *testing.T) {
 		})
 	}()
 
+	waitTManager(t, client)
 	waitPManager(t, client)
 
 	err = e2efixtures.CreateTestActivityDefinition(client)

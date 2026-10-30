@@ -97,11 +97,13 @@ func waitTManager(t *testing.T, client *e2efixtures.ApiClient) {
 	var err error
 	for start := time.Now(); time.Since(start) < 5*time.Second; {
 		// Wait until a tenant can be created
-		if tenant, err := e2efixtures.CreateTenant(client, map[string]any{"group": "suppliers"}); err == nil {
+		tenant, createErr := e2efixtures.CreateTenant(client, map[string]any{"group": "suppliers"})
+		if err = createErr; err == nil {
 			err = client.DeleteToTManager(fmt.Sprintf("tenants/%s", tenant.ID))
 			require.NoError(t, err)
 			break
 		}
+		time.Sleep(100 * time.Millisecond)
 	}
 	require.NoError(t, err)
 }
@@ -118,6 +120,7 @@ func waitPManager(t *testing.T, client *e2efixtures.ApiClient) {
 			require.NoError(t, err)
 			break
 		}
+		time.Sleep(100 * time.Millisecond)
 	}
 	require.NoError(t, err)
 }
