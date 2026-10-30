@@ -73,6 +73,7 @@ func (p provisionManager) Start(ctx context.Context, manifest *model.Orchestrati
 		if err != nil {
 			return types.NewFatalWrappedError(err, "error instantiating orchestration for %s", manifestID)
 		}
+		orch.CompensatedOrchestrationID = manifest.CompensatedManifestID
 		err = p.orchestrator.Execute(ctx, orch)
 		if err != nil {
 			return types.NewFatalWrappedError(err, "error executing orchestration %s for %s", orch.ID, manifestID)

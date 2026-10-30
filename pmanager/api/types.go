@@ -70,6 +70,8 @@ type Orchestration struct {
 	// extract context from — notably auto-compensation launched from the KV watcher — link back to the
 	// originating trace.
 	OriginTraceContext map[string]string `json:"originTraceContext,omitempty"`
+	// CompensatedOrchestrationID is the ID of the failed orchestration this orchestration was started to compensate.
+	CompensatedOrchestrationID string `json:"compensatedOrchestrationId,omitempty"`
 }
 
 func (o *Orchestration) SetState(state OrchestrationState) {

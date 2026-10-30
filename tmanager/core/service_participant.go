@@ -119,6 +119,7 @@ func (p participantService) DeployProfile(ctx context.Context, tenantID string, 
 		specs := generateCredentialSpecs(participantProfile.ParticipantRoles, dProfiles)
 		oManifest.Payload[model.CredentialData] = specs
 
+		setPendingOrchestration(participantProfile, oManifest)
 		result, err := p.participantStore.Create(ctx, participantProfile)
 		if err != nil {
 			return nil, fmt.Errorf("error creating participant %s: %w", deployment.Identifier, err)
@@ -220,6 +221,7 @@ func (p participantService) DisposeProfile(ctx context.Context, tenantID string,
 		oManifest.Payload[model.VPAData] = vpaManifests
 		oManifest.Payload[model.CredentialData] = generateCredentialSpecs(profile.ParticipantRoles, dProfiles)
 
+		setPendingOrchestration(profile, oManifest)
 		err = p.participantStore.Update(c, profile)
 		if err != nil {
 			return fmt.Errorf("error disposing participant %s: %w", participantID, err)
@@ -234,6 +236,48 @@ func (p participantService) DisposeProfile(ctx context.Context, tenantID string,
 
 		return nil
 	})
+}
+
+// pendingOrchestrationKey is the profile property recording the orchestration TM last started for the profile. Only a
+// response for that orchestration is applied to the profile.
+const pendingOrchestrationKey = "cfm.orchestration.pending"
+
+const (
+	pendingManifestIDKey = "manifestId"
+	pendingTypeKey       = "orchestrationType"
+)
+
+// setPendingOrchestration records the manifest as the orchestration the profile is waiting on, replacing any value
+// that was supplied with the profile properties.
+func setPendingOrchestration(profile *api.ParticipantProfile, manifest model.OrchestrationManifest) {
+	if profile.Properties == nil {
+		profile.Properties = make(api.Properties)
+	}
+	profile.Properties[pendingOrchestrationKey] = map[string]any{
+		pendingManifestIDKey: manifest.ID,
+		pendingTypeKey:       manifest.OrchestrationType.String(),
+	}
+}
+
+// isPendingOrchestration reports whether the response matches the manifest ID and orchestration type TM recorded when
+// it started the profile's current orchestration, or is the dispose orchestration the Provision Manager started to
+// compensate it.
+func isPendingOrchestration(profile *api.ParticipantProfile, response model.OrchestrationResponse) bool {
+	pending, ok := profile.Properties[pendingOrchestrationKey].(map[string]any)
+	if !ok {
+		return false
+	}
+	manifestID, _ := pending[pendingManifestIDKey].(string)
+	orchestrationType, _ := pending[pendingTypeKey].(string)
+	if manifestID == "" {
+		return false
+	}
+	if manifestID == response.ManifestID {
+		return orchestrationType == response.OrchestrationType.String()
+	}
+	return manifestID == response.CompensatedManifestID &&
+		orchestrationType == model.VPADeployType.String() &&
+		response.OrchestrationType == model.VPADisposeType
 }
 
 // executeStoreIterator wraps store iterator operations in a transaction context
@@ -331,6 +375,17 @@ func (h vpaCallbackHandler) handle(
 			h.monitor.Infof("Error retrieving participant profile '%s' for manifest %s: %w", response.CorrelationID, response.ManifestID, err)
 			// Do not return error as this is fatal and the message must be acked
 			return nil
+		}
+		if !isPendingOrchestration(profile, response) {
+			// The response does not belong to the orchestration this profile is waiting on: it is a duplicate of an
+			// already processed response, or it was forged. Ack it without touching the profile.
+			h.monitor.Warnf("Ignoring %s response for participant profile '%s': manifest %s is not the pending orchestration",
+				response.OrchestrationType, response.CorrelationID, response.ManifestID)
+			return nil
+		}
+		if response.Success {
+			// A failed orchestration stays pending so that the Provision Manager's compensation can still be applied
+			delete(profile.Properties, pendingOrchestrationKey)
 		}
 		switch {
 		case response.Success:

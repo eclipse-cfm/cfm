@@ -248,6 +248,34 @@ func TestProvisionManager_Start_OrchestrationInstantiation(t *testing.T) {
 	assert.Equal(t, "test-deployment", result.ID)
 }
 
+func TestProvisionManager_Start_RecordsCompensatedOrchestration(t *testing.T) {
+	definitionStore := memorystore.NewDefinitionStore()
+	ctx := context.Background()
+	_, _ = definitionStore.StoreOrchestrationDefinition(ctx, createTestOrchestrationDefinition("test-type"))
+
+	mockOrch := mocks.NewMockOrchestrator(t)
+	mockOrch.EXPECT().GetOrchestration(mock.Anything, "compensation").Return(nil, nil)
+	mockOrch.EXPECT().Execute(mock.Anything, mock.MatchedBy(func(orch *api.Orchestration) bool {
+		return orch.CompensatedOrchestrationID == "failed-deployment"
+	})).Return(nil)
+
+	pm := &provisionManager{
+		orchestrator: mockOrch,
+		store:        definitionStore,
+		monitor:      &system.NoopMonitor{},
+		trxContext:   store.NoOpTransactionContext{},
+	}
+
+	result, err := pm.Start(ctx, &model.OrchestrationManifest{
+		ID:                    "compensation",
+		OrchestrationType:     "test-type",
+		CompensatedManifestID: "failed-deployment",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "failed-deployment", result.CompensatedOrchestrationID)
+}
+
 // TestCountOrchestrations_WithEmptyResult tests counting with no matching orchestrations
 func TestCountOrchestrations_WithEmptyResult(t *testing.T) {
 	ctx := context.Background()
