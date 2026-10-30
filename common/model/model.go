@@ -87,7 +87,7 @@ func (dt VPAType) String() string {
 }
 
 type Query struct {
-	Predicate string `json:"predicate" required:"true"`
+	Predicate string `json:"predicate"`
 	Offset    int64  `json:"offset"`
 	Limit     int64  `json:"limit"`
 }
