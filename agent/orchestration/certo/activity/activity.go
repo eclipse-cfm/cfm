@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/eclipse-cfm/cfm/common/model"
@@ -43,6 +44,8 @@ type certoData struct {
 	ParticipantID        string `json:"cfm.participant.id" validate:"required"`
 	ParticipantContextId string `json:"participantContextId" validate:"required"`
 }
+
+const dataspaceIdentifierKey = "dataspaceIdentifier"
 
 type Config struct {
 	system.LogMonitor
@@ -78,7 +81,6 @@ func (p CertoActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.Activ
 		span.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error reading vpa data: %w", err)}
 	}
-	bpn := properties["bpn"]
 
 	exchangedToken, err := p.TokenProvider.GetToken(ctx.Context(), "certo-mgmt-api:write", "sudo")
 	if err != nil {
@@ -87,15 +89,13 @@ func (p CertoActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.Activ
 	}
 
 	body := struct {
-		Bpn                  any    `json:"bpn"`
-		Did                  string `json:"did"`
 		ParticipantContextId string `json:"participantContextId"`
-		Source               string `json:"source"`
+		Did                  string `json:"did"`
+		DataspaceIdentifier  string `json:"dataspaceIdentifier,omitempty"`
 	}{
-		Bpn:                  bpn,
-		Did:                  data.ParticipantID,
 		ParticipantContextId: data.ParticipantContextId,
-		Source:               "example.com/cloudevents/" + data.ParticipantContextId,
+		Did:                  data.ParticipantID,
+		DataspaceIdentifier:  dataspaceIdentifier(properties),
 	}
 
 	jsonBody, err := json.Marshal(body)
@@ -144,7 +144,7 @@ func (p CertoActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.Acti
 	}
 
 	// --- invoke DELETE endpoint on Certo's API ----
-	rq, err := http.NewRequestWithContext(ctx.Context(), "POST", p.CertoURL+"/management/v1/participant-contexts", nil)
+	rq, err := http.NewRequestWithContext(ctx.Context(), http.MethodDelete, p.CertoURL+"/management/v1/participant-contexts/"+url.PathEscape(data.ParticipantContextId), nil)
 	if err != nil {
 		span.RecordError(err)
 		p.Monitor.Warnf("error creating request: %v", err)
@@ -158,7 +158,11 @@ func (p CertoActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.Acti
 		return api.ActivityResult{Result: api.ActivityResultComplete}
 	}
 	defer response.Body.Close()
-	if response.StatusCode != http.StatusCreated {
+	if response.StatusCode == http.StatusNotFound {
+		p.Monitor.Infof("Certo participant context '%s' does not exist, nothing to dispose", data.ParticipantContextId)
+		return api.ActivityResult{Result: api.ActivityResultComplete}
+	}
+	if response.StatusCode != http.StatusNoContent {
 		errorBody, _ := io.ReadAll(response.Body)
 		p.Monitor.Warnf("failed to delete participant context on Certo: received status code %d, body: %s", response.StatusCode, string(errorBody))
 		return api.ActivityResult{Result: api.ActivityResultComplete}
@@ -166,4 +170,11 @@ func (p CertoActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.Acti
 
 	p.Monitor.Infof("Certo dispose for participant context '%s' completed", data.ParticipantContextId)
 	return api.ActivityResult{Result: api.ActivityResultComplete}
+}
+
+// dataspaceIdentifier returns the participant's dataspace-assigned identifier from the VPA properties, or an empty
+// string if it is not set, since the identifier is optional in Certo.
+func dataspaceIdentifier(properties map[string]any) string {
+	v, _ := properties[dataspaceIdentifierKey].(string)
+	return v
 }
