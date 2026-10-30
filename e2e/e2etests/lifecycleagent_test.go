@@ -80,6 +80,7 @@ func Test_VerifyLifecycleAgentDispatchesCloudEvent(t *testing.T) {
 	// viper uppercases the env prefix and key, so the environment variables must be uppercase.
 	p := strings.ToUpper(agentName)
 	t.Setenv(p+"_URI", nt.URI)
+	t.Setenv(p+"_NATS_AUTH_ALLOWANONYMOUS", "true")
 	t.Setenv(p+"_BUCKET", cfmBucket)
 	t.Setenv(p+"_STREAM", eventsStream)
 

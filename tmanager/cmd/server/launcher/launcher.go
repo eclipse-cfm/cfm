@@ -67,7 +67,7 @@ func Launch(shutdown <-chan struct{}) {
 		panic(fmt.Errorf("error launching Tenant Manager: %w", err))
 	}
 
-	natsAuth, err := natsclient.AuthFromConfig(vConfig)
+	natsAuth, err := natsclient.AuthFromConfig(vConfig, mode)
 	if err != nil {
 		panic(fmt.Errorf("error launching Tenant Manager: %w", err))
 	}

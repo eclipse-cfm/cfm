@@ -56,9 +56,9 @@ type agentConfig struct {
 }
 
 func LaunchAgent(shutdown <-chan struct{}, config LauncherConfig) {
-	cfg := loadAgentConfig(config.AgentName, config.ConfigPrefix)
-
 	mode := runtime.LoadMode()
+
+	cfg := loadAgentConfig(config.AgentName, config.ConfigPrefix, mode)
 
 	monitor := runtime.LoadLogMonitor(config.ConfigPrefix, mode)
 	//goland:noinspection GoUnhandledErrorResult
@@ -95,7 +95,7 @@ func LaunchAgent(shutdown <-chan struct{}, config LauncherConfig) {
 	runtime.AssembleAndLaunch(assembler, cfg.Name, monitor, shutdown)
 }
 
-func loadAgentConfig(name string, configPrefix string) *agentConfig {
+func loadAgentConfig(name string, configPrefix string, mode system.RuntimeMode) *agentConfig {
 	vConfig := system.LoadConfigOrPanic(configPrefix)
 	uri := vConfig.GetString(uriKey)
 	bucketValue := vConfig.GetString(bucketKey)
@@ -109,7 +109,7 @@ func loadAgentConfig(name string, configPrefix string) *agentConfig {
 		panic(fmt.Errorf("error loading agent configuration: %w", err))
 	}
 
-	auth, err := natsclient.AuthFromConfig(vConfig)
+	auth, err := natsclient.AuthFromConfig(vConfig, mode)
 	if err != nil {
 		panic(fmt.Errorf("error loading agent configuration: %w", err))
 	}

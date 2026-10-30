@@ -96,9 +96,9 @@ type agentConfig struct {
 
 // LaunchAgent bootstraps and runs a lifecycle agent until the shutdown channel is closed.
 func LaunchAgent[T any](shutdown <-chan struct{}, config LauncherConfig[T]) {
-	cfg := loadAgentConfig(config.AgentName, config.ConfigPrefix, config.Subjects)
-
 	mode := runtime.LoadMode()
+
+	cfg := loadAgentConfig(config.AgentName, config.ConfigPrefix, config.Subjects, mode)
 
 	monitor := runtime.LoadLogMonitor(config.ConfigPrefix, mode)
 	//goland:noinspection GoUnhandledErrorResult
@@ -137,7 +137,7 @@ func LaunchAgent[T any](shutdown <-chan struct{}, config LauncherConfig[T]) {
 	runtime.AssembleAndLaunch(assembler, cfg.Name, monitor, shutdown)
 }
 
-func loadAgentConfig(name string, configPrefix string, defaultSubjects []string) *agentConfig {
+func loadAgentConfig(name string, configPrefix string, defaultSubjects []string, mode system.RuntimeMode) *agentConfig {
 	vConfig := system.LoadConfigOrPanic(configPrefix)
 	uri := vConfig.GetString(uriKey)
 	bucketValue := vConfig.GetString(bucketKey)
@@ -159,7 +159,7 @@ func loadAgentConfig(name string, configPrefix string, defaultSubjects []string)
 		panic(fmt.Errorf("error loading agent configuration: at least one subject must be configured via LauncherConfig.Subjects, %s.%s or %s.%s", configPrefix, subjectsKey, configPrefix, subjectKey))
 	}
 
-	auth, err := natsclient.AuthFromConfig(vConfig)
+	auth, err := natsclient.AuthFromConfig(vConfig, mode)
 	if err != nil {
 		panic(fmt.Errorf("error loading agent configuration: %w", err))
 	}

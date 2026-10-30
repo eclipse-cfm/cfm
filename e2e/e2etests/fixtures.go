@@ -49,6 +49,7 @@ func launchPlatform(t *testing.T, natsURI string, pgDsn string) (chan struct{}, 
 	_ = os.Setenv("TM_POSTGRES", "true")
 	_ = os.Setenv("TM_DSN", pgDsn)
 	_ = os.Setenv("TM_URI", natsURI)
+	_ = os.Setenv("TM_NATS_AUTH_ALLOWANONYMOUS", "true")
 	_ = os.Setenv("TM_BUCKET", cfmBucket)
 	_ = os.Setenv("TM_STREAM", streamName)
 	_ = os.Setenv("TM_AUTH_ENABLED", "false")
@@ -56,11 +57,13 @@ func launchPlatform(t *testing.T, natsURI string, pgDsn string) (chan struct{}, 
 	_ = os.Setenv("PM_POSTGRES", "true")
 	_ = os.Setenv("PM_DSN", pgDsn)
 	_ = os.Setenv("PM_URI", natsURI)
+	_ = os.Setenv("PM_NATS_AUTH_ALLOWANONYMOUS", "true")
 	_ = os.Setenv("PM_BUCKET", cfmBucket)
 	_ = os.Setenv("PM_STREAM", streamName)
 	_ = os.Setenv("PM_AUTH_ENABLED", "false")
 
 	_ = os.Setenv("TESTAGENT_URI", natsURI)
+	_ = os.Setenv("TESTAGENT_NATS_AUTH_ALLOWANONYMOUS", "true")
 	_ = os.Setenv("TESTAGENT_BUCKET", cfmBucket)
 	_ = os.Setenv("TESTAGENT_STREAM", streamName)
 
@@ -112,14 +115,17 @@ func waitPManager(t *testing.T, client *e2efixtures.ApiClient) {
 
 func cleanup() {
 	_ = os.Unsetenv("TM_URI")
+	_ = os.Unsetenv("TM_NATS_AUTH_ALLOWANONYMOUS")
 	_ = os.Unsetenv("TM_BUCKET")
 	_ = os.Unsetenv("TM_STREAM")
 
 	_ = os.Unsetenv("PM_URI")
+	_ = os.Unsetenv("PM_NATS_AUTH_ALLOWANONYMOUS")
 	_ = os.Unsetenv("PM_BUCKET")
 	_ = os.Unsetenv("PM_STREAM")
 
 	_ = os.Unsetenv("TESTAGENT_URI")
+	_ = os.Unsetenv("TESTAGENT_NATS_AUTH_ALLOWANONYMOUS")
 	_ = os.Unsetenv("TESTAGENT_BUCKET")
 	_ = os.Unsetenv("TESTAGENT_STREAM")
 
