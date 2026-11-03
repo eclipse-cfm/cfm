@@ -37,7 +37,14 @@ func SetupTestContainer(t *testing.T) (testcontainers.Container, string, error) 
 			"POSTGRES_PASSWORD": "test",
 			"POSTGRES_DB":       pgDb,
 		},
-		WaitingFor: wait.ForAll(wait.ForExposedPort(), wait.ForListeningPort("5432/tcp")),
+		// On first start, the image runs its init scripts against a temporary server and then restarts Postgres, so an
+		// open port alone does not mean it is ready: connecting in between fails with "the database system is starting
+		// up". The readiness message is only logged a second time once the final server accepts connections.
+		WaitingFor: wait.ForAll(
+			wait.ForExposedPort(),
+			wait.ForListeningPort("5432/tcp"),
+			wait.ForLog("database system is ready to accept connections").WithOccurrence(2),
+		),
 	}
 
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
