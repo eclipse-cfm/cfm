@@ -76,6 +76,8 @@ type Orchestration struct {
 	ProcessingData    map[string]any          `json:"processingData"`
 	OutputData        map[string]any          `json:"outputData"`
 	Completed         map[string]struct{}     `json:"completed"`
+	// Error is the error that put the orchestration into the errored state, if any.
+	Error string `json:"error,omitempty"`
 }
 
 type OrchestrationStep struct {

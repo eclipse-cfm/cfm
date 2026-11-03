@@ -65,6 +65,9 @@ type Orchestration struct {
 	ProcessingData    map[string]any          `json:"processingData"`
 	OutputData        map[string]any          `json:"outputData"`
 	Completed         map[string]struct{}     `json:"completed"`
+	// EngineState holds the orchestration engine's own bookkeeping. It is kept apart from ProcessingData so that
+	// neither the caller's payload nor activities can read or overwrite it.
+	EngineState EngineState `json:"engineState"`
 	// OriginTraceContext carries the W3C trace context (traceparent/tracestate) of the request that started
 	// this orchestration, captured at execution time. It lets reactive flows that have no inbound message to
 	// extract context from — notably auto-compensation launched from the KV watcher — link back to the
@@ -72,6 +75,31 @@ type Orchestration struct {
 	OriginTraceContext map[string]string `json:"originTraceContext,omitempty"`
 	// CompensatedOrchestrationID is the ID of the failed orchestration this orchestration was started to compensate.
 	CompensatedOrchestrationID string `json:"compensatedOrchestrationId,omitempty"`
+}
+
+// EngineState is the orchestration engine's internal bookkeeping for an orchestration.
+type EngineState struct {
+	// TraceContext is the W3C traceparent that a rescheduled activity continues its trace from.
+	TraceContext string `json:"traceContext,omitempty"`
+	// Attempts counts the executions of each activity, keyed by activity ID.
+	Attempts map[string]int `json:"attempts,omitempty"`
+	// Error is the error that put the orchestration into the errored state.
+	Error string `json:"error,omitempty"`
+}
+
+// Merge copies the bookkeeping in from onto s. Attempts are merged per activity so that counts recorded for other
+// activities in s are kept. TraceContext is last-writer-wins.
+func (s *EngineState) Merge(from EngineState) {
+	s.TraceContext = from.TraceContext
+	if from.Error != "" {
+		s.Error = from.Error
+	}
+	if len(from.Attempts) > 0 && s.Attempts == nil {
+		s.Attempts = make(map[string]int, len(from.Attempts))
+	}
+	for id, attempt := range from.Attempts {
+		s.Attempts[id] = attempt
+	}
 }
 
 func (o *Orchestration) SetState(state OrchestrationState) {

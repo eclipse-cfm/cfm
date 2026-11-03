@@ -1017,6 +1017,33 @@ func TestValidateActivitySchema_IncompatibleOptionalFieldTypes(t *testing.T) {
 	assert.Contains(t, err.Error(), "type of input field field-a differs from dependent activities output")
 }
 
+func TestValidateActivitySchema_NonObjectFieldSchema(t *testing.T) {
+	activities := []api.Activity{
+		{ID: "activity-a", Type: "type-a", DependsOn: []string{}},
+		{ID: "activity-b", Type: "type-b", DependsOn: []string{"activity-a"}},
+	}
+	activityDefinitions := map[api.ActivityType]*api.ActivityDefinition{
+		"type-a": {
+			OutputSchema: map[string]any{
+				"properties": map[string]any{
+					"field-a": "string",
+				},
+			},
+		},
+		"type-b": {
+			InputSchema: map[string]any{
+				"properties": map[string]any{
+					"field-a": 1,
+				},
+			},
+		},
+	}
+	require.NotPanics(t, func() {
+		err := validateActivitySchema(activities, activityDefinitions)
+		require.NoError(t, err, "field schemas that are not objects carry no type to compare")
+	})
+}
+
 func TestValidateActivitySchema_OptionalFieldMissing(t *testing.T) {
 	activities := []api.Activity{
 		{ID: "activity-a", Type: "type-a", DependsOn: []string{}},

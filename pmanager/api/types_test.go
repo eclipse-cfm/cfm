@@ -680,3 +680,29 @@ func TestMappingEntry_UnmarshalJSON(t *testing.T) {
 		})
 	}
 }
+
+func TestEngineState_Merge(t *testing.T) {
+	state := EngineState{
+		TraceContext: "old",
+		Attempts:     map[string]int{"A1": 2, "A2": 1},
+	}
+
+	state.Merge(EngineState{Attempts: map[string]int{"A2": 3}, Error: "failed"})
+
+	assert.Equal(t, "", state.TraceContext)
+	assert.DeepEqual(t, map[string]int{"A1": 2, "A2": 3}, state.Attempts)
+	assert.Equal(t, "failed", state.Error)
+
+	state.Merge(EngineState{TraceContext: "new"})
+
+	assert.Equal(t, "new", state.TraceContext)
+	assert.Equal(t, "failed", state.Error, "an empty error must not clear a recorded one")
+}
+
+func TestEngineState_MergeIntoEmpty(t *testing.T) {
+	var state EngineState
+
+	state.Merge(EngineState{Attempts: map[string]int{"A1": 1}})
+
+	assert.DeepEqual(t, map[string]int{"A1": 1}, state.Attempts)
+}
