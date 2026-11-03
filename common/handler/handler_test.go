@@ -393,3 +393,18 @@ func TestRequireScope(t *testing.T) {
 		assert.False(t, rule.check(claims))
 	})
 }
+
+func TestWriteLinkHeaders(t *testing.T) {
+	w := newMockResponseWriter()
+	handler := HttpHandler{Monitor: system.NoopMonitor{}}
+
+	handler.WriteLinkHeaders(w, "/items", 10, 10, 35)
+
+	expected := `</items?offset=10&limit=10>; rel="self", ` +
+		`</items?offset=20&limit=10>; rel="next", ` +
+		`</items?offset=0&limit=10>; rel="prev", ` +
+		`</items?offset=0&limit=10>; rel="first", ` +
+		`</items?offset=30&limit=10>; rel="last"`
+	assert.Equal(t, expected, w.Header().Get("Link"))
+	assert.Equal(t, "35", w.Header().Get("X-Total-Count"))
+}

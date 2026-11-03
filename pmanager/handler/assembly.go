@@ -22,7 +22,6 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 )
 
 const (
@@ -53,7 +52,6 @@ func (h *HandlerServiceAssembly) Requires() []system.ServiceType {
 
 func (h *HandlerServiceAssembly) Init(context *system.InitContext) error {
 	router := context.Registry.Resolve(routing.RouterKey).(chi.Router)
-	router.Use(middleware.Recoverer)
 
 	provisionManager := context.Registry.Resolve(api.ProvisionManagerKey).(api.ProvisionManager)
 	definitionManager := context.Registry.Resolve(api.DefinitionManagerKey).(api.DefinitionManager)
@@ -94,17 +92,6 @@ func (h *HandlerServiceAssembly) registerOrchestrationRoutes(router chi.Router, 
 		})
 
 		r.Route("/{orchestrationID}", func(r chi.Router) {
-			r.Post("/", func(w http.ResponseWriter, req *http.Request) {
-				if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopePmWrite)) {
-					return
-				}
-				id, found := handler.ExtractPathVariable(w, req, "orchestrationID")
-				if !found {
-					return
-				}
-				//todo: shouldn't this delete the orchestration?
-				handler.deleteOrchestrationDefinition(w, req, id)
-			})
 			r.Get("/", func(w http.ResponseWriter, req *http.Request) {
 				if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopePmRead)) {
 					return
