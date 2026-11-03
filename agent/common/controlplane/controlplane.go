@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	vault "github.com/eclipse-cfm/cfm/agent/common/vault"
 	"github.com/eclipse-cfm/cfm/common/httpx"
@@ -128,7 +129,7 @@ func (h HttpManagementAPIClient) DeleteParticipantContext(ctx context.Context, p
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
 
-	url := fmt.Sprintf("%s%s/%s", h.BaseURL, CreateParticipantURL, participantContextID)
+	url := fmt.Sprintf("%s%s/%s", h.BaseURL, CreateParticipantURL, url.PathEscape(participantContextID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return err
@@ -211,7 +212,7 @@ func (h HttpManagementAPIClient) PatchConfig(ctx context.Context, participantCon
 		return err
 	}
 
-	url := fmt.Sprintf("%s%s/%s/config", h.BaseURL, CreateParticipantURL, participantContextID)
+	url := fmt.Sprintf("%s%s/%s/config", h.BaseURL, CreateParticipantURL, url.PathEscape(participantContextID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, bytes.NewBuffer(payload))
 	if err != nil {
 		return err
@@ -245,7 +246,7 @@ func (h HttpManagementAPIClient) RegisterDataPlane(ctx context.Context, particip
 		return err
 	}
 
-	url := fmt.Sprintf("%s%s/%s/dataplanes", h.BaseURL, CreateParticipantURL, participantContextID)
+	url := fmt.Sprintf("%s%s/%s/dataplanes", h.BaseURL, CreateParticipantURL, url.PathEscape(participantContextID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewBuffer(payload))
 	if err != nil {
 		return err
@@ -274,7 +275,7 @@ func (h HttpManagementAPIClient) UnregisterDataPlane(ctx context.Context, partic
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
 
-	url := fmt.Sprintf("%s%s/%s/dataplanes/%s", h.BaseURL, CreateParticipantURL, participantContextID, dataPlaneID)
+	url := fmt.Sprintf("%s%s/%s/dataplanes/%s", h.BaseURL, CreateParticipantURL, url.PathEscape(participantContextID), url.PathEscape(dataPlaneID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return err
@@ -318,7 +319,7 @@ func (h HttpManagementAPIClient) AssociateProfiles(ctx context.Context, particip
 		return err
 	}
 
-	url := fmt.Sprintf("%s%s/%s/profiles", h.BaseURL, CreateParticipantURL, participantContextID)
+	url := fmt.Sprintf("%s%s/%s/profiles", h.BaseURL, CreateParticipantURL, url.PathEscape(participantContextID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewBuffer(payload))
 	if err != nil {
 		return err

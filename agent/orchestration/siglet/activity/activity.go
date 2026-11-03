@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
@@ -104,7 +105,7 @@ func NewProcessor(config *Config) *SigletActivityProcessor {
 }
 
 type sigletData struct {
-	ParticipantContextId string `json:"participantContextId" validate:"required"`
+	ParticipantContextId string `json:"participantContextId" validate:"required,participantcontextid"`
 }
 
 func (p SigletActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
@@ -393,7 +394,7 @@ func (p SigletActivityProcessor) dataPlaneRegistration(participantContextId stri
 // dataPlaneEndpoint builds the participant-scoped Siglet DPS signaling endpoint the control plane
 // sends flow events to, e.g. http://siglet...:8081/api/v1/<participantContextId>/dataflows.
 func (p SigletActivityProcessor) dataPlaneEndpoint(participantContextId string) string {
-	return strings.TrimRight(p.sigletSignalingURL, "/") + fmt.Sprintf(dataflowsPathTemplate, participantContextId)
+	return strings.TrimRight(p.sigletSignalingURL, "/") + fmt.Sprintf(dataflowsPathTemplate, url.PathEscape(participantContextId))
 }
 
 func dataPlaneID(participantContextId string) string {

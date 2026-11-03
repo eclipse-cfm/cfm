@@ -229,3 +229,26 @@ func TestProcessDispose_DeletesConfiguredClientMappings(t *testing.T) {
 		fmt.Sprintf("/api/v1/mappings/system:serviceaccount:test-ns:custom-cp/%v", participantContextID),
 	}, deleted)
 }
+
+func TestProcessDispose_RejectsInvalidParticipantContextID(t *testing.T) {
+	for _, value := range []any{"../other?force=true#", "", 42} {
+		t.Run(fmt.Sprintf("%v", value), func(t *testing.T) {
+			var deleted []string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				deleted = append(deleted, r.URL.Path)
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			processor := newProcessorForTest(t, &fakeTokenProvider{token: stubToken()}, server.URL)
+
+			ctx := newDeployContext()
+			ctx.SetValue(participantContextIDKey, value)
+
+			result := processor.ProcessDispose(ctx)
+
+			require.EqualValues(t, api.ActivityResultFatalError, result.Result)
+			assert.Empty(t, deleted)
+		})
+	}
+}

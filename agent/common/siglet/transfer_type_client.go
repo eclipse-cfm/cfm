@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/eclipse-cfm/cfm/common/httpx"
 	"github.com/eclipse-cfm/cfm/common/token"
@@ -130,7 +131,7 @@ func (s httpManagementApiClient) GetTransferTypeMapping(ctx context.Context, par
 		return nil, fmt.Errorf("failed to get API access token: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/transfer-type-mappings/%s", s.BaseURL, participantContextID)
+	url := fmt.Sprintf("%s/transfer-type-mappings/%s", s.BaseURL, url.PathEscape(participantContextID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Siglet transfer type mapping request: %w", err)
@@ -174,7 +175,7 @@ func (s httpManagementApiClient) ReplaceTransferTypeMapping(ctx context.Context,
 		return fmt.Errorf("failed to marshal transfer type mapping: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/transfer-type-mappings/%s", s.BaseURL, mapping.ParticipantContextID)
+	url := fmt.Sprintf("%s/transfer-type-mappings/%s", s.BaseURL, url.PathEscape(mapping.ParticipantContextID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewBuffer(payload))
 	if err != nil {
 		return err
@@ -200,7 +201,7 @@ func (s httpManagementApiClient) DeleteTransferTypeMapping(ctx context.Context, 
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/transfer-type-mappings/%s", s.BaseURL, participantContextID)
+	url := fmt.Sprintf("%s/transfer-type-mappings/%s", s.BaseURL, url.PathEscape(participantContextID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create Siglet transfer type mapping request: %w", err)

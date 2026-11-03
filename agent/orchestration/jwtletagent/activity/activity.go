@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
 	"github.com/eclipse-cfm/cfm/agent/common/issuerservice"
 	"github.com/eclipse-cfm/cfm/agent/common/siglet"
+	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/common/token"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
@@ -260,21 +262,32 @@ func (p TokenExchangeActivityProcessor) ProcessDispose(ctx api.ActivityContext) 
 	spanCtx, span := p.tracer.Start(ctx.Context(), "cfm.agent.jwtlet.dispose", trace.WithSpanKind(trace.SpanKindClient))
 	defer span.End()
 
-	participantContextID, ok := ctx.Value(participantContextIDKey)
+	value, ok := ctx.Value(participantContextIDKey)
 	if !ok {
 		err := fmt.Errorf("error processing token exchange dispose for orchestration %s: participant context ID not found in context", ctx.OID())
 		span.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}
 	}
-	span.SetAttributes(attribute.String("cfm.participantContextId", fmt.Sprintf("%v", participantContextID)))
+	participantContextID, ok := value.(string)
+	if !ok {
+		err := fmt.Errorf("error processing token exchange dispose for orchestration %s: participant context ID is not a string", ctx.OID())
+		span.RecordError(err)
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}
+	}
+	if err := model.ValidateParticipantContextID(participantContextID); err != nil {
+		err = fmt.Errorf("error processing token exchange dispose for orchestration %s: %w", ctx.OID(), err)
+		span.RecordError(err)
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}
+	}
+	span.SetAttributes(attribute.String("cfm.participantContextId", participantContextID))
 
-	if err := p.delete(spanCtx, fmt.Sprintf("/api/v1/mappings/%s/%s", p.clientIdentifier, participantContextID)); err != nil {
+	if err := p.delete(spanCtx, mappingPath(p.clientIdentifier, participantContextID)); err != nil {
 		span.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error deleting resource mapping: %w", err)}
 	}
 
 	for _, mapping := range p.resolvedMappings {
-		if err := p.delete(spanCtx, fmt.Sprintf("/api/v1/mappings/%s/%s", mapping.clientIdentifier, participantContextID)); err != nil {
+		if err := p.delete(spanCtx, mappingPath(mapping.clientIdentifier, participantContextID)); err != nil {
 			span.RecordError(err)
 			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error deleting resource mapping for %s: %w", mapping.clientIdentifier, err)}
 		}
@@ -339,6 +352,11 @@ func (p TokenExchangeActivityProcessor) delete(ctx context.Context, url string) 
 	}
 
 	return nil
+}
+
+// mappingPath returns the jwtlet management API path of the resource mapping for a client and participant context.
+func mappingPath(clientIdentifier string, participantContextID string) string {
+	return "/api/v1/mappings/" + url.PathEscape(clientIdentifier) + "/" + url.PathEscape(participantContextID)
 }
 
 func generateClientID() string {

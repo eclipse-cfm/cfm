@@ -379,3 +379,22 @@ func TestHttpApiClient_QueryCredentialsByType_InvalidJson(t *testing.T) {
 	require.ErrorContains(t, err, "error parsing credentials response")
 	require.Nil(t, result)
 }
+
+func TestHttpApiClient_RevokeCredential_EscapesPathSegments(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/v1/participants/..%2Fother%3Fforce=true%23/credentials/a%2Fb/revoke", r.RequestURI)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
+	client := HttpApiClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		IssuerID:      "test-issuer",
+		HttpClient:    &http.Client{},
+	}
+
+	require.NoError(t, client.RevokeCredential(t.Context(), "../other?force=true#", "a/b"))
+}

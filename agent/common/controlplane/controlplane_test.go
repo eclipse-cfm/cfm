@@ -614,3 +614,21 @@ func TestHttpManagementAPIClient_TransportError(t *testing.T) {
 		})
 	}
 }
+
+func TestHttpManagementAPIClient_DeleteParticipantContext_EscapesParticipantContextID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, CreateParticipantURL+"/..%2Fother%3Fforce=true%23", r.RequestURI)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
+	client := HttpManagementAPIClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	require.NoError(t, client.DeleteParticipantContext(t.Context(), "../other?force=true#"))
+}

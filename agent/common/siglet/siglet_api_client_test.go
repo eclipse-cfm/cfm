@@ -265,3 +265,14 @@ func TestHttpApiClient_TransportError(t *testing.T) {
 		})
 	}
 }
+
+func TestHttpApiClient_DeleteKeyMapping_EscapesParticipantContextID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/key-mappings/..%2Fother%3Fforce=true%23", r.RequestURI)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client := NewSigletAPIClient(&http.Client{}, newTokenProvider(t), server.URL)
+	require.NoError(t, client.DeleteKeyMapping(t.Context(), "../other?force=true#"))
+}

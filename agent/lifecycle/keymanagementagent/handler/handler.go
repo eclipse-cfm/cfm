@@ -17,10 +17,12 @@ package handler
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
 	"github.com/eclipse-cfm/cfm/agent/common/siglet"
 	"github.com/eclipse-cfm/cfm/common/lifecycleagent"
+	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/system"
 )
 
@@ -68,10 +70,16 @@ func (p *Processor) Process(ctx context.Context, evt lifecycleagent.EventContext
 	switch evt.Subject {
 	case "events.keypair.rotated":
 	case "events.keypair.revoked":
+		if err := validateParticipantContextID(evt.Subject, keyEventData); err != nil {
+			return err
+		}
 		if err := p.handleKeyDecommissioned(ctx, keyEventData); err != nil {
 			return err
 		}
 	case "events.keypair.activated":
+		if err := validateParticipantContextID(evt.Subject, keyEventData); err != nil {
+			return err
+		}
 		if err := p.handleKeyActivated(ctx, keyEventData); err != nil {
 			return err
 		}
@@ -80,6 +88,15 @@ func (p *Processor) Process(ctx context.Context, evt lifecycleagent.EventContext
 		return nil
 	}
 
+	return nil
+}
+
+// validateParticipantContextID rejects events whose participant context ID is not a plain identifier, since the ID ends
+// up in admin API paths. The returned error is not recoverable, so the message is dropped instead of being redelivered.
+func validateParticipantContextID(subject string, data KeyPairEventData) error {
+	if err := model.ValidateParticipantContextID(data.ParticipantContextID); err != nil {
+		return fmt.Errorf("rejecting key management event %s: %w", subject, err)
+	}
 	return nil
 }
 

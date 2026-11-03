@@ -239,3 +239,21 @@ func TestHttpIdentityAPIClient_TransportError(t *testing.T) {
 		})
 	}
 }
+
+func TestHttpIdentityAPIClient_DeleteParticipantContext_EscapesParticipantContextID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/v1/participants/..%2Fother%3Fforce=true%23", r.RequestURI)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
+	client := HttpIdentityAPIClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	require.NoError(t, client.DeleteParticipantContext(t.Context(), "../other?force=true#"))
+}
