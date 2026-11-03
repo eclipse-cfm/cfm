@@ -17,6 +17,7 @@ import (
 	"fmt"
 
 	"github.com/XSAM/otelsql"
+	"github.com/eclipse-cfm/cfm/common/health"
 	"github.com/eclipse-cfm/cfm/common/sqlstore"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
@@ -78,6 +79,14 @@ func (a *PostgresServiceAssembly) Init(ictx *system.InitContext) error {
 	txContext := sqlstore.NewDBTransactionContext(db)
 	ictx.Registry.Register(store.TransactionContextKey, txContext)
 
+	return nil
+}
+
+// Prepare contributes a readiness check that pings the database.
+func (a *PostgresServiceAssembly) Prepare(ictx *system.InitContext) error {
+	health.RegisterOptional(ictx.Registry, func(r *health.Registry) {
+		r.AddReadiness("postgres", health.DatabaseCheck(a.db))
+	})
 	return nil
 }
 

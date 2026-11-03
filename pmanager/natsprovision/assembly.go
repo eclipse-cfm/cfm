@@ -16,9 +16,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/eclipse-cfm/cfm/common/health"
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
+	"github.com/nats-io/nats.go/jetstream"
 )
 
 type natsProvisionServiceAssembly struct {
@@ -57,23 +59,34 @@ func (a *natsProvisionServiceAssembly) Init(ctx *system.InitContext) error {
 	return nil
 }
 
-func (a *natsProvisionServiceAssembly) Start(_ *system.StartContext) error {
+func (a *natsProvisionServiceAssembly) Start(startCtx *system.StartContext) error {
 	var ctx context.Context
-	natsContext := context.Background()
-	defer natsContext.Done()
 
-	stream, err := natsclient.SetupStream(natsContext, a.natsClient, a.streamName)
+	consumer, err := a.setupConsumer(context.Background())
 	if err != nil {
-		return fmt.Errorf("error initializing NATS stream: %w", err)
+		return err
 	}
+	a.provisionHandler.Loop.Recreate = a.setupConsumer
 
-	consumer, err := natsclient.SetupConsumer(natsContext, stream, natsclient.CFMOrchestration)
-	if err != nil {
-		return fmt.Errorf("error initializing NATS orchestration manifest consumer: %w", err)
-	}
+	health.RegisterOptional(startCtx.Registry, func(r *health.Registry) {
+		r.AddConsumerLoop("consumer:"+natsclient.CFMOrchestration, &a.provisionHandler.Loop)
+	})
 
 	ctx, a.processCancel = context.WithCancel(context.Background())
 	return a.provisionHandler.Init(ctx, consumer)
+}
+
+func (a *natsProvisionServiceAssembly) setupConsumer(ctx context.Context) (jetstream.Consumer, error) {
+	stream, err := natsclient.SetupStream(ctx, a.natsClient, a.streamName)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing NATS stream: %w", err)
+	}
+
+	consumer, err := natsclient.SetupConsumer(ctx, stream, natsclient.CFMOrchestration)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing NATS orchestration manifest consumer: %w", err)
+	}
+	return consumer, nil
 }
 
 func (a *natsProvisionServiceAssembly) Shutdown() error {

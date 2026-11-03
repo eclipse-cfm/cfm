@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/common/health"
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
@@ -74,6 +75,11 @@ func (a *agentServiceAssembly) Start(startCtx *system.StartContext) error {
 		ActivityProcessor: a.newProcessor(actx),
 		Monitor:           startCtx.LogMonitor,
 	}
+
+	health.RegisterOptional(startCtx.Registry, func(r *health.Registry) {
+		r.AddReadiness("nats", health.NatsConnectionCheck(a.natsClient.Connection))
+		r.AddConsumerLoop("consumer:"+a.activityType, &executor.Loop)
+	})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	a.cancel = cancel

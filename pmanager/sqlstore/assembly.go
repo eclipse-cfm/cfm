@@ -17,6 +17,7 @@ import (
 	"fmt"
 
 	"github.com/XSAM/otelsql"
+	"github.com/eclipse-cfm/cfm/common/health"
 	"github.com/eclipse-cfm/cfm/common/sqlstore"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
@@ -72,6 +73,14 @@ func (a *PostgresServiceAssembly) Init(context *system.InitContext) error {
 		// database is reachable, rather than running permanently broken.
 		return fmt.Errorf("failed to create tables: %w", err)
 	}
+	return nil
+}
+
+// Prepare contributes a readiness check that pings the database.
+func (a *PostgresServiceAssembly) Prepare(ictx *system.InitContext) error {
+	health.RegisterOptional(ictx.Registry, func(r *health.Registry) {
+		r.AddReadiness("postgres", health.DatabaseCheck(a.db))
+	})
 	return nil
 }
 

@@ -69,6 +69,9 @@ func (h *HandlerServiceAssembly) Init(context *system.InitContext) error {
 
 	handler := NewHandler(tenantService, participantService, cellService, dataspaceService, txContext, context.LogMonitor)
 
+	// Health is unauthenticated so it can be used by infrastructure probes without a token.
+	router.Get("/health", handler.health)
+
 	router.Route("/api/v1alpha1", func(r chi.Router) {
 		r.Use(validator.Middleware())
 		h.registerV1Alpha1(r, handler)

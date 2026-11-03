@@ -16,6 +16,7 @@ import (
 	"fmt"
 
 	cfmauth "github.com/eclipse-cfm/cfm/assembly/auth"
+	"github.com/eclipse-cfm/cfm/assembly/health"
 	"github.com/eclipse-cfm/cfm/assembly/routing"
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/runtime"
@@ -74,6 +75,7 @@ func Launch(shutdown <-chan struct{}) {
 	assembler := system.NewServiceAssembler(logMonitor, vConfig, mode)
 
 	assembler.Register(&routing.RouterServiceAssembly{})
+	assembler.Register(&health.HealthServiceAssembly{})
 	assembler.Register(&cfmauth.AuthServiceAssembly{})
 	assembler.Register(&handler.HandlerServiceAssembly{})
 

@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/eclipse-cfm/cfm/assembly/health"
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/runtime"
 	"github.com/eclipse-cfm/cfm/common/system"
@@ -127,6 +128,9 @@ func LaunchAgent[T any](shutdown <-chan struct{}, config LauncherConfig[T]) {
 	}
 
 	assembler.Register(agentAssembly)
+	for _, assembly := range health.AgentAssemblies(cfg.VConfig) {
+		assembler.Register(assembly)
+	}
 
 	if err := runtime.SetupTelemetry(config.ServiceName, shutdown); err != nil {
 		monitor.Warnf("Error setting up telemetry: %s. Traces and metrics will not be available.", err.Error())
