@@ -146,6 +146,7 @@ func ToOrchestration(orchestration *api.Orchestration) Orchestration {
 		Steps:             toSteps(orchestration.Steps),
 		OutputData:        orchestration.OutputData,
 		Completed:         orchestration.Completed,
+		Error:             orchestration.EngineState.Error,
 	}
 }
 

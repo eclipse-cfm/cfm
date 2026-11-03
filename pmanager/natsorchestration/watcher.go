@@ -134,7 +134,7 @@ func (w *OrchestrationIndexWatcher) startCompensationOrchestration(ctx context.C
 	ctx, span := otel.GetTracerProvider().Tracer("cfm.pmanager.orchestrator").Start(ctx, "nats.auto_compensation", trace.WithLinks(links...))
 	defer span.End()
 
-	w.monitor.Infof("Orchestration [%s] is in state [%s] with error: [%s]. Starting auto-compensation", orchestration.ID, orchestration.State.String(), orchestration.ProcessingData["error"])
+	w.monitor.Infof("Orchestration [%s] is in state [%s] with error: [%s]. Starting auto-compensation", orchestration.ID, orchestration.State.String(), orchestration.EngineState.Error)
 
 	correlationID := orchestration.CorrelationID //eg. participant profile id, etc.
 	pData := orchestration.ProcessingData        // stuff for the VPAs

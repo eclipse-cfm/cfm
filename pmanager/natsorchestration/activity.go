@@ -128,12 +128,11 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 	}
 
 	// attempt to restore trace ID from stored orchestration
-	if orchestration.ProcessingData["trace_context"] != nil {
-		traceParent := orchestration.ProcessingData["trace_context"].(string)
+	if traceParent := orchestration.EngineState.TraceContext; traceParent != "" {
 		e.Monitor.Infof("Telemetry: continue trace from Orchestration's traceparent: %s", traceParent)
 		carrier := propagation.MapCarrier{"traceparent": traceParent}
 		ctx = otel.GetTextMapPropagator().Extract(ctx, carrier)
-		delete(orchestration.ProcessingData, "trace_context") // Clean up trace context from processing data after restoring it
+		orchestration.EngineState.TraceContext = "" // Clean up trace context after restoring it
 	} else {
 		e.Monitor.Debugf("Telemetry: continue trace from NATS message")
 		// Extract trace context from message headers
@@ -142,14 +141,11 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 	}
 
 	// Track attempt number for this activity — persisted across reschedules so all executions can be correlated
-	attemptKey := "activity." + oMessage.Activity.ID + ".attempt"
-	attempt := 1
-	if raw, ok := orchestration.ProcessingData[attemptKey]; ok {
-		if v, ok := raw.(float64); ok { // JSON unmarshal stores numbers as float64
-			attempt = int(v) + 1
-		}
+	if orchestration.EngineState.Attempts == nil {
+		orchestration.EngineState.Attempts = make(map[string]int)
 	}
-	orchestration.ProcessingData[attemptKey] = attempt
+	attempt := orchestration.EngineState.Attempts[oMessage.Activity.ID] + 1
+	orchestration.EngineState.Attempts[oMessage.Activity.ID] = attempt
 
 	// Start span with extracted context
 	ctx, span := otel.GetTracerProvider().Tracer("cfm.pmanager.orchestrator").Start(ctx, "activity.process_message")
@@ -207,12 +203,10 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 		// IMPORTANT: Must persist state BEFORE rescheduling
 		// This ensures processing data is saved for the next invocation
 
-		// Inject trace context into processing data so that subsequent executions are under the same trace-id
+		// Inject trace context into the engine state so that subsequent executions are under the same trace-id
 		m := propagation.MapCarrier{}
 		otel.GetTextMapPropagator().Inject(ctx, m)
-		if m["traceparent"] != "" {
-			orchestration.ProcessingData["trace_context"] = m["traceparent"]
-		}
+		orchestration.EngineState.TraceContext = m["traceparent"]
 
 		e.persistState(activityContext, orchestration, revision)
 		if err := message.NakWithDelay(result.WaitOnReschedule); err != nil {
@@ -225,6 +219,7 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 }
 
 func (e *NatsActivityExecutor) persistState(activityContext api.ActivityContext, orchestration api.Orchestration, revision uint64) {
+	engineState := orchestration.EngineState
 	if _, _, err := UpdateOrchestration(activityContext.Context(), orchestration, revision, e.Client, func(o *api.Orchestration) {
 		for key, value := range activityContext.Values() {
 			o.ProcessingData[key] = value
@@ -232,6 +227,7 @@ func (e *NatsActivityExecutor) persistState(activityContext api.ActivityContext,
 		for key, value := range activityContext.OutputValues() {
 			o.OutputData[key] = value
 		}
+		o.EngineState.Merge(engineState)
 	}); err != nil {
 		e.Monitor.Warnf("Failed to persist orchestration state for %s: %v", orchestration.ID, err)
 	}
@@ -245,6 +241,7 @@ func (e *NatsActivityExecutor) processOnActivityCompletion(
 	oMessage api.ActivityMessage) error {
 
 	// The orchestration state must be saved and re-read to determine if activities completed after the last read and the orchestration is complete.
+	engineState := orchestration.EngineState
 	orchestration, revision, err := UpdateOrchestration(activityContext.Context(), orchestration, revision, e.Client, func(o *api.Orchestration) {
 		for key, value := range activityContext.Values() {
 			o.ProcessingData[key] = value
@@ -253,6 +250,7 @@ func (e *NatsActivityExecutor) processOnActivityCompletion(
 		for key, value := range activityContext.OutputValues() {
 			o.OutputData[key] = value
 		}
+		o.EngineState.Merge(engineState)
 		o.Completed[oMessage.Activity.ID] = struct{}{} // Mark current activity as completed
 	})
 	if err != nil {
@@ -366,18 +364,23 @@ func (e *NatsActivityExecutor) handleFatalError(
 	resultErr error,
 	message jetstream.Msg) error {
 	// Update the orchestration before acking back. If the update fails, just log it to ensure the ack is sent to avoid message re-delivery
+	engineState := orchestration.EngineState
 	if _, _, err := UpdateOrchestration(activityContext.Context(), orchestration, revision, e.Client, func(o *api.Orchestration) {
-		for key, value := range activityContext.Values() {
-			orchestration.ProcessingData[key] = value
-		}
-		for key, value := range activityContext.OutputValues() {
-			orchestration.OutputData[key] = value
-		}
-		o.SetState(api.OrchestrationStateErrored)
 		if o.ProcessingData == nil {
 			o.ProcessingData = make(map[string]any)
 		}
-		o.ProcessingData["error"] = resultErr.Error()
+		for key, value := range activityContext.Values() {
+			o.ProcessingData[key] = value
+		}
+		if o.OutputData == nil {
+			o.OutputData = make(map[string]any)
+		}
+		for key, value := range activityContext.OutputValues() {
+			o.OutputData[key] = value
+		}
+		o.SetState(api.OrchestrationStateErrored)
+		o.EngineState.Merge(engineState)
+		o.EngineState.Error = resultErr.Error()
 		orchestration = *o
 	}); err != nil {
 		e.Monitor.Warnf("Failed to mark orchestration %s as fatal: %v", orchestration.ID, err)

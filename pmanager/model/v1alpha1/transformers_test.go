@@ -236,6 +236,7 @@ func TestToOrchestration(t *testing.T) {
 		ProcessingData:    map[string]any{"key1": "value1"},
 		OutputData:        map[string]any{"key2": "value2"},
 		Completed:         map[string]struct{}{"activity1": {}},
+		EngineState:       api.EngineState{TraceContext: "trace", Attempts: map[string]int{"activity-1": 2}, Error: "failed"},
 		Steps: []api.OrchestrationStep{
 			{
 				Activities: []api.Activity{
@@ -260,6 +261,7 @@ func TestToOrchestration(t *testing.T) {
 	assert.Equal(t, model.OrchestrationType("test-type"), result.OrchestrationType)
 	assert.Equal(t, map[string]any{"key1": "value1"}, result.ProcessingData)
 	assert.Equal(t, map[string]any{"key2": "value2"}, result.OutputData)
+	assert.Equal(t, "failed", result.Error)
 	assert.Equal(t, 1, len(result.Steps))
 	assert.Equal(t, 1, len(result.Steps[0].Activities))
 	assert.Equal(t, "activity-1", result.Steps[0].Activities[0].ID)

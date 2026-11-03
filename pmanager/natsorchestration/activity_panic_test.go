@@ -53,11 +53,19 @@ type panicTestEntry struct {
 func (e panicTestEntry) Value() []byte    { return e.value }
 func (e panicTestEntry) Revision() uint64 { return 1 }
 
+// panicTestProcessor is an api.ActivityProcessor that panics on every call.
+type panicTestProcessor struct{}
+
+func (panicTestProcessor) Process(api.ActivityContext) api.ActivityResult       { panic("boom") }
+func (panicTestProcessor) ProcessDeploy(api.ActivityContext) api.ActivityResult { panic("boom") }
+func (panicTestProcessor) ProcessDispose(api.ActivityContext) api.ActivityResult {
+	panic("boom")
+}
+
 func TestProcessMessage_PanicTerminatesMessage(t *testing.T) {
-	// a non-string trace_context makes the executor panic on an unchecked type assertion
 	orchestration := api.Orchestration{
 		ID:             "test-panic",
-		ProcessingData: map[string]any{"trace_context": 1},
+		ProcessingData: map[string]any{},
 		Steps: []api.OrchestrationStep{
 			{Activities: []api.Activity{{ID: "A1", Type: panicTestActivityType}}},
 		},
@@ -69,9 +77,10 @@ func TestProcessMessage_PanicTerminatesMessage(t *testing.T) {
 	mockClient.EXPECT().Get(mock.Anything, "test-panic").Return(panicTestEntry{value: orchestrationBytes}, nil)
 
 	executor := &NatsActivityExecutor{
-		Client:       mockClient,
-		ActivityType: panicTestActivityType,
-		Monitor:      system.NoopMonitor{},
+		Client:            mockClient,
+		ActivityType:      panicTestActivityType,
+		ActivityProcessor: panicTestProcessor{},
+		Monitor:           system.NoopMonitor{},
 	}
 
 	messageBytes, err := json.Marshal(api.ActivityMessage{

@@ -254,8 +254,10 @@ func validateActivitySchema(activities []api.Activity, activityDefinitions map[a
 			if !exists {
 				continue
 			}
-			inputFieldType, _ := inputProperties[field].(map[string]any)["type"].(string)
-			dependantFieldType, _ := dependantField.(map[string]any)["type"].(string)
+			inputField, _ := inputProperties[field].(map[string]any)
+			inputFieldType, _ := inputField["type"].(string)
+			dependantFieldMap, _ := dependantField.(map[string]any)
+			dependantFieldType, _ := dependantFieldMap["type"].(string)
 
 			if inputFieldType != "" && dependantFieldType != "" && inputFieldType != dependantFieldType {
 				validationErrors = append(validationErrors, types.NewValidationError(activity.ID, fmt.Sprintf("type of input field %s differs from dependent activities output", field)))

@@ -323,6 +323,9 @@
             "type": "string",
             "format": "date-time"
           },
+          "error": {
+            "type": "string"
+          },
           "id": {
             "type": "string"
           },
