@@ -14,6 +14,7 @@ package model
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -189,4 +190,44 @@ func TestOrchestrationResponse_CompensatedManifestIDRoundTrip(t *testing.T) {
 	var response OrchestrationResponse
 	require.NoError(t, json.Unmarshal(data, &response))
 	assert.Equal(t, "m1", response.CompensatedManifestID)
+}
+
+func TestValidateParticipantContextID(t *testing.T) {
+	tests := []struct {
+		name  string
+		id    string
+		valid bool
+	}{
+		{"generated hex id", "0123456789abcdef0123456789abcdef", true},
+		{"hyphenated id", "test-participant", true},
+		{"underscore id", "pc_1", true},
+		{"max length", strings.Repeat("a", 128), true},
+		{"empty", "", false},
+		{"too long", strings.Repeat("a", 129), false},
+		{"path traversal", "../../other-participant", false},
+		{"slash", "a/b", false},
+		{"dot", "a.b", false},
+		{"query and fragment", "x?force=true#", false},
+		{"percent encoded", "x%2F..", false},
+		{"whitespace", "a b", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateParticipantContextID(tt.id)
+			if tt.valid {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
+
+func TestValidator_ParticipantContextIDTag(t *testing.T) {
+	type data struct {
+		ParticipantContextID string `validate:"required,participantcontextid"`
+	}
+	require.NoError(t, Validator.Struct(data{ParticipantContextID: "test-participant"}))
+	require.Error(t, Validator.Struct(data{ParticipantContextID: "../other"}))
+	require.Error(t, Validator.Struct(data{}))
 }

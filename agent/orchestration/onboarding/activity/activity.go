@@ -36,7 +36,7 @@ type OnboardingActivityProcessor struct {
 
 type credentialRequestData struct {
 	//CredentialRequest    identityhub.CredentialRequest `json:"credentialRequest"`
-	ParticipantContextID string `json:"participantContextId" validate:"required"`
+	ParticipantContextID string `json:"participantContextId" validate:"required,participantcontextid"`
 	HolderPID            string `json:"holderPid"`
 	CredentialRequestURL string `json:"credentialRequest"`
 }

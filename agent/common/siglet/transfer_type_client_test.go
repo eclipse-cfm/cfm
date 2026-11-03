@@ -230,3 +230,14 @@ func TestHttpApiClient_DeleteTransferTypeMapping_ApiReturnsError(t *testing.T) {
 	err := client.DeleteTransferTypeMapping(t.Context(), "participant-1")
 	require.ErrorContains(t, err, "received status code 400")
 }
+
+func TestHttpApiClient_DeleteTransferTypeMapping_EscapesParticipantContextID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/transfer-type-mappings/..%2Fother%3Fforce=true%23", r.RequestURI)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client := NewTransferTypeMappingClient(&http.Client{}, newTokenProvider(t), server.URL)
+	require.NoError(t, client.DeleteTransferTypeMapping(t.Context(), "../other?force=true#"))
+}

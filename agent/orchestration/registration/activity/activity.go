@@ -32,7 +32,7 @@ type RegistrationActivityProcessor struct {
 type registrationData struct {
 	DID                  string `json:"cfm.participant.id" validate:"required"`
 	HolderName           string `json:"cfm.participant.holdername"`
-	ParticipantContextId string `json:"participantContextId" validate:"required"`
+	ParticipantContextId string `json:"participantContextId" validate:"required,participantcontextid"`
 }
 
 func NewProcessor(config *Config) *RegistrationActivityProcessor {

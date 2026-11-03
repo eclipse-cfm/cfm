@@ -13,6 +13,7 @@
 package model
 
 import (
+	"fmt"
 	"regexp"
 
 	"github.com/go-playground/validator/v10"
@@ -34,6 +35,20 @@ const (
 )
 
 var Validator = initValidator()
+
+// participantContextIDPattern restricts participant context IDs to characters that are safe to use verbatim as a URL path
+// segment and as a Vault folder name. Generated IDs are 32 hex characters, so the length cap leaves ample headroom.
+var participantContextIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,128}$`)
+
+// ValidateParticipantContextID returns an error if the given ID contains anything other than letters, digits, underscores
+// and hyphens, or is empty or longer than 128 characters. This rejects path separators, dots, query and fragment
+// delimiters and percent-encoding, which could otherwise re-target admin API requests or Vault paths.
+func ValidateParticipantContextID(id string) error {
+	if !participantContextIDPattern.MatchString(id) {
+		return fmt.Errorf("invalid participant context ID %q", id)
+	}
+	return nil
+}
 
 // OrchestrationManifest represents the configuration details for the execution of an orchestration.
 //
@@ -111,6 +126,11 @@ func initValidator() *validator.Validate {
 		// Only allow alphanumeric, dots, underscores, and hyphens
 		match, _ := regexp.MatchString(`^[a-zA-Z0-9._-]+$`, value)
 		return match
+	})
+
+	// participantcontextid validates participant context IDs, see ValidateParticipantContextID
+	_ = v.RegisterValidation("participantcontextid", func(fl validator.FieldLevel) bool {
+		return ValidateParticipantContextID(fl.Field().String()) == nil
 	})
 	return v
 }

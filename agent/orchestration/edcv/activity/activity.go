@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
+	"github.com/eclipse-cfm/cfm/agent/common/vault"
 	"github.com/eclipse-cfm/cfm/agent/orchestration/edcv"
 	. "github.com/eclipse-cfm/cfm/common/collection"
 	"github.com/eclipse-cfm/cfm/common/model"
@@ -43,7 +44,7 @@ type EDCVActivityProcessor struct {
 
 type edcData struct {
 	ParticipantID        string `json:"cfm.participant.id" validate:"required"`
-	ParticipantContextId string `json:"participantContextId" validate:"required"`
+	ParticipantContextId string `json:"participantContextId" validate:"required,participantcontextid"`
 	// CredentialServiceURL the URL of the credential service, i.e., the query and storage endpoints of IdentityHub
 	CredentialServiceURL string `json:"cfm.participant.credentialservice"`
 	// ProtocolServiceURL the URL of the protocol service, i.e., the DSP protocol endpoint of the control plane
@@ -114,10 +115,14 @@ func (p EDCVActivityProcessor) handleDeployAction(ctx api.ActivityContext, data 
 
 	// the control plane authenticates to Vault via token exchange (jwtlet), so only the vault
 	// config (no credentials) is needed; the participant context id is the token-exchange resource.
+	folderPath, err := vault.ParticipantFolderPath(participantContextId, "controlplane")
+	if err != nil {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing EDC-V activity for orchestration %s: %w", ctx.OID(), err)}
+	}
 	vaultConfig := edcv.VaultConfig{
 		VaultURL:   p.VaultURL,
 		SecretPath: "v1/participants",
-		FolderPath: participantContextId + "/controlplane",
+		FolderPath: folderPath,
 	}
 
 	_, ctrl := p.tracer.Start(ctx.Context(), "cfm.agent.edcv.deploy.controlplane", trace.WithSpanKind(trace.SpanKindClient))

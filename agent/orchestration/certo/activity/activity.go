@@ -42,7 +42,7 @@ type CertoActivityProcessor struct {
 
 type certoData struct {
 	ParticipantID        string `json:"cfm.participant.id" validate:"required"`
-	ParticipantContextId string `json:"participantContextId" validate:"required"`
+	ParticipantContextId string `json:"participantContextId" validate:"required,participantcontextid"`
 }
 
 const dataspaceIdentifierKey = "dataspaceIdentifier"

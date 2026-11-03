@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/eclipse-cfm/cfm/agent/common/vault"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 
@@ -44,7 +45,7 @@ type IdentityHubActivityProcessor struct {
 
 type ihData struct {
 	ParticipantID        string `json:"cfm.participant.id" validate:"required"`
-	ParticipantContextId string `json:"participantContextId" validate:"required"`
+	ParticipantContextId string `json:"participantContextId" validate:"required,participantcontextid"`
 	CredentialServiceURL string `json:"cfm.participant.credentialservice"`
 	ProtocolServiceURL   string `json:"cfm.participant.protocolservice"`
 	DataServiceURL       string `json:"cfm.participant.dataservice"`
@@ -129,9 +130,14 @@ func (p IdentityHubActivityProcessor) handleDeployAction(ctx api.ActivityContext
 
 	// IdentityHub authenticates to Vault via token exchange (jwtlet), so only the vault config
 	// (no credentials) is supplied; the participant context id is the token-exchange resource.
+	folderPath, err := vault.ParticipantFolderPath(participantContextId, "identityhub")
+	if err != nil {
+		ihSpan.RecordError(err)
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("cannot create participant in IdentityHub: %w", err)}
+	}
 	manifest := identityhub.NewParticipantManifest(participantContextId, did, data.CredentialServiceURL, data.ProtocolServiceURL, data.DataServiceURL, func(m *identityhub.ParticipantManifest) {
 		m.VaultConfig.VaultURL = p.VaultURL
-		m.VaultConfig.FolderPath = participantContextId + "/identityhub"
+		m.VaultConfig.FolderPath = folderPath
 	})
 	if err := p.IdentityAPIClient.CreateParticipantContext(ctx.Context(), manifest); err != nil {
 		ihSpan.RecordError(err)
