@@ -59,31 +59,21 @@ type RetriableMessageProcessor[T any] struct {
 	DispatcherCtx func(ctx context.Context, payload T, message jetstream.Msg) error
 	Monitor       system.LogMonitor
 	Processing    atomic.Bool
+	// Loop drives message fetching; set Loop.Recreate to let the processor recover from a deleted consumer.
+	Loop FetchLoop
 }
 
 // ProcessLoop handles the main loop for consuming and processing messages from a JetStream consumer.
-// It runs continuously until the provided context is canceled or an error occurs.
-// Returns an error if message fetching or processing fails.
+// It runs continuously until the provided context is canceled, retrying fetch errors rather than exiting on them.
+// Returns the context's error once it is canceled.
 func (n *RetriableMessageProcessor[T]) ProcessLoop(ctx context.Context, consumer jetstream.Consumer) error {
 	n.Processing.Store(true)
-	for {
-		select {
-		case <-ctx.Done():
-			n.Processing.Store(false)
-			return ctx.Err()
-		default:
-			messageBatch, err := consumer.Fetch(1, jetstream.FetchMaxWait(time.Second))
-			if err != nil {
-				return err
-			}
-
-			for message := range messageBatch.Messages() {
-				if err = n.ProcessMessage(ctx, message); err != nil {
-					n.Monitor.Warnf("Error processing received message: %v", err)
-				}
-			}
+	defer n.Processing.Store(false)
+	return n.Loop.Run(ctx, consumer, n.Monitor, func(ctx context.Context, message jetstream.Msg) {
+		if err := n.ProcessMessage(ctx, message); err != nil {
+			n.Monitor.Warnf("Error processing received message: %v", err)
 		}
-	}
+	})
 }
 
 func (n *RetriableMessageProcessor[T]) ProcessMessage(ctx context.Context, message jetstream.Msg) (err error) {

@@ -176,44 +176,44 @@ func TestNatsOrchestrationClient_ProcessMessage_Errors(t *testing.T) {
 
 func TestNatsOrchestrationClient_ProcessLoop_Errors(t *testing.T) {
 	tests := []struct {
-		name          string
-		setupConsumer func(*mockConsumer)
-		expectedError string
+		name     string
+		fetchErr error
 	}{
 		{
-			name: "consumer fetch error",
-			setupConsumer: func(c *mockConsumer) {
-				c.On("Fetch", 1, mock.Anything).Return(nil, errors.New("fetch failed"))
-			},
-			expectedError: "fetch failed",
+			name:     "consumer fetch error",
+			fetchErr: errors.New("fetch failed"),
 		},
 		{
 			name: "consumer connection lost",
-			setupConsumer: func(c *mockConsumer) {
-				c.On("Fetch", 1, mock.Anything).Return(nil, &jetstream.APIError{ErrorCode: jetstream.JSErrCodeStreamNotFound})
-			},
 			// NATS stream not found error code 10059
-			expectedError: "err_code=10059",
+			fetchErr: &jetstream.APIError{ErrorCode: jetstream.JSErrCodeStreamNotFound},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockConsumer := &mockConsumer{}
-			tt.setupConsumer(mockConsumer)
-
-			mockDispatcher := &mockOrchestrationDispatcher{}
-			client := newNatsOrchestrationClient(nil, mockDispatcher, system.NoopMonitor{})
-
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
+			// The loop must keep retrying fetch errors instead of exiting; cancel once it has retried a few times.
+			calls := 0
+			mockConsumer := &mockConsumer{}
+			mockConsumer.On("Fetch", 1, mock.Anything).Return(nil, tt.fetchErr).Run(func(mock.Arguments) {
+				calls++
+				if calls == 3 {
+					cancel()
+				}
+			})
+
+			mockDispatcher := &mockOrchestrationDispatcher{}
+			client := newNatsOrchestrationClient(nil, mockDispatcher, system.NoopMonitor{})
+			client.Loop.RetryBackoff = time.Millisecond
+
 			err := client.ProcessLoop(ctx, mockConsumer)
 
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tt.expectedError)
-
-			mockConsumer.AssertExpectations(t)
+			require.ErrorIs(t, err, context.Canceled)
+			assert.Equal(t, 3, calls)
+			assert.False(t, client.Processing.Load())
 		})
 	}
 }

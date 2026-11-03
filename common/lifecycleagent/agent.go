@@ -83,6 +83,10 @@ func (a *eventAgentServiceAssembly[T]) Start(startCtx *system.StartContext) erro
 		},
 	}
 
+	msgProcessor.Loop.Recreate = func(context.Context) (jetstream.Consumer, error) {
+		return a.setupConsumer(a.natsClient)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	a.cancel = cancel
 

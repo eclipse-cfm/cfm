@@ -54,6 +54,8 @@ type NatsActivityExecutor struct {
 	ActivityType      string
 	ActivityProcessor api.ActivityProcessor
 	Monitor           system.LogMonitor
+	// Loop drives message fetching. Execute sets Loop.Recreate if it is not already set.
+	Loop natsclient.FetchLoop
 }
 
 // Execute starts a goroutine to process messages from the activity queue.
@@ -69,6 +71,16 @@ func (e *NatsActivityExecutor) Execute(ctx context.Context) error {
 		return fmt.Errorf("error connecting to consumer %s: %w", consumerName, err)
 	}
 
+	if e.Loop.Recreate == nil {
+		e.Loop.Recreate = func(ctx context.Context) (jetstream.Consumer, error) {
+			stream, err := e.Client.Stream(ctx, e.StreamName)
+			if err != nil {
+				return nil, fmt.Errorf("error opening stream: %w", err)
+			}
+			return natsclient.SetupConsumer(ctx, stream, e.ActivityType)
+		}
+	}
+
 	go func() {
 		err := e.processLoop(ctx, consumer)
 		if err != nil {
@@ -79,26 +91,14 @@ func (e *NatsActivityExecutor) Execute(ctx context.Context) error {
 }
 
 // processLoop handles the main loop for consuming and processing messages from a JetStream consumer.
-// It runs continuously until the provided context is canceled or an error occurs.
-// Returns an error if message fetching or processing fails.
+// It runs continuously until the provided context is canceled, retrying fetch errors rather than exiting on them.
+// Returns the context's error once it is canceled.
 func (e *NatsActivityExecutor) processLoop(ctx context.Context, consumer jetstream.Consumer) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			messageBatch, err := consumer.Fetch(1, jetstream.FetchMaxWait(time.Second))
-			if err != nil {
-				return err
-			}
-
-			for message := range messageBatch.Messages() {
-				if err = e.processMessage(ctx, message); err != nil {
-					e.Monitor.Warnf("Error processing message: %v", err)
-				}
-			}
+	return e.Loop.Run(ctx, consumer, e.Monitor, func(ctx context.Context, message jetstream.Msg) {
+		if err := e.processMessage(ctx, message); err != nil {
+			e.Monitor.Warnf("Error processing message: %v", err)
 		}
-	}
+	})
 }
 
 // processMessage processes a single message from the JetStream consumer by delegating to its ActivityProcessor. When
