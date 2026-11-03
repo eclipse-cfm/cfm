@@ -22,7 +22,6 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 )
 
 const (
@@ -58,7 +57,6 @@ func (h *HandlerServiceAssembly) Requires() []system.ServiceType {
 
 func (h *HandlerServiceAssembly) Init(context *system.InitContext) error {
 	router := context.Registry.Resolve(routing.RouterKey).(chi.Router)
-	router.Use(middleware.Recoverer)
 
 	tenantService := context.Registry.Resolve(api.TenantServiceKey).(api.TenantService)
 	participantService := context.Registry.Resolve(api.ParticipantProfileServiceKey).(api.ParticipantProfileService)
@@ -166,7 +164,11 @@ func (h *HandlerServiceAssembly) registerDataspaceProfileRoutes(router chi.Route
 				if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmWrite)) {
 					return
 				}
-				handler.deployDataspaceProfile(w, req)
+				id, found := handler.ExtractPathVariable(w, req, "id")
+				if !found {
+					return
+				}
+				handler.deployDataspaceProfile(w, req, id)
 			})
 		})
 	})

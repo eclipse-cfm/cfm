@@ -77,6 +77,7 @@ func (h *TMHandler) getProfilesForTenant(w http.ResponseWriter, req *http.Reques
 	for profile, err := range iter {
 		if err != nil {
 			h.HandleError(w, err)
+			return
 		}
 		transformed := v1alpha1.ToParticipantProfile(profile)
 		results = append(results, *transformed)
@@ -136,6 +137,7 @@ func (h *TMHandler) disposeParticipantProfile(
 	err := h.participantService.DisposeProfile(req.Context(), tenantID, participantID)
 	if err != nil {
 		h.HandleError(w, err)
+		return
 	}
 
 	h.Accepted(w)
@@ -368,7 +370,7 @@ func (h *TMHandler) getDataspaceProfile(w http.ResponseWriter, req *http.Request
 	h.ResponseOK(w, v1alpha1.ToDataspaceProfile(profile))
 }
 
-func (h *TMHandler) deployDataspaceProfile(w http.ResponseWriter, req *http.Request) {
+func (h *TMHandler) deployDataspaceProfile(w http.ResponseWriter, req *http.Request, profileID string) {
 	if h.InvalidMethod(w, req, http.MethodPost) {
 		return
 	}
@@ -378,7 +380,13 @@ func (h *TMHandler) deployDataspaceProfile(w http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	err := h.dataspaceService.DeployProfile(req.Context(), newDeployment.ProfileID, newDeployment.CellID)
+	// The path identifies the profile; a body that names a different one is rejected rather than trusted.
+	if newDeployment.ProfileID != profileID {
+		h.WriteError(w, "profileId in body does not match path", http.StatusBadRequest)
+		return
+	}
+
+	err := h.dataspaceService.DeployProfile(req.Context(), profileID, newDeployment.CellID)
 	if err != nil {
 		h.HandleError(w, err)
 		return

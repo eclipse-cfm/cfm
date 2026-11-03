@@ -238,7 +238,7 @@ func (h HttpHandler) WriteLinkHeaders(w http.ResponseWriter, path string, offset
 		if lastOffset < 0 {
 			lastOffset = 0
 		}
-		lastLink := fmt.Sprintf("<%s=%d&limit=%d>; rel=\"last\"", path, lastOffset, limit)
+		lastLink := fmt.Sprintf("<%s?offset=%d&limit=%d>; rel=\"last\"", path, lastOffset, limit)
 		links = append(links, lastLink)
 	}
 
