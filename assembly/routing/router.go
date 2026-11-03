@@ -27,7 +27,8 @@ import (
 
 const (
 	RouterKey system.ServiceType = "router:Router"
-	key                          = "httpPort"
+	// PortKey is the configuration key of the port the HTTP server listens on.
+	PortKey = "httpPort"
 )
 
 type RouterServiceAssembly struct {
@@ -59,7 +60,7 @@ func (r *RouterServiceAssembly) Init(ctx *system.InitContext) error {
 }
 
 func (r *RouterServiceAssembly) Start(ctx *system.StartContext) error {
-	port := r.config.GetInt(key)
+	port := r.config.GetInt(PortKey)
 	r.server = &http.Server{
 		Addr:    ":" + strconv.Itoa(port),
 		Handler: r.router,

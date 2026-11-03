@@ -16,6 +16,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/eclipse-cfm/cfm/common/health"
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/tmanager/api"
@@ -69,7 +70,7 @@ func (a *natsOrchestrationServiceAssembly) Init(ctx *system.InitContext) error {
 	return nil
 }
 
-func (a *natsOrchestrationServiceAssembly) Start(_ *system.StartContext) error {
+func (a *natsOrchestrationServiceAssembly) Start(startCtx *system.StartContext) error {
 	var ctx context.Context
 
 	consumer, err := a.setupConsumer(context.Background())
@@ -77,6 +78,11 @@ func (a *natsOrchestrationServiceAssembly) Start(_ *system.StartContext) error {
 		return err
 	}
 	a.orchestrationClient.Loop.Recreate = a.setupConsumer
+
+	health.RegisterOptional(startCtx.Registry, func(r *health.Registry) {
+		r.AddReadiness("nats", health.NatsConnectionCheck(a.natsClient.Connection))
+		r.AddConsumerLoop("consumer:"+natsclient.CFMOrchestrationResponse, &a.orchestrationClient.Loop)
+	})
 
 	ctx, a.processCancel = context.WithCancel(context.Background())
 

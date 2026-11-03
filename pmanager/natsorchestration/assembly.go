@@ -16,6 +16,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/eclipse-cfm/cfm/common/health"
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
@@ -100,6 +101,10 @@ func (a *natsOrchestratorServiceAssembly) Prepare(ctx *system.InitContext) error
 		provisionManager:  provisionManager,
 		definitionManager: definitionManager,
 	}
+	health.RegisterOptional(ctx.Registry, func(r *health.Registry) {
+		r.AddReadiness("nats", health.NatsConnectionCheck(a.natsClient.Connection))
+	})
+
 	var err error
 	a.subscription, err = a.natsClient.JetStream.Conn().Subscribe("$KV."+a.clientConfig.Bucket+".>", func(msg *nats.Msg) {
 		watcher.onMessage(msg.Data, msg)

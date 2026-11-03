@@ -16,6 +16,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/eclipse-cfm/cfm/common/health"
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
@@ -58,7 +59,7 @@ func (a *natsProvisionServiceAssembly) Init(ctx *system.InitContext) error {
 	return nil
 }
 
-func (a *natsProvisionServiceAssembly) Start(_ *system.StartContext) error {
+func (a *natsProvisionServiceAssembly) Start(startCtx *system.StartContext) error {
 	var ctx context.Context
 
 	consumer, err := a.setupConsumer(context.Background())
@@ -66,6 +67,10 @@ func (a *natsProvisionServiceAssembly) Start(_ *system.StartContext) error {
 		return err
 	}
 	a.provisionHandler.Loop.Recreate = a.setupConsumer
+
+	health.RegisterOptional(startCtx.Registry, func(r *health.Registry) {
+		r.AddConsumerLoop("consumer:"+natsclient.CFMOrchestration, &a.provisionHandler.Loop)
+	})
 
 	ctx, a.processCancel = context.WithCancel(context.Background())
 	return a.provisionHandler.Init(ctx, consumer)

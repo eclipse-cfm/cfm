@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/common/health"
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/nats-io/nats.go/jetstream"
@@ -86,6 +87,11 @@ func (a *eventAgentServiceAssembly[T]) Start(startCtx *system.StartContext) erro
 	msgProcessor.Loop.Recreate = func(context.Context) (jetstream.Consumer, error) {
 		return a.setupConsumer(a.natsClient)
 	}
+
+	health.RegisterOptional(startCtx.Registry, func(r *health.Registry) {
+		r.AddReadiness("nats", health.NatsConnectionCheck(a.natsClient.Connection))
+		r.AddConsumerLoop("consumer:"+durableName(a.agentName), &msgProcessor.Loop)
+	})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	a.cancel = cancel
