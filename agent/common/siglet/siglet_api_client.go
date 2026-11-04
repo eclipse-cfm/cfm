@@ -25,6 +25,7 @@ import (
 
 	"github.com/eclipse-cfm/cfm/common/httpx"
 	"github.com/eclipse-cfm/cfm/common/token"
+	"github.com/eclipse-cfm/cfm/common/types"
 )
 
 const (
@@ -71,7 +72,7 @@ type httpManagementApiClient struct {
 func (s httpManagementApiClient) CreateKeyMapping(ctx context.Context, mapping KeyMapping) error {
 	accessToken, err := s.tokenProvider.GetToken(ctx, ScopeApiWrite, mapping.ParticipantContextID)
 	if err != nil {
-		return fmt.Errorf("failed to get API access token: %w", err)
+		return types.NewRecoverableWrappedError(err, "failed to get API access token")
 	}
 
 	payload, err := json.Marshal(mapping)
@@ -89,12 +90,12 @@ func (s httpManagementApiClient) CreateKeyMapping(ctx context.Context, mapping K
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to create Siglet Mapping: %w", err)
+		return types.NewRecoverableWrappedError(err, "failed to create Siglet Mapping")
 	}
 	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("failed to create Siglet Mapping: received status code %d", resp.StatusCode)
+		return httpx.NewStatusError("failed to create Siglet Mapping", resp)
 	}
 
 	return nil
@@ -104,7 +105,7 @@ func (s httpManagementApiClient) CreateKeyMapping(ctx context.Context, mapping K
 func (s httpManagementApiClient) UpdateKeyMapping(ctx context.Context, mapping KeyMapping) error {
 	accessToken, err := s.tokenProvider.GetToken(ctx, ScopeApiWrite, mapping.ParticipantContextID)
 	if err != nil {
-		return fmt.Errorf("failed to get API access token: %w", err)
+		return types.NewRecoverableWrappedError(err, "failed to get API access token")
 	}
 
 	payload, err := json.Marshal(mapping)
@@ -122,12 +123,12 @@ func (s httpManagementApiClient) UpdateKeyMapping(ctx context.Context, mapping K
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to create Siglet Mapping: %w", err)
+		return types.NewRecoverableWrappedError(err, "failed to create Siglet Mapping")
 	}
 	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("failed to create Siglet Mapping: received status code %d", resp.StatusCode)
+		return httpx.NewStatusError("failed to create Siglet Mapping", resp)
 	}
 
 	return nil
@@ -136,7 +137,7 @@ func (s httpManagementApiClient) UpdateKeyMapping(ctx context.Context, mapping K
 func (s httpManagementApiClient) GetKeyMapping(ctx context.Context, participantContextID string) (*KeyMapping, error) {
 	accessToken, err := s.tokenProvider.GetToken(ctx, ScopeApiRead, participantContextID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get API access token: %w", err)
+		return nil, types.NewRecoverableWrappedError(err, "failed to get API access token")
 	}
 	url := fmt.Sprintf("%s/key-mappings/%s", s.BaseURL, url.PathEscape(participantContextID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -148,7 +149,7 @@ func (s httpManagementApiClient) GetKeyMapping(ctx context.Context, participantC
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get Siglet Mapping: %w", err)
+		return nil, types.NewRecoverableWrappedError(err, "failed to get Siglet Mapping")
 	}
 	defer httpx.DrainAndClose(resp)
 
@@ -156,12 +157,12 @@ func (s httpManagementApiClient) GetKeyMapping(ctx context.Context, participantC
 		return nil, nil
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get Siglet Mapping: received status code %d", resp.StatusCode)
+		return nil, httpx.NewStatusError("failed to get Siglet Mapping", resp)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, types.NewRecoverableWrappedError(err, "failed to read response body")
 	}
 
 	var keyMapping KeyMapping
@@ -176,7 +177,7 @@ func (s httpManagementApiClient) DeleteKeyMapping(ctx context.Context, participa
 
 	accessToken, err := s.tokenProvider.GetToken(ctx, ScopeApiWrite, participantContextID)
 	if err != nil {
-		return fmt.Errorf("failed to get API access token: %w", err)
+		return types.NewRecoverableWrappedError(err, "failed to get API access token")
 	}
 	url := fmt.Sprintf("%s/key-mappings/%s", s.BaseURL, url.PathEscape(participantContextID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
@@ -188,12 +189,15 @@ func (s httpManagementApiClient) DeleteKeyMapping(ctx context.Context, participa
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to get Siglet Mapping: %w", err)
+		return types.NewRecoverableWrappedError(err, "failed to get Siglet Mapping")
 	}
 	defer httpx.DrainAndClose(resp)
 
+	if resp.StatusCode == http.StatusNotFound {
+		return nil // already gone, e.g. a redelivered revocation
+	}
 	if resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("error deleting Siglet Mapping: received status code %d", resp.StatusCode)
+		return httpx.NewStatusError("error deleting Siglet Mapping", resp)
 	}
 	return nil
 }

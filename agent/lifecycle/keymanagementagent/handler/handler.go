@@ -17,13 +17,16 @@ package handler
 
 import (
 	"context"
-	"fmt"
+	"errors"
+	"net/http"
 
 	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
 	"github.com/eclipse-cfm/cfm/agent/common/siglet"
+	"github.com/eclipse-cfm/cfm/common/httpx"
 	"github.com/eclipse-cfm/cfm/common/lifecycleagent"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/common/types"
 )
 
 // KeyManagementEvent is the CloudEvent delivered on the "events.key.management.*" subjects.
@@ -60,8 +63,10 @@ func NewProcessor(config *Config) *Processor {
 	}
 }
 
-// Process handles a single key management event. Returning a recoverable error (see common/types) causes the
-// message to be redelivered; any other error is treated as fatal and the message is dropped.
+// Process handles a single key management event. Returning a client or fatal error (see common/types) drops the
+// message; any other error causes it to be redelivered, up to the consumer's delivery limit. The Siglet and control
+// plane clients classify their errors, so an unreachable or failing downstream is retried, while a request that was
+// rejected for good is not. Dropping a revocation would leave the revoked key in use, so when in doubt, retry.
 func (p *Processor) Process(ctx context.Context, evt lifecycleagent.EventContext[KeyManagementEvent]) error {
 
 	keyEventData := evt.Payload.Data
@@ -92,10 +97,10 @@ func (p *Processor) Process(ctx context.Context, evt lifecycleagent.EventContext
 }
 
 // validateParticipantContextID rejects events whose participant context ID is not a plain identifier, since the ID ends
-// up in admin API paths. The returned error is not recoverable, so the message is dropped instead of being redelivered.
+// up in admin API paths. The returned error is a client error, so the message is dropped instead of being redelivered.
 func validateParticipantContextID(subject string, data KeyPairEventData) error {
 	if err := model.ValidateParticipantContextID(data.ParticipantContextID); err != nil {
-		return fmt.Errorf("rejecting key management event %s: %w", subject, err)
+		return types.NewClientWrappedError(err, "rejecting key management event %s", subject)
 	}
 	return nil
 }
@@ -156,6 +161,10 @@ func (p *Processor) updateControlPlaneKeyAssociation(ctx context.Context, keyEve
 	}
 	if err := p.controlPlaneClient.PatchConfig(ctx, pid, patch); err != nil {
 		p.monitor.Warnf("Error patching participant config in control plane: %s", err)
+		var statusErr *httpx.StatusError
+		if errors.As(err, &statusErr) && statusErr.StatusCode == http.StatusNotFound {
+			return types.NewRecoverableWrappedError(err, "participant config %s not provisioned yet", pid)
+		}
 		return err
 	}
 	return nil

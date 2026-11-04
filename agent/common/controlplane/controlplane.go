@@ -26,6 +26,7 @@ import (
 	vault "github.com/eclipse-cfm/cfm/agent/common/vault"
 	"github.com/eclipse-cfm/cfm/common/httpx"
 	"github.com/eclipse-cfm/cfm/common/token"
+	"github.com/eclipse-cfm/cfm/common/types"
 )
 
 const (
@@ -196,7 +197,7 @@ func (h HttpManagementAPIClient) CreateParticipantContext(ctx context.Context, m
 func (h HttpManagementAPIClient) PatchConfig(ctx context.Context, participantContextID string, config ParticipantContextConfig) error {
 	accessToken, err := h.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
 	if err != nil {
-		return fmt.Errorf("failed to get API access token: %w", err)
+		return types.NewRecoverableWrappedError(err, "failed to get API access token")
 	}
 
 	configData := map[string]any{
@@ -221,14 +222,13 @@ func (h HttpManagementAPIClient) PatchConfig(ctx context.Context, participantCon
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	resp, err := h.HttpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to patch participant context config on control plane: %w", err)
+		return types.NewRecoverableWrappedError(err, "failed to patch participant context config on control plane")
 	}
 
 	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to patch participant context config on control plane: received status code %d, body: %s", resp.StatusCode, string(body))
+		return httpx.NewStatusError("failed to patch participant context config on control plane", resp)
 	}
 	return nil
 }

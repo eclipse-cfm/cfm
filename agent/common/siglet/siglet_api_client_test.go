@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/eclipse-cfm/cfm/common/mocks"
+	"github.com/eclipse-cfm/cfm/common/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -233,6 +234,60 @@ func TestHttpApiClient_DeleteKeyMapping_ApiReturnsError(t *testing.T) {
 	client := NewSigletAPIClient(&http.Client{}, newTokenProvider(t), server.URL)
 	err := client.DeleteKeyMapping(t.Context(), "participant-1")
 	require.ErrorContains(t, err, "received status code 400")
+	assert.True(t, types.IsClientError(err))
+	assert.False(t, types.IsRecoverable(err), "a rejected request must not be retried")
+}
+
+// A revocation may be delivered more than once, so deleting a mapping that is already gone succeeds.
+func TestHttpApiClient_DeleteKeyMapping_NotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	client := NewSigletAPIClient(&http.Client{}, newTokenProvider(t), server.URL)
+	require.NoError(t, client.DeleteKeyMapping(t.Context(), "participant-1"))
+}
+
+// Errors that may clear up on their own are recoverable, so that the key management agent retries the event instead of
+// dropping it.
+func TestHttpApiClient_TransientErrorsAreRecoverable(t *testing.T) {
+	for _, status := range []int{http.StatusInternalServerError, http.StatusServiceUnavailable, http.StatusTooManyRequests} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(status)
+			}))
+			defer server.Close()
+			client := NewSigletAPIClient(&http.Client{}, newTokenProvider(t), server.URL)
+
+			_, err := client.GetKeyMapping(t.Context(), "participant-1")
+			assert.True(t, types.IsRecoverable(err), "get: %v", err)
+			err = client.CreateKeyMapping(t.Context(), KeyMapping{ParticipantContextID: "participant-1"})
+			assert.True(t, types.IsRecoverable(err), "create: %v", err)
+			err = client.UpdateKeyMapping(t.Context(), KeyMapping{ParticipantContextID: "participant-1"})
+			assert.True(t, types.IsRecoverable(err), "update: %v", err)
+			err = client.DeleteKeyMapping(t.Context(), "participant-1")
+			assert.True(t, types.IsRecoverable(err), "delete: %v", err)
+		})
+	}
+
+	t.Run("transport error", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+		server.Close()
+		client := NewSigletAPIClient(&http.Client{}, newTokenProvider(t), server.URL)
+
+		err := client.DeleteKeyMapping(t.Context(), "participant-1")
+		assert.True(t, types.IsRecoverable(err), "%v", err)
+	})
+
+	t.Run("token error", func(t *testing.T) {
+		tp := mocks.NewMockTokenProvider(t)
+		tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("", fmt.Errorf("idp unavailable"))
+		client := NewSigletAPIClient(&http.Client{}, tp, "http://foo.bar")
+
+		err := client.DeleteKeyMapping(t.Context(), "participant-1")
+		assert.True(t, types.IsRecoverable(err), "%v", err)
+	})
 }
 
 func TestHttpApiClient_TransportError(t *testing.T) {

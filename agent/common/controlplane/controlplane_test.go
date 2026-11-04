@@ -23,7 +23,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/eclipse-cfm/cfm/common/httpx"
 	"github.com/eclipse-cfm/cfm/common/mocks"
+	"github.com/eclipse-cfm/cfm/common/types"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -430,6 +433,29 @@ func TestPatchConfig_ServerError(t *testing.T) {
 
 	err := client.PatchConfig(t.Context(), "test-participant", ParticipantContextConfig{ParticipantContextID: "test-participant"})
 	require.ErrorContains(t, err, "received status code 500")
+	require.ErrorContains(t, err, "internal server error")
+	assert.True(t, types.IsRecoverable(err))
+}
+
+func TestPatchConfig_NotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
+	client := HttpManagementAPIClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	err := client.PatchConfig(t.Context(), "test-participant", ParticipantContextConfig{ParticipantContextID: "test-participant"})
+	var statusErr *httpx.StatusError
+	require.ErrorAs(t, err, &statusErr)
+	assert.Equal(t, http.StatusNotFound, statusErr.StatusCode)
+	assert.False(t, types.IsRecoverable(err))
 }
 
 func TestRegisterDataPlane(t *testing.T) {
