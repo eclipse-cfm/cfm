@@ -31,7 +31,19 @@ const (
 	DefaultRetryWaitMin   int    = 1
 	ConfigKeyRetryWaitMax string = "httpclient.retrywaitmax"
 	DefaultRetryWaitMax   int    = 5
+	// ConfigKeyTimeout is the time in seconds a single request attempt may take, including reading the response
+	// body. An attempt that times out is retried like any other connection error.
+	ConfigKeyTimeout string = "httpclient.timeout"
+	DefaultTimeout   int    = 30
 )
+
+// clientConfig holds the settings of the shared HTTP client.
+type clientConfig struct {
+	retryMax     int
+	retryWaitMin time.Duration
+	retryWaitMax time.Duration
+	timeout      time.Duration
+}
 
 type HttpClientServiceAssembly struct {
 	system.DefaultServiceAssembly
@@ -50,13 +62,30 @@ func (h HttpClientServiceAssembly) Requires() []system.ServiceType {
 }
 
 func (h HttpClientServiceAssembly) Init(context *system.InitContext) error {
+	config := clientConfig{
+		retryMax:     context.GetConfigIntOrDefault(ConfigKeyRetryMax, DefaultRetryMax),
+		retryWaitMin: time.Duration(context.GetConfigIntOrDefault(ConfigKeyRetryWaitMin, DefaultRetryWaitMin)) * time.Second,
+		retryWaitMax: time.Duration(context.GetConfigIntOrDefault(ConfigKeyRetryWaitMax, DefaultRetryWaitMax)) * time.Second,
+		timeout:      time.Duration(context.GetConfigIntOrDefault(ConfigKeyTimeout, DefaultTimeout)) * time.Second,
+	}
+	standardClient := newClient(config, &routingLogger{monitor: context.LogMonitor})
+	context.Registry.Register(serviceapi.HttpClientKey, *standardClient)
+	return nil
+}
+
+// newClient creates an HTTP client that retries failed requests. Each attempt is bounded by the configured timeout, so
+// a server that accepts the connection but never answers cannot block the caller indefinitely.
+func newClient(config clientConfig, logger retryablehttp.LeveledLogger) *http.Client {
 	retryClient := retryablehttp.NewClient()
 
-	retryClient.RetryMax = context.GetConfigIntOrDefault(ConfigKeyRetryMax, DefaultRetryMax)
-	retryClient.RetryWaitMin = time.Duration(context.GetConfigIntOrDefault(ConfigKeyRetryWaitMin, DefaultRetryWaitMin)) * time.Second
-	retryClient.RetryWaitMax = time.Duration(context.GetConfigIntOrDefault(ConfigKeyRetryWaitMax, DefaultRetryWaitMax)) * time.Second
+	retryClient.RetryMax = config.retryMax
+	retryClient.RetryWaitMin = config.retryWaitMin
+	retryClient.RetryWaitMax = config.retryWaitMax
 	retryClient.CheckRetry = customCheckRetry
-	retryClient.Logger = &routingLogger{monitor: context.LogMonitor}
+	retryClient.Logger = logger
+	if config.timeout > 0 {
+		retryClient.HTTPClient.Timeout = config.timeout
+	}
 	standardClient := retryClient.StandardClient()
 
 	// Wrap the client with OpenTelemetry instrumentation
@@ -66,9 +95,7 @@ func (h HttpClientServiceAssembly) Init(context *system.InitContext) error {
 			return r.Method + " " + r.URL.Path
 		}))
 
-	context.Registry.Register(serviceapi.HttpClientKey, *standardClient)
-
-	return nil
+	return standardClient
 }
 
 // customCheckRetry determines whether a request should be retried
