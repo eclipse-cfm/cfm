@@ -49,7 +49,7 @@ type ConsumerFactory func(ctx context.Context) (jetstream.Consumer, error)
 // the consumer's AckWait. A slow handler therefore keeps its message instead of having it redelivered to another
 // consumer while it is still working on it. If the process dies, the heartbeat stops and the message is redelivered
 // once AckWait has passed. Handlers must bound their own run time, since the heartbeat keeps the message for as long as
-// the handler runs.
+// the handler runs: RetriableMessageProcessor and the activity executor do so with a deadline.
 type FetchLoop struct {
 	// Recreate optionally re-obtains the consumer after it has been deleted. If nil, the loop keeps retrying the
 	// original consumer.
@@ -138,7 +138,9 @@ func (l *FetchLoop) fetch(ctx context.Context, consumer jetstream.Consumer, moni
 
 // handleWithHeartbeat runs the handler and reports the message as in progress every HeartbeatInterval until the
 // handler returns. It only returns once the heartbeat has stopped, so no heartbeat is sent for a message after it has
-// been handled.
+// been handled. A heartbeat that is already on its way when the handler NAKs the message with a delay can still reach
+// the server after the NAK, which shortens that delay to AckWait. The window is tiny compared to the heartbeat
+// interval, and the message is then merely redelivered early.
 func (l *FetchLoop) handleWithHeartbeat(ctx context.Context, message jetstream.Msg, monitor system.LogMonitor, handle func(context.Context, jetstream.Msg)) {
 	interval := l.HeartbeatInterval
 	if interval <= 0 {

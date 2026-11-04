@@ -39,6 +39,10 @@ const (
 // with NakWithDelay instead (see NakWithBackoff).
 const DefaultAckWait = 30 * time.Second
 
+// DefaultDispatchTimeout is how long a message dispatcher may run before its context is canceled. FetchLoop keeps a
+// message for as long as its handler runs, so the limit makes sure that a dispatcher that hangs releases its message.
+const DefaultDispatchTimeout = 5 * time.Minute
+
 // retryDelays is the delay before a message that failed with a retriable error is redelivered, indexed by the number
 // of failed attempts so far. The last value is used for every attempt beyond the end of the schedule.
 var retryDelays = []time.Duration{time.Second, 2 * time.Second, 5 * time.Second, 10 * time.Second, 30 * time.Second, time.Minute}
