@@ -71,7 +71,8 @@ func (p participantService) QueryProfiles(ctx context.Context, predicate query.P
 func (p participantService) DeployProfile(ctx context.Context, tenantID string, deployment *api.NewParticipantProfileDeployment) (*api.ParticipantProfile, error) {
 
 	// TODO perform property validation against a custom schema
-	return store.Trx[api.ParticipantProfile](p.trxContext).AndReturn(ctx, func(ctx context.Context) (*api.ParticipantProfile, error) {
+	var oManifest model.OrchestrationManifest
+	result, err := store.Trx[api.ParticipantProfile](p.trxContext).AndReturn(ctx, func(ctx context.Context) (*api.ParticipantProfile, error) {
 		cells, err := collection.CollectAllDeref(p.cellStore.GetAll(ctx))
 		if err != nil {
 			return nil, err
@@ -94,7 +95,7 @@ func (p participantService) DeployProfile(ctx context.Context, tenantID string, 
 			return nil, err
 		}
 
-		oManifest := model.OrchestrationManifest{
+		oManifest = model.OrchestrationManifest{
 			ID:                uuid.New().String(),
 			CorrelationID:     participantProfile.ID,
 			OrchestrationType: model.VPADeployType,
@@ -124,16 +125,24 @@ func (p participantService) DeployProfile(ctx context.Context, tenantID string, 
 		if err != nil {
 			return nil, fmt.Errorf("error creating participant %s: %w", deployment.Identifier, err)
 		}
-
-		// Only send the orchestration message if the storage operation succeeded. If the send fails, the transaction
-		// will be rolled back.
-		err = p.provisionClient.Send(ctx, oManifest)
-		if err != nil {
-			return nil, fmt.Errorf("error deploying participant %s: %w", deployment.Identifier, err)
-		}
-
 		return result, nil
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Only send the orchestration message once the profile is committed. The response can arrive before an open
+	// transaction commits, and the callback would then not find the profile and drop the response.
+	if err := p.provisionClient.Send(ctx, oManifest); err != nil {
+		sendErr := fmt.Errorf("error deploying participant %s: %w", deployment.Identifier, err)
+		if err := p.trxContext.Execute(ctx, func(c context.Context) error {
+			return p.participantStore.Delete(c, result.ID)
+		}); err != nil {
+			return nil, errors.Join(sendErr, fmt.Errorf("error removing participant profile %s: %w", result.ID, err))
+		}
+		return nil, sendErr
+	}
+	return result, nil
 }
 
 // getFilteredProfiles filters dProfiles based on the given dataspace profile IDs. All profiles are returned if the ID list is empty.
@@ -166,7 +175,8 @@ func (p participantService) getFilteredProfiles(
 }
 
 func (p participantService) DisposeProfile(ctx context.Context, tenantID string, participantID string) error {
-	return p.trxContext.Execute(ctx, func(c context.Context) error {
+	var oManifest model.OrchestrationManifest
+	err := p.trxContext.Execute(ctx, func(c context.Context) error {
 		profile, err := p.participantStore.FindByID(c, participantID)
 		if err != nil {
 			return err
@@ -193,7 +203,7 @@ func (p participantService) DisposeProfile(ctx context.Context, tenantID string,
 			return err
 		}
 
-		oManifest := model.OrchestrationManifest{
+		oManifest = model.OrchestrationManifest{
 			ID:                uuid.New().String(),
 			CorrelationID:     participantID,
 			OrchestrationType: model.VPADisposeType,
@@ -226,14 +236,41 @@ func (p participantService) DisposeProfile(ctx context.Context, tenantID string,
 		if err != nil {
 			return fmt.Errorf("error disposing participant %s: %w", participantID, err)
 		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
 
-		// Only send the orchestration message if the storage operation succeeded. If the send fails, the transaction
-		// will be rolled back.
-		err = p.provisionClient.Send(ctx, oManifest)
-		if err != nil {
-			return fmt.Errorf("error disposing participant %s: %w", participantID, err)
+	// Only send the orchestration message once the profile update is committed, see DeployProfile.
+	if err := p.provisionClient.Send(ctx, oManifest); err != nil {
+		sendErr := fmt.Errorf("error disposing participant %s: %w", participantID, err)
+		if err := p.revertDispose(ctx, participantID, oManifest); err != nil {
+			return errors.Join(sendErr, err)
 		}
+		return sendErr
+	}
+	return nil
+}
 
+// revertDispose returns the profile's VPAs to the active state after the dispose orchestration could not be sent, so
+// that the dispose can be retried. The profile is left alone if another orchestration has been started for it since.
+func (p participantService) revertDispose(ctx context.Context, participantID string, manifest model.OrchestrationManifest) error {
+	return p.trxContext.Execute(ctx, func(c context.Context) error {
+		profile, err := p.participantStore.FindByID(c, participantID)
+		if err != nil {
+			return fmt.Errorf("error reverting dispose of participant %s: %w", participantID, err)
+		}
+		if !isPendingOrchestration(profile, model.OrchestrationResponse{ManifestID: manifest.ID, OrchestrationType: manifest.OrchestrationType}) {
+			return nil
+		}
+		delete(profile.Properties, pendingOrchestrationKey)
+		for i := range profile.VPAs {
+			profile.VPAs[i].State = api.DeploymentStateActive
+		}
+		if err := p.participantStore.Update(c, profile); err != nil {
+			return fmt.Errorf("error reverting dispose of participant %s: %w", participantID, err)
+		}
 		return nil
 	})
 }

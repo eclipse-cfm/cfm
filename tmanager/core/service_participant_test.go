@@ -14,6 +14,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -990,4 +991,106 @@ type mockProvisionClient struct {
 func (m *mockProvisionClient) Send(ctx context.Context, manifest model.OrchestrationManifest) error {
 	args := m.Called(ctx, manifest)
 	return args.Error(0)
+}
+
+// recordingTrxContext reports whether a transaction is open, so tests can check that orchestration messages are only
+// sent after the transaction has committed.
+type recordingTrxContext struct {
+	open *bool
+}
+
+func (r recordingTrxContext) Execute(ctx context.Context, callback func(ctx context.Context) error) error {
+	*r.open = true
+	defer func() { *r.open = false }()
+	return callback(ctx)
+}
+
+func newDeployableTestService(t *testing.T) *participantService {
+	service := newTestParticipantService()
+	cell := newTestCell("cell-1", "external-id")
+	cell.State = api.DeploymentStateActive
+	_, err := service.cellStore.Create(t.Context(), cell)
+	require.NoError(t, err)
+	_, err = service.dataspaceStore.Create(t.Context(), newTestDataspaceProfile("ds-1"))
+	require.NoError(t, err)
+	return service
+}
+
+func newDisposableTestProfile(t *testing.T, service *participantService) *api.ParticipantProfile {
+	_, err := service.dataspaceStore.Create(t.Context(), newTestDataspaceProfile("dataspace-1"))
+	require.NoError(t, err)
+	profile := newTestParticipantProfile("tenant-1", "participant-1")
+	profile.Properties[model.VPAStateData] = map[string]any{"state": "deployed"}
+	profile.VPAs[0].State = api.DeploymentStateActive
+	created, err := service.participantStore.Create(t.Context(), profile)
+	require.NoError(t, err)
+	return created
+}
+
+func TestDeployProfile_SendsAfterCommit(t *testing.T) {
+	ctx := t.Context()
+	service := newDeployableTestService(t)
+	trxOpen := false
+	service.trxContext = recordingTrxContext{open: &trxOpen}
+
+	mockClient := new(mockProvisionClient)
+	mockClient.On("Send", ctx, mock.Anything).Run(func(mock.Arguments) {
+		assert.False(t, trxOpen, "manifest must be sent after the transaction commits")
+	}).Return(nil)
+	service.provisionClient = mockClient
+
+	_, err := service.DeployProfile(ctx, "tenant-1", &api.NewParticipantProfileDeployment{Identifier: "participant-identifier"})
+
+	require.NoError(t, err)
+	mockClient.AssertExpectations(t)
+}
+
+func TestDeployProfile_SendFailureRemovesProfile(t *testing.T) {
+	ctx := t.Context()
+	service := newDeployableTestService(t)
+
+	mockClient := new(mockProvisionClient)
+	mockClient.On("Send", ctx, mock.Anything).Return(errors.New("send failed"))
+	service.provisionClient = mockClient
+
+	_, err := service.DeployProfile(ctx, "tenant-1", &api.NewParticipantProfileDeployment{Identifier: "participant-identifier"})
+
+	require.ErrorContains(t, err, "send failed")
+	count, err := service.participantStore.CountByPredicate(ctx, query.Eq("tenantId", "tenant-1"))
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), count)
+}
+
+func TestDisposeProfile_SendsAfterCommit(t *testing.T) {
+	ctx := t.Context()
+	service := newTestParticipantService()
+	profile := newDisposableTestProfile(t, service)
+	trxOpen := false
+	service.trxContext = recordingTrxContext{open: &trxOpen}
+
+	mockClient := new(mockProvisionClient)
+	mockClient.On("Send", ctx, mock.Anything).Run(func(mock.Arguments) {
+		assert.False(t, trxOpen, "manifest must be sent after the transaction commits")
+	}).Return(nil)
+	service.provisionClient = mockClient
+
+	require.NoError(t, service.DisposeProfile(ctx, "tenant-1", profile.ID))
+	mockClient.AssertExpectations(t)
+}
+
+func TestDisposeProfile_SendFailureRevertsProfile(t *testing.T) {
+	ctx := t.Context()
+	service := newTestParticipantService()
+	profile := newDisposableTestProfile(t, service)
+
+	mockClient := new(mockProvisionClient)
+	mockClient.On("Send", ctx, mock.Anything).Return(errors.New("send failed"))
+	service.provisionClient = mockClient
+
+	require.ErrorContains(t, service.DisposeProfile(ctx, "tenant-1", profile.ID), "send failed")
+
+	reverted, err := service.participantStore.FindByID(ctx, profile.ID)
+	require.NoError(t, err)
+	assert.Equal(t, api.DeploymentStateActive, reverted.VPAs[0].State)
+	assert.NotContains(t, reverted.Properties, pendingOrchestrationKey)
 }
