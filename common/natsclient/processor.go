@@ -36,6 +36,7 @@ var (
 	natsMsgDuration metric.Float64Histogram
 	natsMsgErrors   metric.Int64Counter
 	natsMsgNaks     metric.Int64Counter
+	natsMsgDead     metric.Int64Counter
 )
 
 func initNatsMetrics() {
@@ -44,6 +45,7 @@ func initNatsMetrics() {
 		natsMsgDuration, _ = meter.Float64Histogram("cfm.nats.process.duration", metric.WithUnit("s"))
 		natsMsgErrors, _ = meter.Int64Counter("cfm.nats.process.errors.total")
 		natsMsgNaks, _ = meter.Int64Counter("cfm.nats.message.naks.total")
+		natsMsgDead, _ = meter.Int64Counter("cfm.nats.message.dead_lettered.total")
 	})
 }
 
@@ -53,12 +55,20 @@ func initNatsMetrics() {
 // DispatcherCtx additionally receives the raw jetstream.Msg, giving access to the message subject, headers and bytes;
 // it is useful for agents that subscribe to multiple subjects and must branch on the subject. When DispatcherCtx is set
 // it takes precedence over Dispatcher.
+//
+// A dispatcher error has the message redelivered after a growing delay, unless it is a client or fatal error (see
+// common/types), which acks the message. Retries stop at the message's last allowed delivery (MaxDeliver): the message
+// is then dead-lettered, which means it is terminated, logged at severe level and counted in the
+// cfm.nats.message.dead_lettered.total metric.
 type RetriableMessageProcessor[T any] struct {
 	Client        MsgClient
 	Dispatcher    func(ctx context.Context, payload T) error
 	DispatcherCtx func(ctx context.Context, payload T, message jetstream.Msg) error
 	Monitor       system.LogMonitor
 	Processing    atomic.Bool
+	// MaxDeliver must match the MaxDeliver of the consumer the processor reads from. It defaults to DefaultMaxDeliver,
+	// which is what SetupConsumer and SetupMultiSubjectConsumer configure.
+	MaxDeliver int
 	// Loop drives message fetching; set Loop.Recreate to let the processor recover from a deleted consumer.
 	Loop FetchLoop
 }
@@ -100,7 +110,7 @@ func (n *RetriableMessageProcessor[T]) ProcessMessage(ctx context.Context, messa
 	if err := json.Unmarshal(message.Data(), &payload); err != nil {
 		err2 := AckMessage(message)
 		if err2 != nil {
-			n.Monitor.Warnf("Failed to ACK message %s: %v", err2)
+			n.Monitor.Warnf("Failed to ACK message on %s: %v", subject, err2)
 		}
 		span.RecordError(err)
 		natsMsgErrors.Add(ctx, 1, metric.WithAttributes(attribute.String("messaging.destination", subject)))
@@ -118,8 +128,16 @@ func (n *RetriableMessageProcessor[T]) ProcessMessage(ctx context.Context, messa
 	}
 
 	switch {
-	case types.IsRecoverable(resultErr):
-		if err := message.Nak(); err != nil {
+	case shouldRetry(resultErr) && IsFinalDelivery(message, n.maxDeliver()):
+		span.RecordError(resultErr)
+		natsMsgDead.Add(ctx, 1, metric.WithAttributes(attribute.String("messaging.destination", subject)))
+		n.Monitor.Severef("Giving up on message on %s after %d deliveries: %v", subject, deliveryCount(message), resultErr)
+		if err := message.Term(); err != nil {
+			return fmt.Errorf("retriable failure on final delivery and TERM response (errors: %w, %v)", resultErr, err)
+		}
+		return fmt.Errorf("retriable failure on final delivery, message dead-lettered: %w", resultErr)
+	case shouldRetry(resultErr):
+		if err := NakWithBackoff(message); err != nil {
 			span.RecordError(err)
 			natsMsgErrors.Add(ctx, 1, metric.WithAttributes(attribute.String("messaging.destination", subject)))
 			return fmt.Errorf("retriable failure when dispatching message and NAK response (errors: %w, %v)", resultErr, err)
@@ -128,7 +146,7 @@ func (n *RetriableMessageProcessor[T]) ProcessMessage(ctx context.Context, messa
 		natsMsgNaks.Add(ctx, 1, metric.WithAttributes(attribute.String("messaging.destination", subject)))
 		return fmt.Errorf("retriable failure when dispatching message: %w", resultErr)
 	default:
-		// All other errors are fatal
+		// Client and fatal errors are permanent
 		if err := message.Ack(); err != nil {
 			span.RecordError(err)
 			natsMsgErrors.Add(ctx, 1, metric.WithAttributes(attribute.String("messaging.destination", subject)))
@@ -157,6 +175,21 @@ func TermOnPanic(message jetstream.Msg, monitor system.LogMonitor, err *error) {
 	}
 }
 
+func (n *RetriableMessageProcessor[T]) maxDeliver() int {
+	if n.MaxDeliver == 0 {
+		return DefaultMaxDeliver
+	}
+	return n.MaxDeliver
+}
+
+// shouldRetry reports whether a dispatcher error should have the message redelivered. Only errors that are explicitly
+// permanent (client or fatal errors) are not retried; an unclassified error is retried, since dropping a message by
+// mistake (for example a key revocation) is worse than retrying it a bounded number of times. An error that is marked
+// recoverable is retried even if it wraps a permanent one.
+func shouldRetry(err error) bool {
+	return types.IsRecoverable(err) || (!types.IsClientError(err) && !types.IsFatal(err))
+}
+
 func AckMessage(message jetstream.Msg) error {
 	if err := message.Ack(); err != nil {
 		return fmt.Errorf("failed to ACK message: %w", err)
@@ -164,8 +197,10 @@ func AckMessage(message jetstream.Msg) error {
 	return nil
 }
 
+// NakError asks for the message to be redelivered after a backoff delay (see NakWithBackoff) and returns err, joined
+// with the NAK error if the NAK fails.
 func NakError(message jetstream.Msg, err error) error {
-	err2 := message.Nak() // Attempt redelivery
+	err2 := NakWithBackoff(message) // Attempt redelivery
 	if err2 != nil {
 		err = errors.Join(err, err2)
 	}

@@ -170,8 +170,9 @@ func SetupTestStream(t *testing.T, ctx context.Context, client *natsclient.NatsC
 	return stream
 }
 
+// SetupTestConsumer creates an activity consumer for subject, configured as SetupActivityConsumer does.
 func SetupTestConsumer(t *testing.T, ctx context.Context, stream jetstream.Stream, subject string) jetstream.Consumer {
-	consumer, err := natsclient.SetupConsumer(ctx, stream, subject)
+	consumer, err := natsclient.SetupActivityConsumer(ctx, stream, subject)
 	require.NoError(t, err)
 	return consumer
 }

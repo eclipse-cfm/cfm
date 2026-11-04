@@ -179,3 +179,82 @@ func consumerReceives(consumer jetstream.Consumer) bool {
 	}
 	return false
 }
+
+// Consumers bound their deliveries, and consumers created before the limits were introduced pick them up when the
+// component restarts.
+func TestSetupConsumers_BoundDelivery(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), streamTestTimeout)
+	defer cancel()
+
+	nt, err := natsfixtures.SetupNatsContainer(ctx, "cfm-bucket")
+	require.NoError(t, err)
+	defer natsfixtures.TeardownNatsContainer(ctx, nt)
+
+	stream, err := natsclient.SetupStream(ctx, nt.Client, "cfm-stream")
+	require.NoError(t, err)
+
+	// a consumer as older versions created it, without any delivery limit
+	_, err = stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
+		Durable:       "cfm-orchestration",
+		AckPolicy:     jetstream.AckExplicitPolicy,
+		FilterSubject: natsclient.CFMOrchestrationSubject,
+	})
+	require.NoError(t, err)
+
+	consumer, err := natsclient.SetupConsumer(ctx, stream, natsclient.CFMOrchestration)
+	require.NoError(t, err)
+	info, err := consumer.Info(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, natsclient.DefaultMaxDeliver, info.Config.MaxDeliver)
+	assert.Equal(t, natsclient.DefaultAckWait, info.Config.AckWait)
+
+	activityConsumer, err := natsclient.SetupActivityConsumer(ctx, stream, "test.activity")
+	require.NoError(t, err)
+	info, err = activityConsumer.Info(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, -1, info.Config.MaxDeliver, "activities poll by redelivery, so their consumer has no delivery limit")
+	assert.Equal(t, natsclient.DefaultAckWait, info.Config.AckWait)
+
+	multi, err := natsclient.SetupMultiSubjectConsumer(ctx, stream, "test-agent", []string{"event.a", "event.b"})
+	require.NoError(t, err)
+	info, err = multi.Info(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, natsclient.DefaultMaxDeliver, info.Config.MaxDeliver)
+}
+
+// A message that keeps failing is redelivered with a delay each time, not immediately.
+func TestNakWithBackoff_DelaysEveryRedelivery(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), streamTestTimeout)
+	defer cancel()
+
+	nt, err := natsfixtures.SetupNatsContainer(ctx, "cfm-bucket")
+	require.NoError(t, err)
+	defer natsfixtures.TeardownNatsContainer(ctx, nt)
+
+	stream, err := natsclient.SetupStream(ctx, nt.Client, "cfm-stream")
+	require.NoError(t, err)
+	consumer, err := natsclient.SetupConsumer(ctx, stream, "test.retry")
+	require.NoError(t, err)
+	_, err = natsclient.NewMsgClient(nt.Client).Publish(ctx, natsclient.CFMSubjectPrefix+".test-retry", []byte(`{}`))
+	require.NoError(t, err)
+
+	// the first two retries wait 1s and 2s
+	var gaps []time.Duration
+	last := time.Now()
+	for i := 0; i < 3; i++ {
+		msg, err := consumer.Next(jetstream.FetchMaxWait(10 * time.Second))
+		require.NoError(t, err)
+		if i > 0 {
+			gaps = append(gaps, time.Since(last))
+		}
+		last = time.Now()
+		if i < 2 {
+			require.NoError(t, natsclient.NakWithBackoff(msg))
+		} else {
+			require.NoError(t, msg.Ack())
+		}
+	}
+	require.Len(t, gaps, 2)
+	assert.GreaterOrEqual(t, gaps[0], 900*time.Millisecond)
+	assert.GreaterOrEqual(t, gaps[1], 1900*time.Millisecond)
+}

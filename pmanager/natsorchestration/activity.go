@@ -77,7 +77,7 @@ func (e *NatsActivityExecutor) Execute(ctx context.Context) error {
 			if err != nil {
 				return nil, fmt.Errorf("error opening stream: %w", err)
 			}
-			return natsclient.SetupConsumer(ctx, stream, e.ActivityType)
+			return natsclient.SetupActivityConsumer(ctx, stream, e.ActivityType)
 		}
 	}
 
