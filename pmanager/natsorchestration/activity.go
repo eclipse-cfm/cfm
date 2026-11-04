@@ -129,8 +129,18 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 		return fmt.Errorf("failed to unmarshal orchestration message: %w", err)
 	}
 
+	finalDelivery := natsclient.IsFinalDelivery(message, natsclient.ActivityMaxDeliver)
+
 	orchestration, revision, err := ReadOrchestration(ctx, oMessage.OrchestrationID, e.Client)
 	if err != nil {
+		if finalDelivery {
+			// Last chance: without the orchestration it cannot be marked errored, so drop the message loudly
+			e.Monitor.Severef("Giving up on activity message %s for orchestration %s after %d deliveries: %v",
+				oMessage.Activity.ID, oMessage.OrchestrationID, natsclient.ActivityMaxDeliver, err)
+			if termErr := message.Term(); termErr != nil {
+				err = errors.Join(err, fmt.Errorf("failed to TERM message: %w", termErr))
+			}
+		}
 		return fmt.Errorf("failed to read orchestration data: %w", err)
 	}
 
@@ -172,6 +182,15 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 		oMessage.Activity,
 		orchestration.ProcessingData,
 		orchestration.OutputData)
+
+	if finalDelivery {
+		// Safety net: the message has been redelivered so often that something is stuck, for example an activity that
+		// reschedules forever or a completion that keeps failing. Stop here and mark the orchestration errored.
+		e.Monitor.Severef("Giving up on activity %s of orchestration %s after %d deliveries",
+			oMessage.Activity.ID, oMessage.OrchestrationID, natsclient.ActivityMaxDeliver)
+		return e.handleFatalError(activityContext, orchestration, revision,
+			fmt.Errorf("activity %s was delivered %d times without completing", oMessage.Activity.ID, natsclient.ActivityMaxDeliver), message)
+	}
 
 	e.Monitor.Debugf("Received activity message %s for orchestration %s (attempt %d)", oMessage.Activity.ID, oMessage.OrchestrationID, attempt)
 

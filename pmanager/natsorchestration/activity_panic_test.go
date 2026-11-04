@@ -32,11 +32,12 @@ const panicTestActivityType = "test.panic-activity"
 // panicTestMsg is a jetstream.Msg that records how it was acknowledged. Methods that are not overridden panic.
 type panicTestMsg struct {
 	jetstream.Msg
-	data     []byte
-	acked    bool
-	naked    bool
-	nakDelay time.Duration
-	termed   bool
+	data         []byte
+	numDelivered uint64
+	acked        bool
+	naked        bool
+	nakDelay     time.Duration
+	termed       bool
 }
 
 func (m *panicTestMsg) Data() []byte         { return m.data }
@@ -45,6 +46,9 @@ func (m *panicTestMsg) Headers() nats.Header { return nats.Header{} }
 func (m *panicTestMsg) Ack() error           { m.acked = true; return nil }
 func (m *panicTestMsg) Nak() error           { m.naked = true; return nil }
 func (m *panicTestMsg) Term() error          { m.termed = true; return nil }
+func (m *panicTestMsg) Metadata() (*jetstream.MsgMetadata, error) {
+	return &jetstream.MsgMetadata{NumDelivered: m.numDelivered}, nil
+}
 func (m *panicTestMsg) NakWithDelay(delay time.Duration) error {
 	m.naked = true
 	m.nakDelay = delay

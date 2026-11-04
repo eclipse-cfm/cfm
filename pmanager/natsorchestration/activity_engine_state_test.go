@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/eclipse-cfm/cfm/common/mocks"
+	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/nats-io/nats.go/jetstream"
@@ -61,6 +62,12 @@ var spoofedPayload = map[string]any{
 // runEngineStateTest processes one message for a single-activity orchestration whose ProcessingData holds
 // spoofedPayload, and returns the message and every orchestration revision the executor wrote.
 func runEngineStateTest(t *testing.T, processor api.ActivityProcessor, engineState api.EngineState) (*panicTestMsg, []api.Orchestration, error) {
+	t.Helper()
+	return runEngineStateTestOnDelivery(t, processor, engineState, 1)
+}
+
+// runEngineStateTestOnDelivery is runEngineStateTest for a message that is on its numDelivered-th delivery.
+func runEngineStateTestOnDelivery(t *testing.T, processor api.ActivityProcessor, engineState api.EngineState, numDelivered uint64) (*panicTestMsg, []api.Orchestration, error) {
 	t.Helper()
 	processingData := make(map[string]any)
 	for key, value := range spoofedPayload {
@@ -104,7 +111,7 @@ func runEngineStateTest(t *testing.T, processor api.ActivityProcessor, engineSta
 		Activity:        api.Activity{ID: "A1", Type: panicTestActivityType},
 	})
 	require.NoError(t, err)
-	msg := &panicTestMsg{data: messageBytes}
+	msg := &panicTestMsg{data: messageBytes, numDelivered: numDelivered}
 
 	require.NotPanics(t, func() {
 		err = executor.processMessage(t.Context(), msg)
@@ -193,4 +200,36 @@ func TestProcessMessage_RetryErrorGivesUpAfterMaxRetries(t *testing.T) {
 	require.Len(t, written, 1)
 	assert.Equal(t, api.OrchestrationStateErrored, written[0].State)
 	assert.Equal(t, "activity A1 failed 10 times: not ready", written[0].EngineState.Error)
+}
+
+// An activity message that reaches the consumer's delivery limit, for example because the activity reschedules forever,
+// marks the orchestration errored instead of running the activity again.
+func TestProcessMessage_FinalDeliveryMarksOrchestrationErrored(t *testing.T) {
+	processor := &resultTestProcessor{result: api.ActivityResult{Result: api.ActivityResultSchedule, WaitOnReschedule: 5 * time.Second}}
+
+	msg, written, err := runEngineStateTestOnDelivery(t, processor, api.EngineState{}, natsclient.ActivityMaxDeliver)
+
+	require.ErrorContains(t, err, "delivered 1000 times without completing")
+	assert.Nil(t, processor.seen, "the activity must not run again")
+	assert.True(t, msg.acked)
+	assert.False(t, msg.naked)
+	require.Len(t, written, 1)
+	assert.Equal(t, api.OrchestrationStateErrored, written[0].State)
+}
+
+func TestProcessMessage_FinalDeliveryWithoutOrchestrationTerminatesMessage(t *testing.T) {
+	mockClient := mocks.NewMockMsgClient(t)
+	mockClient.EXPECT().Get(mock.Anything, "missing").Return(nil, errors.New("kv unavailable"))
+	executor := &NatsActivityExecutor{Client: mockClient, ActivityType: panicTestActivityType, Monitor: system.NoopMonitor{}}
+
+	messageBytes, err := json.Marshal(api.ActivityMessage{OrchestrationID: "missing", Activity: api.Activity{ID: "A1", Type: panicTestActivityType}})
+	require.NoError(t, err)
+
+	msg := &panicTestMsg{data: messageBytes, numDelivered: natsclient.ActivityMaxDeliver - 1}
+	require.Error(t, executor.processMessage(t.Context(), msg))
+	assert.False(t, msg.termed, "earlier deliveries are left to redelivery")
+
+	msg = &panicTestMsg{data: messageBytes, numDelivered: natsclient.ActivityMaxDeliver}
+	require.ErrorContains(t, executor.processMessage(t.Context(), msg), "kv unavailable")
+	assert.True(t, msg.termed)
 }

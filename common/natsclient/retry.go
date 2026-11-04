@@ -23,9 +23,11 @@ const (
 	// explicit retries (NAKs) as well as redeliveries after an ack timeout.
 	DefaultMaxDeliver = 10
 
-	// unlimitedMaxDeliver disables the server-side delivery limit. Activity consumers use it because rescheduled
-	// activities poll by redelivering the same message; their retries are bounded by the activity executor instead.
-	unlimitedMaxDeliver = -1
+	// ActivityMaxDeliver is the delivery limit of activity consumers. Rescheduled activities poll by having the same
+	// message redelivered, so the limit is far higher than DefaultMaxDeliver: activity retries are bounded by the
+	// activity executor, and this limit is only a safety net for messages that get stuck, about 80 minutes of polling
+	// every 5 seconds.
+	ActivityMaxDeliver = 1000
 )
 
 // DefaultAckWait is how long the server waits for a message to be acknowledged before redelivering it, for example

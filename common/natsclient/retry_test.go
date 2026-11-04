@@ -31,6 +31,6 @@ func TestIsFinalDelivery(t *testing.T) {
 	assert.False(t, IsFinalDelivery(&fakeMsg{numDelivered: 9}, 10))
 	assert.True(t, IsFinalDelivery(&fakeMsg{numDelivered: 10}, 10))
 	assert.True(t, IsFinalDelivery(&fakeMsg{numDelivered: 11}, 10))
-	assert.False(t, IsFinalDelivery(&fakeMsg{numDelivered: 1000}, unlimitedMaxDeliver))
+	assert.False(t, IsFinalDelivery(&fakeMsg{numDelivered: 1000}, -1), "a negative limit means unlimited")
 	assert.False(t, IsFinalDelivery(&fakeMsg{numDelivered: 0}, 10), "a message without metadata counts as its first delivery")
 }

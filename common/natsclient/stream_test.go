@@ -212,7 +212,7 @@ func TestSetupConsumers_BoundDelivery(t *testing.T) {
 	require.NoError(t, err)
 	info, err = activityConsumer.Info(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, -1, info.Config.MaxDeliver, "activities poll by redelivery, so their consumer has no delivery limit")
+	assert.Equal(t, natsclient.ActivityMaxDeliver, info.Config.MaxDeliver, "activities poll by redelivery, so their limit is only a safety net")
 	assert.Equal(t, natsclient.DefaultAckWait, info.Config.AckWait)
 
 	multi, err := natsclient.SetupMultiSubjectConsumer(ctx, stream, "test-agent", []string{"event.a", "event.b"})

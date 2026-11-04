@@ -53,11 +53,12 @@ func SetupConsumer(ctx context.Context, stream jetstream.Stream, subject string)
 	return setupSubjectConsumer(ctx, stream, subject, DefaultMaxDeliver)
 }
 
-// SetupActivityConsumer creates or updates a NATS JetStream consumer for an orchestration activity. Unlike SetupConsumer
-// it sets no delivery limit: a rescheduled activity polls by having its message redelivered, so the number of deliveries
-// says nothing about how often the activity failed. The activity executor bounds retries itself.
+// SetupActivityConsumer creates or updates a NATS JetStream consumer for an orchestration activity. A rescheduled activity
+// polls by having its message redelivered, so the number of deliveries says little about how often the activity failed:
+// the activity executor bounds retries itself, and the consumer only has the much higher ActivityMaxDeliver as a
+// safety net.
 func SetupActivityConsumer(ctx context.Context, stream jetstream.Stream, activityType string) (jetstream.Consumer, error) {
-	return setupSubjectConsumer(ctx, stream, activityType, unlimitedMaxDeliver)
+	return setupSubjectConsumer(ctx, stream, activityType, ActivityMaxDeliver)
 }
 
 func setupSubjectConsumer(ctx context.Context, stream jetstream.Stream, subject string, maxDeliver int) (jetstream.Consumer, error) {
