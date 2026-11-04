@@ -17,13 +17,15 @@ import (
 	"fmt"
 )
 
+// The sentinels below describe permanent conditions: retrying the same operation gives the same result. They are
+// therefore client errors, not recoverable ones, so that a message that runs into them is not redelivered.
 var (
 	// ErrConflict indicates an object conflict, e.g. when creating an object that already exists
-	ErrConflict = NewRecoverableError("conflict")
+	ErrConflict = NewClientError("conflict")
 	// ErrNotFound indicates that a certain object does not exist
-	ErrNotFound = NewRecoverableError("not found")
+	ErrNotFound = NewClientError("not found")
 	// ErrInvalidInput Sentinel error to indicate a wrong input, e.g., a string when a number was expected, or an empty string
-	ErrInvalidInput = NewRecoverableError("invalid input")
+	ErrInvalidInput = NewClientError("invalid input")
 )
 
 type RecoverableError interface {
