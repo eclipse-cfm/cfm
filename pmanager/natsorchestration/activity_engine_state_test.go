@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/eclipse-cfm/cfm/common/mocks"
 	"github.com/eclipse-cfm/cfm/common/system"
@@ -89,7 +90,7 @@ func runEngineStateTest(t *testing.T, processor api.ActivityProcessor, engineSta
 			written = append(written, o)
 			return revision + 1, nil
 		})
-	mockClient.EXPECT().Publish(mock.Anything, mock.Anything, mock.Anything).Return(&jetstream.PubAck{}, nil)
+	mockClient.EXPECT().Publish(mock.Anything, mock.Anything, mock.Anything).Return(&jetstream.PubAck{}, nil).Maybe()
 
 	executor := &NatsActivityExecutor{
 		Client:            mockClient,
@@ -153,4 +154,43 @@ func TestProcessMessage_AttemptCountedAcrossRedeliveries(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, written)
 	assert.Equal(t, map[string]int{"A0": 1, "A1": 3}, written[len(written)-1].EngineState.Attempts)
+}
+
+func TestProcessMessage_RetryErrorUsesWaitOnReschedule(t *testing.T) {
+	processor := &resultTestProcessor{result: api.ActivityResult{
+		Result: api.ActivityResultRetryError, WaitOnReschedule: 30 * time.Second, Error: errors.New("not ready")}}
+
+	msg, written, err := runEngineStateTest(t, processor, api.EngineState{})
+
+	require.ErrorContains(t, err, "not ready")
+	assert.True(t, msg.naked)
+	assert.Equal(t, 30*time.Second, msg.nakDelay)
+	assert.False(t, msg.acked)
+	require.NotEmpty(t, written)
+	assert.Equal(t, map[string]int{"A1": 1}, written[len(written)-1].EngineState.Retries)
+}
+
+func TestProcessMessage_RetryErrorBacksOff(t *testing.T) {
+	processor := &resultTestProcessor{result: api.ActivityResult{Result: api.ActivityResultRetryError, Error: errors.New("not ready")}}
+
+	msg, written, err := runEngineStateTest(t, processor, api.EngineState{Retries: map[string]int{"A1": 2}})
+
+	require.Error(t, err)
+	assert.Equal(t, 5*time.Second, msg.nakDelay, "the third retry waits 5s")
+	require.NotEmpty(t, written)
+	assert.Equal(t, map[string]int{"A1": 3}, written[len(written)-1].EngineState.Retries)
+}
+
+// Once an activity has used up its retries, the orchestration is marked errored instead of being retried forever.
+func TestProcessMessage_RetryErrorGivesUpAfterMaxRetries(t *testing.T) {
+	processor := &resultTestProcessor{result: api.ActivityResult{Result: api.ActivityResultRetryError, Error: errors.New("not ready")}}
+
+	msg, written, err := runEngineStateTest(t, processor, api.EngineState{Retries: map[string]int{"A1": 9}})
+
+	require.ErrorContains(t, err, "activity A1 failed 10 times: not ready")
+	assert.True(t, msg.acked)
+	assert.False(t, msg.naked)
+	require.Len(t, written, 1)
+	assert.Equal(t, api.OrchestrationStateErrored, written[0].State)
+	assert.Equal(t, "activity A1 failed 10 times: not ready", written[0].EngineState.Error)
 }

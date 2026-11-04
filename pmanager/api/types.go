@@ -83,12 +83,15 @@ type EngineState struct {
 	TraceContext string `json:"traceContext,omitempty"`
 	// Attempts counts the executions of each activity, keyed by activity ID.
 	Attempts map[string]int `json:"attempts,omitempty"`
+	// Retries counts the retriable failures of each activity, keyed by activity ID. Unlike Attempts it does not count
+	// reschedules, so it can bound how often a failing activity is retried.
+	Retries map[string]int `json:"retries,omitempty"`
 	// Error is the error that put the orchestration into the errored state.
 	Error string `json:"error,omitempty"`
 }
 
-// Merge copies the bookkeeping in from onto s. Attempts are merged per activity so that counts recorded for other
-// activities in s are kept. TraceContext is last-writer-wins.
+// Merge copies the bookkeeping in from onto s. Attempts and Retries are merged per activity so that counts recorded for
+// other activities in s are kept. TraceContext is last-writer-wins.
 func (s *EngineState) Merge(from EngineState) {
 	s.TraceContext = from.TraceContext
 	if from.Error != "" {
@@ -99,6 +102,12 @@ func (s *EngineState) Merge(from EngineState) {
 	}
 	for id, attempt := range from.Attempts {
 		s.Attempts[id] = attempt
+	}
+	if len(from.Retries) > 0 && s.Retries == nil {
+		s.Retries = make(map[string]int, len(from.Retries))
+	}
+	for id, retries := range from.Retries {
+		s.Retries[id] = retries
 	}
 }
 
