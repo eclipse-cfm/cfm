@@ -31,8 +31,8 @@ const (
 )
 
 // DefaultAckWait is how long the server waits for a message to be acknowledged before redelivering it, for example
-// because the consumer crashed while processing it. It must be long enough for a slow message to be processed without
-// being redelivered in the meantime.
+// because the consumer crashed while processing it. FetchLoop reports messages that take longer to handle as in
+// progress, which resets the wait, so it only needs to cover the time between two heartbeats.
 //
 // Consumers deliberately set no BackOff schedule. With a BackOff, NATS ignores the delay of a second NakWithDelay and
 // redelivers on the BackOff schedule instead, which would break rescheduled activities. Explicit retries are delayed

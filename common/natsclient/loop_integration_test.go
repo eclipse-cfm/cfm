@@ -86,6 +86,56 @@ func TestFetchLoop_RecoversFromDeletedConsumer(t *testing.T) {
 	require.ErrorIs(t, <-done, context.Canceled)
 }
 
+// TestFetchLoop_HeartbeatPreventsRedelivery verifies against a real JetStream server that a handler running longer than
+// the consumer's AckWait keeps its message: without the heartbeat, the message would be redelivered while the handler
+// is still working on it.
+func TestFetchLoop_HeartbeatPreventsRedelivery(t *testing.T) {
+	ctx := t.Context()
+	nt, err := natsfixtures.SetupNatsContainer(ctx, "cfm-bucket")
+	require.NoError(t, err)
+	defer natsfixtures.TeardownNatsContainer(context.Background(), nt)
+
+	const subject = "heartbeat-test"
+	const ackWait = time.Second
+	stream := natsfixtures.SetupTestStream(t, ctx, nt.Client, "cfm-stream")
+	consumer, err := stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
+		Durable:       subject,
+		AckPolicy:     jetstream.AckExplicitPolicy,
+		AckWait:       ackWait,
+		FilterSubject: natsclient.CFMSubjectPrefix + "." + subject,
+	})
+	require.NoError(t, err)
+
+	loop := &natsclient.FetchLoop{HeartbeatInterval: ackWait / 4}
+	var deliveries atomic.Int32
+	var handled atomic.Bool
+	loopCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- loop.Run(loopCtx, consumer, printMonitor{t: t}, func(_ context.Context, msg jetstream.Msg) {
+			deliveries.Add(1)
+			time.Sleep(3 * ackWait)
+			_ = msg.Ack()
+			handled.Store(true)
+		})
+	}()
+
+	_, err = nt.Client.JetStream.Publish(ctx, natsclient.CFMSubjectPrefix+"."+subject, []byte("{}"))
+	require.NoError(t, err)
+	require.Eventually(t, handled.Load, 10*time.Second, 50*time.Millisecond)
+
+	// Give a redelivery the chance to show up, then check the message was only delivered once
+	time.Sleep(2 * ackWait)
+	require.Equal(t, int32(1), deliveries.Load(), "a message that is still being handled must not be redelivered")
+	info, err := consumer.Info(ctx)
+	require.NoError(t, err)
+	require.Zero(t, info.NumRedelivered)
+
+	cancel()
+	require.ErrorIs(t, <-done, context.Canceled)
+}
+
 // printMonitor logs warnings to the test output.
 type printMonitor struct {
 	system.NoopMonitor
