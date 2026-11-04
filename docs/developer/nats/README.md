@@ -86,7 +86,3 @@ The permissions narrow what a compromised component can do, but some trust remai
   change the bucket's configuration (but not its contents).
 - **Replies share the `_INBOX.>` namespace.** Components can subscribe to each other's request replies. NATS supports
   per-user inbox prefixes, but CFM does not configure them yet.
-- **The PM's index watcher replies to KV writers.** It acknowledges the core NATS messages it receives on
-  `$KV.<bucket>.>`, which sends `+ACK` to the publisher's reply inbox. The permissions above deny those publishes, and the
-  server logs them as permission violations. This is harmless and is expected to disappear when the watcher is moved to
-  a JetStream consumer.

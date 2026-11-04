@@ -13,17 +13,18 @@
 package natsorchestration
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"testing"
 	"time"
 
 	"github.com/eclipse-cfm/cfm/common/mocks"
+	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/types"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	aMocks "github.com/eclipse-cfm/cfm/pmanager/api/mocks"
-	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -346,27 +347,103 @@ func TestOnMessage_MalformedJSON_AckCalled(t *testing.T) {
 	mockStore.AssertExpectations(t)
 }
 
+// Compensation start fails - verify the message is rejected with a delay so that the failure is retried
+func TestOnMessage_CompensationStartError_NakWithDelay(t *testing.T) {
+	index := createTestStore(t)
+	pManager := &aMocks.MockProvisionManager{}
+	pManager.On("Start", mock.Anything, mock.Anything).Return(nil, errors.New("kv unavailable"))
+	definitionManager := &aMocks.MockDefinitionManager{}
+	definitionManager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{{}}, nil)
+	watcher := createTestWatcher(index, &store.NoOpTransactionContext{}, pManager, definitionManager)
+
+	running := createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateRunning)
+	_, err := index.Create(t.Context(), convertToEntry(running))
+	assert.NoError(t, err)
+
+	errored := createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateErrored)
+	errored.StateTimestamp = running.StateTimestamp.Add(time.Second)
+	msg := createNatsMsg(t, errored)
+
+	watcher.onMessage(msg.Data, msg)
+
+	assert.Equal(t, 0, msg.AckCalls)
+	assert.Equal(t, []time.Duration{watcherRedeliveryDelay}, msg.NakDelays)
+	pManager.AssertExpectations(t)
+}
+
+// Commit fails after the index was written - verify the message is not acknowledged
+func TestOnMessage_CommitError_NakNotAck(t *testing.T) {
+	mockStore := mocks.NewMockEntityStore[*api.OrchestrationEntry](t)
+	watcher := createTestWatcher(mockStore, failingCommitTransactionContext{}, &aMocks.MockProvisionManager{}, &aMocks.MockDefinitionManager{})
+
+	mockStore.EXPECT().FindByID(mock.Anything, "orch-1").Return(nil, types.ErrNotFound).Once()
+	mockStore.EXPECT().Create(mock.Anything, mock.Anything).Return(&api.OrchestrationEntry{}, nil).Once()
+
+	msg := createNatsMsg(t, createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateRunning))
+
+	watcher.onMessage(msg.Data, msg)
+
+	assert.Equal(t, 0, msg.AckCalls, "Ack must not be sent before the index transaction has committed")
+	assert.Equal(t, 1, msg.NakCalls)
+}
+
+// The same failure handled twice starts the same compensation, so the provision manager can de-duplicate it
+func TestOnMessage_RedeliveredFailure_SameCompensationID(t *testing.T) {
+	var manifestIDs []string
+	pManager := &aMocks.MockProvisionManager{}
+	pManager.On("Start", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		manifestIDs = append(manifestIDs, args.Get(1).(*model.OrchestrationManifest).ID)
+	}).Return(&api.Orchestration{}, nil)
+	definitionManager := &aMocks.MockDefinitionManager{}
+	definitionManager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{{}}, nil)
+
+	running := createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateRunning)
+	errored := createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateErrored)
+	errored.StateTimestamp = running.StateTimestamp.Add(time.Second)
+
+	// two replicas, each with an index that has not seen the failure yet
+	for range 2 {
+		index := createTestStore(t)
+		_, err := index.Create(t.Context(), convertToEntry(running))
+		assert.NoError(t, err)
+		watcher := createTestWatcher(index, &store.NoOpTransactionContext{}, pManager, definitionManager)
+		msg := createNatsMsg(t, errored)
+		watcher.onMessage(msg.Data, msg)
+		assert.Equal(t, 1, msg.AckCalls)
+	}
+
+	assert.Equal(t, []string{"orch-1-compensation", "orch-1-compensation"}, manifestIDs)
+}
+
+// failingCommitTransactionContext runs the callback and then fails, as a commit error would.
+type failingCommitTransactionContext struct{}
+
+func (failingCommitTransactionContext) Execute(ctx context.Context, callback func(ctx context.Context) error) error {
+	if err := callback(ctx); err != nil {
+		return err
+	}
+	return errors.New("commit failed")
+}
+
 // MockMessage implements MessageAck interface for testing Nak/Ack calls
 type MockMessage struct {
-	data     []byte
-	NakCalls int
-	AckCalls int
+	Data      []byte
+	NakCalls  int
+	AckCalls  int
+	NakDelays []time.Duration
 }
 
 func NewMockMessage(data []byte) *MockMessage {
-	return &MockMessage{
-		data:     data,
-		NakCalls: 0,
-		AckCalls: 0,
-	}
+	return &MockMessage{Data: data}
 }
 
-func (m *MockMessage) Nak(...nats.AckOpt) error {
+func (m *MockMessage) NakWithDelay(delay time.Duration) error {
 	m.NakCalls++
+	m.NakDelays = append(m.NakDelays, delay)
 	return nil
 }
 
-func (m *MockMessage) Ack(...nats.AckOpt) error {
+func (m *MockMessage) Ack() error {
 	m.AckCalls++
 	return nil
 }
