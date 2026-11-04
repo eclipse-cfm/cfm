@@ -21,11 +21,15 @@ import (
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
-	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 )
 
 const (
 	setupStreamKey = "setupStream"
+
+	// IndexWatcherConsumer is the durable consumer through which the PM replicas share the orchestration updates written
+	// to the KV bucket. Each update is delivered to a single replica.
+	IndexWatcherConsumer = "pmanager-index-watcher"
 )
 
 type natsOrchestratorServiceAssembly struct {
@@ -34,7 +38,7 @@ type natsOrchestratorServiceAssembly struct {
 	natsClient   *natsclient.NatsClient
 	system.DefaultServiceAssembly
 	processCancel context.CancelFunc
-	subscription  *nats.Subscription
+	watcherLoop   natsclient.FetchLoop
 }
 
 func NewOrchestratorServiceAssembly(clientConfig natsclient.ClientConfig, streamName string) system.ServiceAssembly {
@@ -105,19 +109,48 @@ func (a *natsOrchestratorServiceAssembly) Prepare(ctx *system.InitContext) error
 		r.AddReadiness("nats", health.NatsConnectionCheck(a.natsClient.Connection))
 	})
 
-	var err error
-	a.subscription, err = a.natsClient.JetStream.Conn().Subscribe("$KV."+a.clientConfig.Bucket+".>", func(msg *nats.Msg) {
-		watcher.onMessage(msg.Data, msg)
+	bucket := a.clientConfig.Bucket
+	setupConsumer := func(ctx context.Context) (jetstream.Consumer, error) {
+		return SetupIndexWatcherConsumer(ctx, a.natsClient, bucket)
+	}
+	consumer, err := setupConsumer(context.Background())
+	if err != nil {
+		return err
+	}
+	a.watcherLoop.Recreate = setupConsumer
+	health.RegisterOptional(ctx.Registry, func(r *health.Registry) {
+		r.AddConsumerLoop("consumer:"+IndexWatcherConsumer, &a.watcherLoop)
 	})
-	return err
+
+	loopCtx, cancel := context.WithCancel(context.Background())
+	a.processCancel = cancel
+	go func() {
+		_ = a.watcherLoop.Run(loopCtx, consumer, ctx.LogMonitor, func(_ context.Context, msg jetstream.Msg) {
+			watcher.onMessage(msg.Data(), msg)
+		})
+	}()
+	return nil
+}
+
+// SetupIndexWatcherConsumer creates or updates the durable consumer that feeds the orchestration index watcher. It reads
+// the stream backing the KV bucket, so updates written while no PM replica is running are delivered once one starts.
+// On first creation it delivers the latest value of every key, which (re)builds the index.
+func SetupIndexWatcherConsumer(ctx context.Context, client *natsclient.NatsClient, bucket string) (jetstream.Consumer, error) {
+	stream, err := natsclient.GetExistingStream(ctx, client, "KV_"+bucket)
+	if err != nil {
+		return nil, err
+	}
+	return stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
+		Durable:       IndexWatcherConsumer,
+		AckPolicy:     jetstream.AckExplicitPolicy,
+		DeliverPolicy: jetstream.DeliverAllPolicy,
+		FilterSubject: "$KV." + bucket + ".>",
+	})
 }
 
 func (a *natsOrchestratorServiceAssembly) Shutdown() error {
 	if a.processCancel != nil {
 		a.processCancel()
-	}
-	if a.subscription != nil {
-		_ = a.subscription.Unsubscribe()
 	}
 	if a.natsClient != nil {
 		a.natsClient.Connection.Close()

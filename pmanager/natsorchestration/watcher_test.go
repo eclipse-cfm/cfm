@@ -24,7 +24,6 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/eclipse-cfm/cfm/pmanager/api/mocks"
-	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -82,7 +81,7 @@ func TestOnMessage_MalformedJSON(t *testing.T) {
 	trxContext := &store.NoOpTransactionContext{}
 	watcher := createTestWatcher(index, trxContext, &mocks.MockProvisionManager{}, &mocks.MockDefinitionManager{})
 
-	msg := &nats.Msg{Data: []byte("invalid json")}
+	msg := NewMockMessage([]byte("invalid json"))
 
 	watcher.onMessage(msg.Data, msg)
 
@@ -191,7 +190,7 @@ func TestOnMessage_CompensationReferencesFailedOrchestration(t *testing.T) {
 		return manifest.OrchestrationType == model.VPADisposeType &&
 			manifest.CorrelationID == "corr-1" &&
 			manifest.CompensatedManifestID == "orch-1" &&
-			manifest.ID != "orch-1"
+			manifest.ID == "orch-1-compensation"
 	})).Return(&api.Orchestration{}, nil)
 	manager := mocks.MockDefinitionManager{}
 	manager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{{}}, nil)
@@ -242,10 +241,12 @@ func TestOnMessage_ErrorWhenTooManyCompensationOrchs(t *testing.T) {
 
 	watcher.onMessage(msg.Data, msg)
 
-	// Verify state remains Running
+	// The no-op transaction context does not roll back, so the index keeps the update, but the message is rejected
 	entry, err := index.FindByID(ctx, "orch-1")
 	require.NoError(t, err)
 	assert.Equal(t, api.OrchestrationStateErrored, entry.State)
+	assert.Equal(t, 1, msg.NakCalls, "the update should be redelivered when the compensation cannot be started")
+	assert.Equal(t, 0, msg.AckCalls)
 }
 
 // Create multiple independent entries
@@ -470,8 +471,8 @@ func createWatcherOrchestration(id, correlationID string, state api.Orchestratio
 	}
 }
 
-func createNatsMsg(t *testing.T, orch api.Orchestration) *nats.Msg {
+func createNatsMsg(t *testing.T, orch api.Orchestration) *MockMessage {
 	data, err := json.Marshal(orch)
 	require.NoError(t, err)
-	return &nats.Msg{Data: data}
+	return NewMockMessage(data)
 }

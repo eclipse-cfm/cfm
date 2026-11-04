@@ -16,6 +16,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/query"
@@ -23,16 +25,19 @@ import (
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/common/types"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
-	"github.com/google/uuid"
-	"github.com/nats-io/nats.go"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
 
+// watcherRedeliveryDelay is how long a rejected orchestration update waits before it is redelivered. It keeps an update
+// that keeps failing, for example while the database is unavailable, from being retried in a hot loop.
+const watcherRedeliveryDelay = 5 * time.Second
+
+// MessageAck acknowledges a JetStream message. It is implemented by jetstream.Msg.
 type MessageAck interface {
-	Ack(opts ...nats.AckOpt) error
-	Nak(opts ...nats.AckOpt) error
+	Ack() error
+	NakWithDelay(delay time.Duration) error
 }
 
 // OrchestrationIndexWatcher watches the underlying Jetsream KV subject for orchestration changes and updates the
@@ -47,6 +52,10 @@ type OrchestrationIndexWatcher struct {
 	provisionManager  api.ProvisionManager
 }
 
+// onMessage records an orchestration update in the index and starts a compensation when an orchestration has failed.
+// The message is acknowledged only once the index transaction has committed. If the index cannot be read or written,
+// or the compensation cannot be started, the transaction is rolled back and the message is rejected so that it is
+// redelivered.
 func (w *OrchestrationIndexWatcher) onMessage(data []byte, msg MessageAck) {
 	ctx := context.Background()
 
@@ -58,60 +67,60 @@ func (w *OrchestrationIndexWatcher) onMessage(data []byte, msg MessageAck) {
 		return
 	}
 
-	_ = w.trxContext.Execute(ctx, func(ctx context.Context) error {
+	err = w.trxContext.Execute(ctx, func(ctx context.Context) error {
 		currentEntry, err := w.index.FindByID(ctx, orchestration.ID)
 		if err != nil && !errors.Is(err, types.ErrNotFound) {
-			w.monitor.Infof("Failed to lookup orchestration entry: %v", err)
-			_ = msg.Nak()
-			return nil
+			return fmt.Errorf("failed to look up orchestration entry: %w", err)
 		}
 
 		entry := convertToEntry(orchestration)
-		if currentEntry != nil { // Found
-			// Only update if state and timestamp changed and not in a terminal state (messages may arrive out of order)
-			if (currentEntry.State == orchestration.State && orchestration.StateTimestamp == currentEntry.StateTimestamp) ||
-				currentEntry.State == api.OrchestrationStateCompleted ||
-				currentEntry.State == api.OrchestrationStateErrored {
-				return nil
+		if currentEntry == nil {
+			if _, err := w.index.Create(ctx, entry); err != nil {
+				return fmt.Errorf("failed to create orchestration entry: %w", err)
 			}
-			entry.State = orchestration.State
-			entry.StateTimestamp = orchestration.StateTimestamp
-			if w.index.Update(ctx, entry) != nil {
-				w.monitor.Infof("Failed to update orchestration entry: %v", err)
-				_ = msg.Nak()
-				return nil
-			}
-
-			// the orchestration failed, kick off the compensation
-			if orchestration.State == api.OrchestrationStateErrored && orchestration.OrchestrationType != model.VPADisposeType {
-
-				err2 := w.startCompensationOrchestration(ctx, orchestration, err)
-				if err2 != nil {
-					return err2
-				}
-			}
-
-			// w.monitor.Debugf("Orchestration index entry %s updated to state %s", orchestration.ID, orchestration.State)
-		} else {
-			_, err := w.index.Create(ctx, entry)
-			if err != nil {
-				w.monitor.Infof("Failed to create orchestration entry: %v", err)
-				_ = msg.Nak()
-				return nil
-			}
-			// w.monitor.Debugf("Created orchestration index entry %s in state %s", orchestration.ID, orchestration.State)
+			return nil
 		}
-		if msg.Ack() != nil {
-			w.monitor.Infof("Failed to acknowledge message for orchestration %s: %v", orchestration.ID, err)
+
+		// Only update if state and timestamp changed and not in a terminal state (messages may arrive out of order)
+		if (currentEntry.State == orchestration.State && orchestration.StateTimestamp == currentEntry.StateTimestamp) ||
+			currentEntry.State == api.OrchestrationStateCompleted ||
+			currentEntry.State == api.OrchestrationStateErrored {
+			return nil
+		}
+		entry.State = orchestration.State
+		entry.StateTimestamp = orchestration.StateTimestamp
+		if err := w.index.Update(ctx, entry); err != nil {
+			return fmt.Errorf("failed to update orchestration entry: %w", err)
+		}
+
+		// the orchestration failed, kick off the compensation
+		if orchestration.State == api.OrchestrationStateErrored && orchestration.OrchestrationType != model.VPADisposeType {
+			if err := w.startCompensationOrchestration(ctx, orchestration); err != nil {
+				return fmt.Errorf("failed to start compensation: %w", err)
+			}
 		}
 		return nil
 	})
+	if err != nil {
+		w.monitor.Warnf("Orchestration %s not indexed, it will be redelivered: %v", orchestration.ID, err)
+		_ = msg.NakWithDelay(watcherRedeliveryDelay)
+		return
+	}
+	if err := msg.Ack(); err != nil {
+		w.monitor.Infof("Failed to acknowledge message for orchestration %s: %v", orchestration.ID, err)
+	}
+}
+
+// CompensationID returns the ID of the compensation orchestration for the given orchestration. It is derived from the
+// orchestration ID so that the compensation is started only once, even if the failure is handled more than once.
+func CompensationID(orchestrationID string) string {
+	return orchestrationID + "-compensation"
 }
 
 // startCompensationOrchestration initiates a compensation orchestration if a matching definition exists for the given orchestration.
 // an error is returned if no compensation orchestration definition exists, if the orchestration could not be started, or if the exists-check failed
 // de-duplication is handled by the ProvisionManager
-func (w *OrchestrationIndexWatcher) startCompensationOrchestration(ctx context.Context, orchestration api.Orchestration, err error) error {
+func (w *OrchestrationIndexWatcher) startCompensationOrchestration(ctx context.Context, orchestration api.Orchestration) error {
 
 	exists, err := w.existsCompensationOrchestration(ctx, model.VPADisposeType, orchestration.DefinitionID)
 	if err != nil {
@@ -139,7 +148,7 @@ func (w *OrchestrationIndexWatcher) startCompensationOrchestration(ctx context.C
 	correlationID := orchestration.CorrelationID //eg. participant profile id, etc.
 	pData := orchestration.ProcessingData        // stuff for the VPAs
 	manifest := model.OrchestrationManifest{
-		ID:                    uuid.NewString(),
+		ID:                    CompensationID(orchestration.ID),
 		CorrelationID:         correlationID,
 		OrchestrationType:     model.VPADisposeType,
 		Payload:               pData,
