@@ -69,6 +69,13 @@ func runEngineStateTest(t *testing.T, processor api.ActivityProcessor, engineSta
 // runEngineStateTestOnDelivery is runEngineStateTest for a message that is on its numDelivered-th delivery.
 func runEngineStateTestOnDelivery(t *testing.T, processor api.ActivityProcessor, engineState api.EngineState, numDelivered uint64) (*panicTestMsg, []api.Orchestration, error) {
 	t.Helper()
+	return runEngineStateTestWith(t, processor, engineState, numDelivered, nil)
+}
+
+// runEngineStateTestWith is runEngineStateTestOnDelivery with an executor that configure may adjust. It fails the test
+// if the executor updates the orchestration with a context that is already done.
+func runEngineStateTestWith(t *testing.T, processor api.ActivityProcessor, engineState api.EngineState, numDelivered uint64, configure func(*NatsActivityExecutor)) (*panicTestMsg, []api.Orchestration, error) {
+	t.Helper()
 	processingData := make(map[string]any)
 	for key, value := range spoofedPayload {
 		processingData[key] = value
@@ -91,7 +98,8 @@ func runEngineStateTestOnDelivery(t *testing.T, processor api.ActivityProcessor,
 	mockClient := mocks.NewMockMsgClient(t)
 	mockClient.EXPECT().Get(mock.Anything, "test-engine-state").Return(panicTestEntry{value: orchestrationBytes}, nil)
 	mockClient.EXPECT().Update(mock.Anything, "test-engine-state", mock.Anything, mock.Anything).
-		RunAndReturn(func(_ context.Context, _ string, value []byte, revision uint64) (uint64, error) {
+		RunAndReturn(func(ctx context.Context, _ string, value []byte, revision uint64) (uint64, error) {
+			require.NoError(t, ctx.Err(), "orchestration updates must not use an expired context")
 			var o api.Orchestration
 			require.NoError(t, json.Unmarshal(value, &o))
 			written = append(written, o)
@@ -104,6 +112,9 @@ func runEngineStateTestOnDelivery(t *testing.T, processor api.ActivityProcessor,
 		ActivityType:      panicTestActivityType,
 		ActivityProcessor: processor,
 		Monitor:           system.NoopMonitor{},
+	}
+	if configure != nil {
+		configure(executor)
 	}
 
 	messageBytes, err := json.Marshal(api.ActivityMessage{
@@ -186,6 +197,89 @@ func TestProcessMessage_RetryErrorBacksOff(t *testing.T) {
 	assert.Equal(t, 5*time.Second, msg.nakDelay, "the third retry waits 5s")
 	require.NotEmpty(t, written)
 	assert.Equal(t, map[string]int{"A1": 3}, written[len(written)-1].EngineState.Retries)
+}
+
+// hangingProcessor blocks until its context is done and then fails fatally, as agents do for any downstream error.
+type hangingProcessor struct {
+	deadline    time.Time
+	hasDeadline bool
+}
+
+func (p *hangingProcessor) Process(ctx api.ActivityContext) api.ActivityResult {
+	p.deadline, p.hasDeadline = ctx.Context().Deadline()
+	<-ctx.Context().Done()
+	return api.ActivityResult{Result: api.ActivityResultFatalError, Error: ctx.Context().Err()}
+}
+
+func (p *hangingProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
+	return p.Process(ctx)
+}
+func (p *hangingProcessor) ProcessDispose(ctx api.ActivityContext) api.ActivityResult {
+	return p.Process(ctx)
+}
+
+// An activity that runs out of time is retried instead of failing the orchestration, and the executor can still record
+// the outcome afterwards.
+func TestProcessMessage_ActivityTimeoutIsRetried(t *testing.T) {
+	processor := &hangingProcessor{}
+
+	start := time.Now()
+	msg, written, err := runEngineStateTestWith(t, processor, api.EngineState{}, 1, func(e *NatsActivityExecutor) {
+		e.ActivityTimeout = 20 * time.Millisecond
+	})
+
+	require.ErrorContains(t, err, "did not finish within 20ms")
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.True(t, processor.hasDeadline, "the activity must run with a deadline")
+	assert.WithinDuration(t, start.Add(20*time.Millisecond), processor.deadline, time.Second)
+	assert.True(t, msg.naked, "the activity must be retried")
+	assert.False(t, msg.acked)
+	require.NotEmpty(t, written)
+	last := written[len(written)-1]
+	assert.Equal(t, api.OrchestrationStateRunning, last.State)
+	assert.Equal(t, map[string]int{"A1": 1}, last.EngineState.Retries)
+}
+
+// Retrying a timed-out activity is still bounded by the activity retry limit.
+func TestProcessMessage_ActivityTimeoutGivesUpAfterMaxRetries(t *testing.T) {
+	msg, written, err := runEngineStateTestWith(t, &hangingProcessor{}, api.EngineState{Retries: map[string]int{"A1": 9}}, 1, func(e *NatsActivityExecutor) {
+		e.ActivityTimeout = 10 * time.Millisecond
+	})
+
+	require.ErrorContains(t, err, "activity A1 failed 10 times")
+	assert.True(t, msg.acked)
+	require.Len(t, written, 1)
+	assert.Equal(t, api.OrchestrationStateErrored, written[0].State)
+}
+
+func TestProcessMessage_ActivityRunsWithDefaultTimeout(t *testing.T) {
+	processor := &deadlineRecordingProcessor{}
+
+	start := time.Now()
+	_, _, err := runEngineStateTest(t, processor, api.EngineState{})
+
+	require.NoError(t, err)
+	require.True(t, processor.hasDeadline)
+	assert.WithinDuration(t, start.Add(DefaultActivityTimeout), processor.deadline, time.Minute)
+}
+
+// deadlineRecordingProcessor completes immediately and records the deadline of its context.
+type deadlineRecordingProcessor struct {
+	deadline    time.Time
+	hasDeadline bool
+}
+
+func (p *deadlineRecordingProcessor) Process(ctx api.ActivityContext) api.ActivityResult {
+	p.deadline, p.hasDeadline = ctx.Context().Deadline()
+	return api.ActivityResult{Result: api.ActivityResultComplete}
+}
+
+func (p *deadlineRecordingProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
+	return p.Process(ctx)
+}
+
+func (p *deadlineRecordingProcessor) ProcessDispose(ctx api.ActivityContext) api.ActivityResult {
+	return p.Process(ctx)
 }
 
 // Once an activity has used up its retries, the orchestration is marked errored instead of being retried forever.
