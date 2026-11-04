@@ -47,13 +47,28 @@ func SetupStream(ctx context.Context, client *NatsClient, streamName string) (je
 	return nil, fmt.Errorf("unable to access NATS stream: %w", err)
 }
 
-// SetupConsumer creates or updates a NATS JetStream consumer for an activity processor.
+// SetupConsumer creates or updates a NATS JetStream consumer for a message processor. Messages are delivered at most
+// DefaultMaxDeliver times, and redelivered after DefaultAckWait when they are not acknowledged in time.
 func SetupConsumer(ctx context.Context, stream jetstream.Stream, subject string) (jetstream.Consumer, error) {
+	return setupSubjectConsumer(ctx, stream, subject, DefaultMaxDeliver)
+}
+
+// SetupActivityConsumer creates or updates a NATS JetStream consumer for an orchestration activity. A rescheduled activity
+// polls by having its message redelivered, so the number of deliveries says little about how often the activity failed:
+// the activity executor bounds retries itself, and the consumer only has the much higher ActivityMaxDeliver as a
+// safety net.
+func SetupActivityConsumer(ctx context.Context, stream jetstream.Stream, activityType string) (jetstream.Consumer, error) {
+	return setupSubjectConsumer(ctx, stream, activityType, ActivityMaxDeliver)
+}
+
+func setupSubjectConsumer(ctx context.Context, stream jetstream.Stream, subject string, maxDeliver int) (jetstream.Consumer, error) {
 	sanitizedSubject := strings.ReplaceAll(subject, ".", "-") // convert to `-` because NATs uses dot-notation to denote subject hierarchies
 	return stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
 		Durable:       sanitizedSubject,
 		AckPolicy:     jetstream.AckExplicitPolicy,
 		FilterSubject: CFMSubjectPrefix + "." + sanitizedSubject,
+		AckWait:       DefaultAckWait,
+		MaxDeliver:    maxDeliver,
 	})
 }
 
@@ -123,12 +138,14 @@ func EnsureStreamSubjects(ctx context.Context, client *NatsClient, stream jetstr
 
 // SetupMultiSubjectConsumer creates or updates a single durable consumer bound to all the given filter subjects. The
 // subjects are used verbatim (no prefixing or sanitization), and the durable name is derived from the agent rather than
-// the subject so that one consumer can span multiple subjects.
+// the subject so that one consumer can span multiple subjects. Delivery is bounded in the same way as for SetupConsumer.
 func SetupMultiSubjectConsumer(ctx context.Context, stream jetstream.Stream, durable string, subjects []string) (jetstream.Consumer, error) {
 	return stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
 		Durable:        durable,
 		AckPolicy:      jetstream.AckExplicitPolicy,
 		FilterSubjects: subjects,
+		AckWait:        DefaultAckWait,
+		MaxDeliver:     DefaultMaxDeliver,
 	})
 }
 

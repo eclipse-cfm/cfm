@@ -15,6 +15,7 @@ package natsorchestration
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -54,8 +55,18 @@ type NatsActivityExecutor struct {
 	ActivityType      string
 	ActivityProcessor api.ActivityProcessor
 	Monitor           system.LogMonitor
+	// MaxActivityRetries is how often an activity may fail with a retriable error before the orchestration is marked
+	// errored. It defaults to natsclient.DefaultMaxDeliver.
+	MaxActivityRetries int
 	// Loop drives message fetching. Execute sets Loop.Recreate if it is not already set.
 	Loop natsclient.FetchLoop
+}
+
+func (e *NatsActivityExecutor) maxActivityRetries() int {
+	if e.MaxActivityRetries <= 0 {
+		return natsclient.DefaultMaxDeliver
+	}
+	return e.MaxActivityRetries
 }
 
 // Execute starts a goroutine to process messages from the activity queue.
@@ -77,7 +88,7 @@ func (e *NatsActivityExecutor) Execute(ctx context.Context) error {
 			if err != nil {
 				return nil, fmt.Errorf("error opening stream: %w", err)
 			}
-			return natsclient.SetupConsumer(ctx, stream, e.ActivityType)
+			return natsclient.SetupActivityConsumer(ctx, stream, e.ActivityType)
 		}
 	}
 
@@ -118,8 +129,18 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 		return fmt.Errorf("failed to unmarshal orchestration message: %w", err)
 	}
 
+	finalDelivery := natsclient.IsFinalDelivery(message, natsclient.ActivityMaxDeliver)
+
 	orchestration, revision, err := ReadOrchestration(ctx, oMessage.OrchestrationID, e.Client)
 	if err != nil {
+		if finalDelivery {
+			// Last chance: without the orchestration it cannot be marked errored, so drop the message loudly
+			e.Monitor.Severef("Giving up on activity message %s for orchestration %s after %d deliveries: %v",
+				oMessage.Activity.ID, oMessage.OrchestrationID, natsclient.ActivityMaxDeliver, err)
+			if termErr := message.Term(); termErr != nil {
+				err = errors.Join(err, fmt.Errorf("failed to TERM message: %w", termErr))
+			}
+		}
 		return fmt.Errorf("failed to read orchestration data: %w", err)
 	}
 
@@ -162,6 +183,15 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 		orchestration.ProcessingData,
 		orchestration.OutputData)
 
+	if finalDelivery {
+		// Safety net: the message has been redelivered so often that something is stuck, for example an activity that
+		// reschedules forever or a completion that keeps failing. Stop here and mark the orchestration errored.
+		e.Monitor.Severef("Giving up on activity %s of orchestration %s after %d deliveries",
+			oMessage.Activity.ID, oMessage.OrchestrationID, natsclient.ActivityMaxDeliver)
+		return e.handleFatalError(activityContext, orchestration, revision,
+			fmt.Errorf("activity %s was delivered %d times without completing", oMessage.Activity.ID, natsclient.ActivityMaxDeliver), message)
+	}
+
 	e.Monitor.Debugf("Received activity message %s for orchestration %s (attempt %d)", oMessage.Activity.ID, oMessage.OrchestrationID, attempt)
 
 	initActivityMetrics()
@@ -190,7 +220,7 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 
 	switch result.Result {
 	case api.ActivityResultRetryError:
-		return e.handleRetryError(activityContext, orchestration, revision, message, result.Error)
+		return e.handleRetryError(activityContext, orchestration, revision, message, oMessage.Activity.ID, result)
 
 	case api.ActivityResultFatalError:
 		return e.handleFatalError(activityContext, orchestration, revision, result.Error, message)
@@ -337,17 +367,43 @@ func (e *NatsActivityExecutor) publishResponse(activityContext api.ActivityConte
 	return err
 }
 
-// handleRetryError handles retriable errors by persisting the orchestration state and re-delivering the message using a Nak.
+// handleRetryError handles retriable errors by persisting the orchestration state and redelivering the message after a
+// delay: the activity's WaitOnReschedule if it set one, otherwise a backoff that grows with each retry. Once the
+// activity has failed MaxActivityRetries times, the error is handled as fatal instead, so the orchestration is marked
+// errored rather than retried forever.
 func (e *NatsActivityExecutor) handleRetryError(
 	activityContext api.ActivityContext,
 	orchestration api.Orchestration,
 	revision uint64,
 	message jetstream.Msg,
-	resultErr error) error {
+	activityID string,
+	result api.ActivityResult) error {
+
+	resultErr := result.Error
+	if resultErr == nil {
+		resultErr = errors.New("activity requested a retry")
+	}
+
+	if orchestration.EngineState.Retries == nil {
+		orchestration.EngineState.Retries = make(map[string]int)
+	}
+	retries := orchestration.EngineState.Retries[activityID] + 1
+	orchestration.EngineState.Retries[activityID] = retries
+
+	if retries >= e.maxActivityRetries() {
+		e.Monitor.Severef("Giving up on activity %s of orchestration %s after %d failed attempts: %v",
+			activityID, orchestration.ID, retries, resultErr)
+		return e.handleFatalError(activityContext, orchestration, revision,
+			fmt.Errorf("activity %s failed %d times: %w", activityID, retries, resultErr), message)
+	}
+
+	delay := result.WaitOnReschedule
+	if delay <= 0 {
+		delay = natsclient.RetryDelay(retries)
+	}
 
 	e.persistState(activityContext, orchestration, revision)
-	// Nak to redeliver the message
-	if err := message.Nak(); err != nil {
+	if err := message.NakWithDelay(delay); err != nil {
 		return fmt.Errorf("retriable failure when executing activity message and NAK response %s (errors: %w, %v)",
 			orchestration.ID, resultErr, err)
 	}

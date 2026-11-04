@@ -108,7 +108,7 @@ func (a *agentServiceAssembly) setupConsumer(natsClient *natsclient.NatsClient) 
 		return fmt.Errorf("error setting up agent stream: %w", err)
 	}
 
-	_, err = natsclient.SetupConsumer(ctx, stream, a.activityType)
+	_, err = natsclient.SetupActivityConsumer(ctx, stream, a.activityType)
 
 	if err != nil {
 		return fmt.Errorf("error setting up agent consumer: %w", err)

@@ -59,7 +59,7 @@ func TestNatsOrchestrationClient_ProcessMessage_Errors(t *testing.T) {
 			},
 			setupMessage: func(m *mockJetStreamMsg) {
 				m.On("Data").Return([]byte(`{"id":"test-id","success":true,"manifestId":"manifest-1","correlationId":"123","orchestrationType":"cfm.vpa"}`))
-				m.On("Nak").Return(nil)
+				m.On("NakWithDelay", time.Second).Return(nil)
 				m.On("Subject").Return("test-subject")
 			},
 			expectedError: "retriable failure when dispatching ",
@@ -74,7 +74,7 @@ func TestNatsOrchestrationClient_ProcessMessage_Errors(t *testing.T) {
 			},
 			setupMessage: func(m *mockJetStreamMsg) {
 				m.On("Data").Return([]byte(`{"id":"test-id-2","success":true,"manifestId":"manifest-2","correlationId":"corr-2","orchestrationType":"cfm.vpa"}`))
-				m.On("Nak").Return(errors.New("NAK failed"))
+				m.On("NakWithDelay", time.Second).Return(errors.New("NAK failed"))
 				m.On("Subject").Return("test-subject")
 			},
 			expectedError: "retriable failure when dispatching ",
@@ -238,15 +238,16 @@ func (m *mockJetStreamMsg) Headers() nats.Header {
 }
 
 func (m *mockJetStreamMsg) Metadata() (*jetstream.MsgMetadata, error) {
-	panic("not implemented")
+	return nil, jetstream.ErrNotJSMessage
 }
 
 func (m *mockJetStreamMsg) DoubleAck(_ context.Context) error {
 	panic("not implemented")
 }
 
-func (m *mockJetStreamMsg) NakWithDelay(_ time.Duration) error {
-	panic("not implemented")
+func (m *mockJetStreamMsg) NakWithDelay(delay time.Duration) error {
+	args := m.Called(delay)
+	return args.Error(0)
 }
 
 func (m *mockJetStreamMsg) TermWithReason(_ string) error {

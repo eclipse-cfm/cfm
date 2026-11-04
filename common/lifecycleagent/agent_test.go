@@ -240,7 +240,7 @@ func TestLifecycleAgent_FatalErrorIsNotRedelivered(t *testing.T) {
 	proc := &recordingProcessor{
 		received: make(chan lifecycleagent.EventContext[testEvent], 8),
 		onCall: func(int32) error {
-			return assert.AnError // non-recoverable
+			return types.NewFatalError("permanent failure") // unclassified errors are retried, so mark it fatal
 		},
 	}
 	shutdown := launchAgent(t, ctx, nt, "fatalagent", subject, proc)

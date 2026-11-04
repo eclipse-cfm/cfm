@@ -49,9 +49,9 @@ type EventContext[T any] struct {
 	Raw []byte
 }
 
-// EventProcessor processes events delivered to a lifecycle agent. Returning a recoverable error (see
-// common/types.NewRecoverableError) causes the message to be redelivered; any other error is treated as fatal and the
-// message is acknowledged (dropped).
+// EventProcessor processes events delivered to a lifecycle agent. Returning a client or fatal error (see common/types)
+// acknowledges (drops) the message; any other error causes it to be redelivered after a delay, up to the consumer's
+// delivery limit (see natsclient.RetriableMessageProcessor).
 type EventProcessor[T any] interface {
 	Process(ctx context.Context, evt EventContext[T]) error
 }
