@@ -38,6 +38,11 @@ type InMemoryEntityStore[T store.EntityType] struct {
 	matcher query.FieldMatcher
 }
 
+// FindByIDAndLock behaves like FindByID: the in-memory store has no transactions to hold a lock.
+func (s *InMemoryEntityStore[T]) FindByIDAndLock(ctx context.Context, id string, _ store.LockMode) (T, error) {
+	return s.FindByID(ctx, id)
+}
+
 func (s *InMemoryEntityStore[T]) FindByID(_ context.Context, id string) (T, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

@@ -104,6 +104,11 @@ func DefaultPaginationOptions() PaginationOptions {
 // EntityStore defines the interface for entity storage.
 type EntityStore[T EntityType] interface {
 	FindByID(ctx context.Context, id string) (T, error)
+	// FindByIDAndLock returns the entity like FindByID and locks it until the surrounding transaction ends, so that a
+	// check on the entity and the write that depends on it can't interleave with a conflicting transaction. It returns
+	// types.ErrNotFound if the entity doesn't exist. Stores without row locks, such as the in-memory store, behave
+	// like FindByID.
+	FindByIDAndLock(ctx context.Context, id string, mode LockMode) (T, error)
 	Exists(ctx context.Context, id string) (bool, error)
 	Create(ctx context.Context, entity T) (T, error)
 	Update(ctx context.Context, entity T) error // T is already a pointer type
@@ -117,6 +122,18 @@ type EntityStore[T EntityType] interface {
 	CountByPredicate(ctx context.Context, predicate query.Predicate) (int64, error)
 	DeleteByPredicate(ctx context.Context, predicate query.Predicate) error
 }
+
+// LockMode is the kind of lock FindByIDAndLock takes on an entity.
+type LockMode int
+
+const (
+	// LockShared lets other transactions read and share-lock the entity, but blocks changes and deletes, and
+	// exclusive locks, until the transaction ends. Take it on an entity that a write references.
+	LockShared LockMode = iota
+	// LockExclusive blocks other locks, changes and deletes until the transaction ends. Take it on an entity before
+	// checking whether it can be changed or deleted.
+	LockExclusive
+)
 
 // EntityType defines a versionable entity.
 type EntityType interface {

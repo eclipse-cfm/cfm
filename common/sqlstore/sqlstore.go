@@ -63,6 +63,24 @@ type PostgresEntityStore[T store.EntityType] struct {
 }
 
 func (p *PostgresEntityStore[T]) FindByID(ctx context.Context, id string) (T, error) {
+	return p.findByID(ctx, id, "")
+}
+
+// FindByIDAndLock returns the entity and locks its row until the transaction ends: FOR SHARE for store.LockShared,
+// FOR UPDATE for store.LockExclusive.
+func (p *PostgresEntityStore[T]) FindByIDAndLock(ctx context.Context, id string, mode store.LockMode) (T, error) {
+	switch mode {
+	case store.LockShared:
+		return p.findByID(ctx, id, " FOR SHARE")
+	case store.LockExclusive:
+		return p.findByID(ctx, id, " FOR UPDATE")
+	default:
+		var zero T
+		return zero, fmt.Errorf("unsupported lock mode %d", mode)
+	}
+}
+
+func (p *PostgresEntityStore[T]) findByID(ctx context.Context, id string, lockClause string) (T, error) {
 	var zero T
 	selectClause := strings.Join(p.columnNames, ", ")
 
@@ -71,7 +89,7 @@ func (p *PostgresEntityStore[T]) FindByID(ctx context.Context, id string) (T, er
 		return zero, err
 	}
 	row := tx.QueryRowContext(ctx,
-		fmt.Sprintf("SELECT %s FROM %s WHERE id = $1", selectClause, p.tableName),
+		fmt.Sprintf("SELECT %s FROM %s WHERE id = $1%s", selectClause, p.tableName, lockClause),
 		id,
 	)
 
