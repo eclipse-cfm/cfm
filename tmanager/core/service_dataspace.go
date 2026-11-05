@@ -17,15 +17,18 @@ import (
 	"time"
 
 	"github.com/eclipse-cfm/cfm/common/collection"
+	"github.com/eclipse-cfm/cfm/common/query"
 	"github.com/eclipse-cfm/cfm/common/store"
+	"github.com/eclipse-cfm/cfm/common/types"
 	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/google/uuid"
 )
 
 type dataspaceProfileService struct {
-	trxContext   store.TransactionContext
-	profileStore store.EntityStore[*api.DataspaceProfile]
-	cellStore    store.EntityStore[*api.Cell]
+	trxContext       store.TransactionContext
+	profileStore     store.EntityStore[*api.DataspaceProfile]
+	cellStore        store.EntityStore[*api.Cell]
+	participantStore store.EntityStore[*api.ParticipantProfile]
 }
 
 func (d dataspaceProfileService) GetProfile(ctx context.Context, profileID string) (*api.DataspaceProfile, error) {
@@ -40,8 +43,24 @@ func (d dataspaceProfileService) CreateProfile(ctx context.Context, profile *api
 	})
 }
 
+// DeleteProfile deletes a dataspace profile that no participant uses, apart from disposed participants.
 func (t dataspaceProfileService) DeleteProfile(ctx context.Context, profileID string) error {
 	return t.trxContext.Execute(ctx, func(ctx context.Context) error {
+		// The exclusive lock waits for participant deployments that share-locked the profile, so that the check below
+		// sees them, and makes deployments that start later wait for this delete.
+		if _, err := t.profileStore.FindByIDAndLock(ctx, profileID, store.LockExclusive); err != nil {
+			return err
+		}
+
+		for participant, err := range t.participantStore.FindByPredicate(ctx, query.Eq("dataspaceProfileIds", profileID)) {
+			if err != nil {
+				return err
+			}
+			if !participantIsDisposed(participant) {
+				return types.NewClientError("cannot delete dataspace profile %s: participant profile %s uses it", profileID, participant.ID)
+			}
+		}
+
 		return t.profileStore.Delete(ctx, profileID)
 	})
 }
@@ -53,7 +72,8 @@ func (d dataspaceProfileService) DeployProfile(ctx context.Context, profileID st
 			return err
 		}
 
-		cell, err := d.cellStore.FindByID(ctx, cellID)
+		// The shared lock keeps the cell from being deleted until the deployment is committed
+		cell, err := d.cellStore.FindByIDAndLock(ctx, cellID, store.LockShared)
 		if err != nil {
 			return err
 		}

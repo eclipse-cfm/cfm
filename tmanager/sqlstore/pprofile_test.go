@@ -175,6 +175,38 @@ func TestNewParticipantProfileStore_Create(t *testing.T) {
 	assert.Equal(t, "new-corp", created.Identifier)
 }
 
+// TestNewParticipantProfileStore_SearchByVPACellIDPredicate tests filtering by the cell of a VPA, which guards cell deletes
+func TestNewParticipantProfileStore_SearchByVPACellIDPredicate(t *testing.T) {
+	setupParticipantProfileTable(t, testDB)
+	defer cleanupParticipantProfileTestData(t, testDB)
+
+	estore := newParticipantProfileStore()
+	ctx := context.Background()
+	tx, err := testDB.BeginTx(ctx, nil)
+	require.NoError(t, err)
+	defer tx.Rollback()
+	txCtx := context.WithValue(ctx, sqlstore.SQLTransactionKey, tx)
+
+	_, err = estore.Create(txCtx, &api.ParticipantProfile{
+		Entity:     api.Entity{ID: "pprofile-cell", Version: 1},
+		Identifier: "cell-corp",
+		TenantID:   "tenant-1",
+		VPAs: []api.VirtualParticipantAgent{
+			{DeployableEntity: api.DeployableEntity{Entity: api.Entity{ID: "vpa-1"}, State: api.DeploymentStateActive}, Type: "connector", CellID: "cell-a"},
+		},
+		Properties: map[string]any{},
+	})
+	require.NoError(t, err)
+
+	count, err := estore.CountByPredicate(txCtx, query.Eq("vpas.cellId", "cell-a"))
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), count)
+
+	count, err = estore.CountByPredicate(txCtx, query.Eq("vpas.cellId", "cell-b"))
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), count)
+}
+
 // TestNewParticipantProfileStore_SearchByDataspaceProfileIDsPredicate tests filtering by dataspaceProfileIds
 func TestNewParticipantProfileStore_SearchByDataspaceProfileIDsPredicate(t *testing.T) {
 	setupParticipantProfileTable(t, testDB)

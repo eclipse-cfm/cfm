@@ -163,6 +163,39 @@ func TestDeleteDataspaceProfile(t *testing.T) {
 	})
 }
 
+func TestDeleteDataspaceProfile_InUse(t *testing.T) {
+	t.Run("participant using the profile blocks the delete", func(t *testing.T) {
+		ctx := t.Context()
+		service := newTestDataspaceService()
+		_, err := service.profileStore.Create(ctx, newTestDataspaceProfile("dataspace-1"))
+		require.NoError(t, err)
+		_, err = service.participantStore.Create(ctx, newTestParticipantProfile("tenant-1", "participant-1"))
+		require.NoError(t, err)
+
+		err = service.DeleteProfile(ctx, "dataspace-1")
+
+		require.ErrorContains(t, err, "participant profile participant-1")
+		assert.True(t, types.IsClientError(err))
+		_, err = service.GetProfile(ctx, "dataspace-1")
+		require.NoError(t, err)
+	})
+
+	t.Run("disposed participant does not block the delete", func(t *testing.T) {
+		ctx := t.Context()
+		service := newTestDataspaceService()
+		_, err := service.profileStore.Create(ctx, newTestDataspaceProfile("dataspace-1"))
+		require.NoError(t, err)
+		participant := newTestParticipantProfile("tenant-1", "participant-1")
+		for i := range participant.VPAs {
+			participant.VPAs[i].State = api.DeploymentStateDisposed
+		}
+		_, err = service.participantStore.Create(ctx, participant)
+		require.NoError(t, err)
+
+		require.NoError(t, service.DeleteProfile(ctx, "dataspace-1"))
+	})
+}
+
 func TestDeployDataspaceProfile(t *testing.T) {
 	ctx := context.Background()
 
@@ -393,8 +426,9 @@ func newTestDataspaceProfile(id string) *api.DataspaceProfile {
 
 func newTestDataspaceService() *dataspaceProfileService {
 	return &dataspaceProfileService{
-		trxContext:   store.NoOpTransactionContext{},
-		profileStore: memorystore.NewInMemoryEntityStore[*api.DataspaceProfile](),
-		cellStore:    memorystore.NewInMemoryEntityStore[*api.Cell](),
+		trxContext:       store.NoOpTransactionContext{},
+		profileStore:     memorystore.NewInMemoryEntityStore[*api.DataspaceProfile](),
+		cellStore:        memorystore.NewInMemoryEntityStore[*api.Cell](),
+		participantStore: memorystore.NewInMemoryEntityStore[*api.ParticipantProfile](),
 	}
 }
