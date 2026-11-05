@@ -31,13 +31,17 @@ const (
 )
 
 // DefaultAckWait is how long the server waits for a message to be acknowledged before redelivering it, for example
-// because the consumer crashed while processing it. It must be long enough for a slow message to be processed without
-// being redelivered in the meantime.
+// because the consumer crashed while processing it. FetchLoop reports messages that take longer to handle as in
+// progress, which resets the wait, so it only needs to cover the time between two heartbeats.
 //
 // Consumers deliberately set no BackOff schedule. With a BackOff, NATS ignores the delay of a second NakWithDelay and
 // redelivers on the BackOff schedule instead, which would break rescheduled activities. Explicit retries are delayed
 // with NakWithDelay instead (see NakWithBackoff).
 const DefaultAckWait = 30 * time.Second
+
+// DefaultDispatchTimeout is how long a message dispatcher may run before its context is canceled. FetchLoop keeps a
+// message for as long as its handler runs, so the limit makes sure that a dispatcher that hangs releases its message.
+const DefaultDispatchTimeout = 5 * time.Minute
 
 // retryDelays is the delay before a message that failed with a retriable error is redelivered, indexed by the number
 // of failed attempts so far. The last value is used for every attempt beyond the end of the schedule.

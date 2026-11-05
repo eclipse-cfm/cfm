@@ -24,8 +24,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/stretchr/testify/assert"
@@ -251,4 +253,181 @@ func TestProcessDispose_RejectsInvalidParticipantContextID(t *testing.T) {
 			assert.Empty(t, deleted)
 		})
 	}
+}
+
+// fakeJwtlet is an in-memory jwtlet management API that answers like the real one: creating a mapping that exists
+// returns 409, and replacing or deleting a mapping that does not exist returns 404.
+type fakeJwtlet struct {
+	mu       sync.Mutex
+	mappings map[string]resourceMapping
+	requests []string
+	// failCreate makes the create of a mapping for this client identifier fail with a 500
+	failCreate string
+}
+
+func newFakeJwtlet(t *testing.T) (*fakeJwtlet, *httptest.Server) {
+	j := &fakeJwtlet{mappings: map[string]resourceMapping{}}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		j.mu.Lock()
+		defer j.mu.Unlock()
+		j.requests = append(j.requests, r.Method)
+		const prefix = "/api/v1/mappings/"
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/mappings":
+			var rm resourceMapping
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&rm))
+			if rm.ClientIdentifier == j.failCreate {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			key := rm.ClientIdentifier + "/" + rm.ParticipantContext
+			if _, exists := j.mappings[key]; exists {
+				w.WriteHeader(http.StatusConflict)
+				return
+			}
+			j.mappings[key] = rm
+			w.WriteHeader(http.StatusCreated)
+		case r.Method == http.MethodPut && strings.HasPrefix(r.URL.Path, prefix):
+			var rm resourceMapping
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&rm))
+			key := strings.TrimPrefix(r.URL.Path, prefix)
+			require.Equal(t, rm.ClientIdentifier+"/"+rm.ParticipantContext, key)
+			if _, exists := j.mappings[key]; !exists {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			j.mappings[key] = rm
+			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, prefix):
+			key := strings.TrimPrefix(r.URL.Path, prefix)
+			if _, exists := j.mappings[key]; !exists {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			delete(j.mappings, key)
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
+	t.Cleanup(server.Close)
+	return j, server
+}
+
+func (j *fakeJwtlet) participantContexts() map[string]int {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	contexts := map[string]int{}
+	for _, rm := range j.mappings {
+		contexts[rm.ParticipantContext]++
+	}
+	return contexts
+}
+
+func newDeployContextFor(orchestrationID string, processingData map[string]any) api.ActivityContext {
+	data := map[string]any{"cfm.participant.id": "participant-123"}
+	for key, value := range processingData {
+		data[key] = value
+	}
+	return api.NewActivityContext(context.Background(), orchestrationID, api.Activity{ID: "jwtlet"}, data, map[string]any{})
+}
+
+// Running the deploy step again for the same orchestration, for example after a redelivery, must reuse the participant
+// context of the first attempt and leave exactly one set of mappings behind.
+func TestProcessDeploy_RepeatedAttemptsAreIdempotent(t *testing.T) {
+	jwtlet, server := newFakeJwtlet(t)
+	processor := newProcessorForTest(t, &fakeTokenProvider{token: stubToken()}, server.URL)
+
+	first := newDeployContextFor("orch-1", nil)
+	require.EqualValues(t, api.ActivityResultComplete, processor.ProcessDeploy(first).Result)
+	second := newDeployContextFor("orch-1", nil)
+	result := processor.ProcessDeploy(second)
+
+	require.EqualValues(t, api.ActivityResultComplete, result.Result, "a repeated deploy must succeed, got error: %v", result.Error)
+	firstID, _ := first.Value(participantContextIDKey)
+	secondID, _ := second.Value(participantContextIDKey)
+	assert.Equal(t, firstID, secondID)
+	assert.Equal(t, firstID, second.OutputValues()[participantContextIDKey])
+	assert.Equal(t, map[string]int{firstID.(string): 4}, jwtlet.participantContexts(), "exactly one set of mappings must exist")
+	assert.Contains(t, jwtlet.requests, http.MethodPut, "existing mappings must be replaced")
+}
+
+func TestProcessDeploy_DerivesValidDistinctParticipantContextIDs(t *testing.T) {
+	_, server := newFakeJwtlet(t)
+	processor := newProcessorForTest(t, &fakeTokenProvider{token: stubToken()}, server.URL)
+
+	first := newDeployContextFor("orch-1", nil)
+	second := newDeployContextFor("orch-2", nil)
+	require.EqualValues(t, api.ActivityResultComplete, processor.ProcessDeploy(first).Result)
+	require.EqualValues(t, api.ActivityResultComplete, processor.ProcessDeploy(second).Result)
+
+	firstID, _ := first.Value(participantContextIDKey)
+	secondID, _ := second.Value(participantContextIDKey)
+	assert.NotEqual(t, firstID, secondID)
+	assert.Len(t, firstID, 32)
+	assert.NoError(t, model.ValidateParticipantContextID(firstID.(string)))
+}
+
+// The participant context ID must not come from the orchestration payload, which would let a caller point the deploy at
+// another participant's context.
+func TestProcessDeploy_IgnoresParticipantContextIDFromPayload(t *testing.T) {
+	jwtlet, server := newFakeJwtlet(t)
+	processor := newProcessorForTest(t, &fakeTokenProvider{token: stubToken()}, server.URL)
+
+	ctx := newDeployContextFor("orch-1", map[string]any{participantContextIDKey: "someone-elses-context"})
+	require.EqualValues(t, api.ActivityResultComplete, processor.ProcessDeploy(ctx).Result)
+
+	id, _ := ctx.Value(participantContextIDKey)
+	assert.Equal(t, deriveParticipantContextID("orch-1", "jwtlet"), id)
+	assert.NotContains(t, jwtlet.participantContexts(), "someone-elses-context")
+}
+
+// A deploy that fails part-way must still record the participant context ID, so the dispose step can delete the
+// mappings that were created.
+func TestProcessDeploy_FailedDeployCanBeDisposed(t *testing.T) {
+	jwtlet, server := newFakeJwtlet(t)
+	jwtlet.failCreate = "system:serviceaccount:test-ns:identityhub"
+	processor := newProcessorForTest(t, &fakeTokenProvider{token: stubToken()}, server.URL)
+
+	ctx := newDeployContextFor("orch-1", nil)
+	result := processor.ProcessDeploy(ctx)
+	require.EqualValues(t, api.ActivityResultFatalError, result.Result)
+	require.ErrorContains(t, result.Error, "failed with status 500")
+	require.NotEmpty(t, jwtlet.participantContexts(), "some mappings were created before the failure")
+
+	_, ok := ctx.Value(participantContextIDKey)
+	require.True(t, ok, "the participant context ID must be recorded before calling jwtlet")
+	assert.NotContains(t, ctx.OutputValues(), participantContextIDKey, "a failed deploy must not report the ID as output")
+
+	result = processor.ProcessDispose(ctx)
+	require.EqualValues(t, api.ActivityResultComplete, result.Result, "dispose must clean up a partial deploy, got error: %v", result.Error)
+	assert.Empty(t, jwtlet.participantContexts())
+}
+
+func TestProcessDispose_RepeatedAttemptsSucceed(t *testing.T) {
+	jwtlet, server := newFakeJwtlet(t)
+	processor := newProcessorForTest(t, &fakeTokenProvider{token: stubToken()}, server.URL)
+
+	ctx := newDeployContextFor("orch-1", nil)
+	require.EqualValues(t, api.ActivityResultComplete, processor.ProcessDeploy(ctx).Result)
+	require.EqualValues(t, api.ActivityResultComplete, processor.ProcessDispose(ctx).Result)
+
+	result := processor.ProcessDispose(ctx)
+
+	require.EqualValues(t, api.ActivityResultComplete, result.Result, "a repeated dispose must succeed, got error: %v", result.Error)
+	assert.Empty(t, jwtlet.participantContexts())
+}
+
+func TestProcessDispose_FailsOnServerError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+	processor := newProcessorForTest(t, &fakeTokenProvider{token: stubToken()}, server.URL)
+
+	ctx := newDeployContextFor("orch-1", map[string]any{participantContextIDKey: deriveParticipantContextID("orch-1", "jwtlet")})
+	result := processor.ProcessDispose(ctx)
+
+	require.EqualValues(t, api.ActivityResultFatalError, result.Result)
+	assert.ErrorContains(t, result.Error, "failed with status 500")
 }

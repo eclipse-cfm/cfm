@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -187,7 +188,11 @@ func (p TokenExchangeActivityProcessor) ProcessDeploy(ctx api.ActivityContext) a
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing token exchange deploy for orchestration %s: %w", ctx.OID(), err)}
 	}
 
-	participantContextID := generateClientID()
+	// The ID is derived from the orchestration, so a retried or concurrently redelivered attempt works on the same
+	// participant context instead of creating another one. It is stored right away so that it is persisted even if the
+	// activity fails, which lets the dispose step clean up whatever was created.
+	participantContextID := deriveParticipantContextID(ctx.OID(), ctx.ID())
+	ctx.SetValue(participantContextIDKey, participantContextID)
 	span.SetAttributes(attribute.String("cfm.participantContextId", participantContextID))
 
 	// step 1: create the resource mappings via the jwtlet management API
@@ -201,7 +206,7 @@ func (p TokenExchangeActivityProcessor) ProcessDeploy(ctx api.ActivityContext) a
 		Audiences:          []string{p.Audience},
 	}
 	p.Monitor.Debugf("Creating resource mapping for participant context: %s", participantContextID)
-	if err := p.post(mapCtx, "/api/v1/mappings", rm); err != nil {
+	if err := p.createOrReplaceMapping(mapCtx, rm); err != nil {
 		mapSpan.RecordError(err)
 		mapSpan.End()
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating resource mapping: %w", err)}
@@ -221,7 +226,7 @@ func (p TokenExchangeActivityProcessor) ProcessDeploy(ctx api.ActivityContext) a
 			Audiences:          []string{p.Audience},
 		}
 		p.Monitor.Debugf("Creating workload resource mapping for %s -> %s", mapping.clientIdentifier, participantContextID)
-		if err := p.post(mapCtx, "/api/v1/mappings", wm); err != nil {
+		if err := p.createOrReplaceMapping(mapCtx, wm); err != nil {
 			mapSpan.RecordError(err)
 			mapSpan.End()
 			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating resource mapping for %s: %w", mapping.clientIdentifier, err)}
@@ -251,8 +256,7 @@ func (p TokenExchangeActivityProcessor) ProcessDeploy(ctx api.ActivityContext) a
 	exSpan.End()
 	p.Monitor.Debugf("token exchange successful. claims: %s", claims)
 
-	// set both - for further processing in other agents and for the output
-	ctx.SetValue(participantContextIDKey, participantContextID)
+	// the processing data already holds the ID for further processing in other agents; also return it as output
 	ctx.SetOutputValue(participantContextIDKey, participantContextID)
 
 	return api.ActivityResult{Result: api.ActivityResultComplete}
@@ -281,13 +285,13 @@ func (p TokenExchangeActivityProcessor) ProcessDispose(ctx api.ActivityContext) 
 	}
 	span.SetAttributes(attribute.String("cfm.participantContextId", participantContextID))
 
-	if err := p.delete(spanCtx, mappingPath(p.clientIdentifier, participantContextID)); err != nil {
+	if err := p.deleteMapping(spanCtx, p.clientIdentifier, participantContextID); err != nil {
 		span.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error deleting resource mapping: %w", err)}
 	}
 
 	for _, mapping := range p.resolvedMappings {
-		if err := p.delete(spanCtx, mappingPath(mapping.clientIdentifier, participantContextID)); err != nil {
+		if err := p.deleteMapping(spanCtx, mapping.clientIdentifier, participantContextID); err != nil {
 			span.RecordError(err)
 			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error deleting resource mapping for %s: %w", mapping.clientIdentifier, err)}
 		}
@@ -299,58 +303,77 @@ func (p TokenExchangeActivityProcessor) ProcessDispose(ctx api.ActivityContext) 
 	return api.ActivityResult{Result: api.ActivityResultComplete}
 }
 
-func (p TokenExchangeActivityProcessor) post(ctx context.Context, url string, body any) error {
-	// read workload token
-	tokenBytes, err := os.ReadFile(p.TokenFilePath)
+// createOrReplaceMapping creates a resource mapping, or replaces it if it already exists. A mapping already exists when
+// an earlier attempt of the activity created it, so replacing it makes the deploy step safe to repeat.
+func (p TokenExchangeActivityProcessor) createOrReplaceMapping(ctx context.Context, mapping resourceMapping) error {
+	method := http.MethodPost
+	status, err := p.send(ctx, method, "/api/v1/mappings", mapping)
 	if err != nil {
-		return fmt.Errorf("error reading token file from %s: %w", p.TokenFilePath, err)
+		return err
 	}
-
-	bodyJson, err := json.Marshal(body)
-	if err != nil {
-		return fmt.Errorf("error marshalling body: %w", err)
+	if status == http.StatusConflict {
+		p.Monitor.Debugf("Resource mapping %s -> %s already exists, replacing it", mapping.ClientIdentifier, mapping.ParticipantContext)
+		method = http.MethodPut
+		status, err = p.send(ctx, method, mappingPath(mapping.ClientIdentifier, mapping.ParticipantContext), mapping)
+		if err != nil {
+			return err
+		}
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.ManagementBasePath+url, bytes.NewReader(bodyJson))
-	if err != nil {
-		return fmt.Errorf("error creating request: %w", err)
-	}
-	req.Header.Set(contentTypeHeader, jsonContentType)
-	req.Header.Set(authHeader, "Bearer "+string(tokenBytes))
-	resp, err := p.HttpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("error sending request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("request '%s %s' failed with status %d", req.Method, req.URL.String(), resp.StatusCode)
-	}
-
-	return nil
+	return checkStatus(method, mapping.ClientIdentifier, status)
 }
 
-func (p TokenExchangeActivityProcessor) delete(ctx context.Context, url string) error {
+// deleteMapping deletes a resource mapping. A mapping that does not exist counts as deleted, so the dispose step is safe
+// to repeat and can clean up after a deploy that failed part-way.
+func (p TokenExchangeActivityProcessor) deleteMapping(ctx context.Context, clientIdentifier string, participantContextID string) error {
+	status, err := p.send(ctx, http.MethodDelete, mappingPath(clientIdentifier, participantContextID), nil)
+	if err != nil {
+		return err
+	}
+	if status == http.StatusNotFound {
+		p.Monitor.Debugf("Resource mapping %s -> %s does not exist, nothing to delete", clientIdentifier, participantContextID)
+		return nil
+	}
+	return checkStatus(http.MethodDelete, clientIdentifier, status)
+}
+
+// send sends a request to the jwtlet management API, with body as JSON unless it is nil, and returns the response
+// status.
+func (p TokenExchangeActivityProcessor) send(ctx context.Context, method string, path string, body any) (int, error) {
 	// read workload token
 	tokenBytes, err := os.ReadFile(p.TokenFilePath)
 	if err != nil {
-		return fmt.Errorf("error reading token file from %s: %w", p.TokenFilePath, err)
+		return 0, fmt.Errorf("error reading token file from %s: %w", p.TokenFilePath, err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, p.ManagementBasePath+url, nil)
+	var reqBody io.Reader
+	if body != nil {
+		bodyJson, err := json.Marshal(body)
+		if err != nil {
+			return 0, fmt.Errorf("error marshalling body: %w", err)
+		}
+		reqBody = bytes.NewReader(bodyJson)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, p.ManagementBasePath+path, reqBody)
 	if err != nil {
-		return fmt.Errorf("error creating request: %w", err)
+		return 0, fmt.Errorf("error creating request: %w", err)
+	}
+	if body != nil {
+		req.Header.Set(contentTypeHeader, jsonContentType)
 	}
 	req.Header.Set(authHeader, "Bearer "+string(tokenBytes))
 	resp, err := p.HttpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("error sending request: %w", err)
+		return 0, fmt.Errorf("error sending request '%s %s': %w", method, req.URL.String(), err)
 	}
-	defer resp.Body.Close()
+	_ = resp.Body.Close()
+	return resp.StatusCode, nil
+}
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("request '%s %s' failed with status %d", req.Method, req.URL.String(), resp.StatusCode)
+// checkStatus returns an error unless status is a success status.
+func checkStatus(method string, clientIdentifier string, status int) error {
+	if status < 200 || status >= 300 {
+		return fmt.Errorf("request '%s' for the resource mapping of %s failed with status %d", method, clientIdentifier, status)
 	}
-
 	return nil
 }
 
@@ -359,8 +382,15 @@ func mappingPath(clientIdentifier string, participantContextID string) string {
 	return "/api/v1/mappings/" + url.PathEscape(clientIdentifier) + "/" + url.PathEscape(participantContextID)
 }
 
-func generateClientID() string {
-	return strings.ReplaceAll(uuid.New().String(), "-", "")
+// participantContextIDNamespace is the namespace of the name-based UUIDs participant context IDs are derived from.
+var participantContextIDNamespace = uuid.NewSHA1(uuid.NameSpaceURL, []byte("https://github.com/eclipse-cfm/cfm/jwtlet/participant-context"))
+
+// deriveParticipantContextID returns the participant context ID for the given activity of an orchestration: a
+// name-based UUID without dashes, so every attempt of the activity gets the same ID while different orchestrations get
+// different ones.
+func deriveParticipantContextID(orchestrationID string, activityID string) string {
+	id := uuid.NewSHA1(participantContextIDNamespace, []byte(orchestrationID+"/"+activityID))
+	return strings.ReplaceAll(id.String(), "-", "")
 }
 
 // decodeJWTClaims base64-decodes the payload section of a JWT and returns it as a raw JSON string.

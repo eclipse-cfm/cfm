@@ -157,3 +157,58 @@ func TestProcessMessage_RecoverableWrappingPermanentErrorIsRetried(t *testing.T)
 	require.Error(t, newFailingProcessor(err).ProcessMessage(t.Context(), msg))
 	assert.True(t, msg.naked)
 }
+
+// A dispatcher that runs out of time has its message retried, even when it reports the timeout as a fatal error.
+func TestProcessMessage_DispatchTimeoutIsRetried(t *testing.T) {
+	var deadline time.Time
+	var hasDeadline bool
+	processor := &RetriableMessageProcessor[map[string]any]{
+		Dispatcher: func(ctx context.Context, payload map[string]any) error {
+			deadline, hasDeadline = ctx.Deadline()
+			<-ctx.Done()
+			return types.NewFatalWrappedError(ctx.Err(), "downstream did not answer")
+		},
+		Monitor:         system.NoopMonitor{},
+		DispatchTimeout: 20 * time.Millisecond,
+	}
+	msg := &fakeMsg{data: []byte(`{}`), numDelivered: 1}
+
+	start := time.Now()
+	err := processor.ProcessMessage(t.Context(), msg)
+
+	require.ErrorContains(t, err, "did not finish within 20ms")
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.True(t, hasDeadline)
+	assert.WithinDuration(t, start.Add(20*time.Millisecond), deadline, time.Second)
+	assert.True(t, msg.naked, "a timed-out message must be retried")
+	assert.False(t, msg.acked)
+}
+
+func TestProcessMessage_DispatcherRunsWithDefaultTimeout(t *testing.T) {
+	var deadline time.Time
+	var hasDeadline bool
+	processor := &RetriableMessageProcessor[map[string]any]{
+		DispatcherCtx: func(ctx context.Context, payload map[string]any, _ jetstream.Msg) error {
+			deadline, hasDeadline = ctx.Deadline()
+			return nil
+		},
+		Monitor: system.NoopMonitor{},
+	}
+
+	start := time.Now()
+	require.NoError(t, processor.ProcessMessage(t.Context(), &fakeMsg{data: []byte(`{}`)}))
+
+	require.True(t, hasDeadline)
+	assert.WithinDuration(t, start.Add(DefaultDispatchTimeout), deadline, time.Minute)
+}
+
+// A fatal error returned before the deadline is still not retried.
+func TestProcessMessage_FatalErrorWithinTimeoutIsAcked(t *testing.T) {
+	processor := newFailingProcessor(types.NewFatalError("broken"))
+	processor.DispatchTimeout = time.Minute
+	msg := &fakeMsg{data: []byte(`{}`)}
+
+	require.ErrorContains(t, processor.ProcessMessage(t.Context(), msg), "fatal failure")
+	assert.True(t, msg.acked)
+	assert.False(t, msg.naked)
+}

@@ -49,6 +49,11 @@ func initActivityMetrics() {
 	})
 }
 
+// DefaultActivityTimeout is how long an activity processor may run before its context is canceled. Activities that wait
+// for something to happen should reschedule themselves rather than block, so the limit only stops activities that
+// hang, for example on a downstream that does not answer.
+const DefaultActivityTimeout = 5 * time.Minute
+
 type NatsActivityExecutor struct {
 	Client            natsclient.MsgClient
 	StreamName        string
@@ -58,6 +63,8 @@ type NatsActivityExecutor struct {
 	// MaxActivityRetries is how often an activity may fail with a retriable error before the orchestration is marked
 	// errored. It defaults to natsclient.DefaultMaxDeliver.
 	MaxActivityRetries int
+	// ActivityTimeout bounds how long the activity processor may run. It defaults to DefaultActivityTimeout.
+	ActivityTimeout time.Duration
 	// Loop drives message fetching. Execute sets Loop.Recreate if it is not already set.
 	Loop natsclient.FetchLoop
 }
@@ -67,6 +74,13 @@ func (e *NatsActivityExecutor) maxActivityRetries() int {
 		return natsclient.DefaultMaxDeliver
 	}
 	return e.MaxActivityRetries
+}
+
+func (e *NatsActivityExecutor) activityTimeout() time.Duration {
+	if e.ActivityTimeout <= 0 {
+		return DefaultActivityTimeout
+	}
+	return e.ActivityTimeout
 }
 
 // Execute starts a goroutine to process messages from the activity queue.
@@ -202,14 +216,7 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 	activityStartedCounter.Add(ctx, 1, activityAttrs)
 	activityStart := time.Now()
 
-	var result api.ActivityResult
-	if activityContext.Discriminator() == api.DeployDiscriminator {
-		result = e.ActivityProcessor.ProcessDeploy(activityContext)
-	} else if activityContext.Discriminator() == api.DisposeDiscriminator {
-		result = e.ActivityProcessor.ProcessDispose(activityContext)
-	} else {
-		result = e.ActivityProcessor.Process(activityContext)
-	}
+	result := e.runActivity(ctx, orchestration, oMessage.Activity)
 
 	activityDurationHistogram.Record(ctx, float64(time.Since(activityStart).Milliseconds()),
 		metric.WithAttributes(
@@ -246,6 +253,42 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 	}
 
 	return e.processOnActivityCompletion(activityContext, orchestration, revision, message, oMessage)
+}
+
+// runActivity runs the activity processor with a deadline of ActivityTimeout. Only the processor gets the deadline: the
+// executor's own updates afterwards use the caller's context, so that the outcome is still recorded after an activity
+// ran out of time. An activity that fails because it ran out of time is retried rather than failed, since agents
+// commonly report any error from a downstream as fatal, and a slow downstream must not fail the orchestration for good.
+func (e *NatsActivityExecutor) runActivity(ctx context.Context, orchestration api.Orchestration, activity api.Activity) api.ActivityResult {
+	timeout := e.activityTimeout()
+	activityCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	// The context shares the orchestration's data maps, so values set by the processor are seen by the executor
+	activityContext := api.NewActivityContext(activityCtx, orchestration.ID, activity, orchestration.ProcessingData, orchestration.OutputData)
+
+	var result api.ActivityResult
+	switch activityContext.Discriminator() {
+	case api.DeployDiscriminator:
+		result = e.ActivityProcessor.ProcessDeploy(activityContext)
+	case api.DisposeDiscriminator:
+		result = e.ActivityProcessor.ProcessDispose(activityContext)
+	default:
+		result = e.ActivityProcessor.Process(activityContext)
+	}
+
+	if result.Result == api.ActivityResultFatalError && errors.Is(activityCtx.Err(), context.DeadlineExceeded) && ctx.Err() == nil {
+		e.Monitor.Warnf("Activity %s of orchestration %s did not finish within %s, retrying it", activity.ID, orchestration.ID, timeout)
+		resultErr := result.Error
+		if resultErr == nil {
+			resultErr = context.DeadlineExceeded
+		}
+		return api.ActivityResult{
+			Result: api.ActivityResultRetryError,
+			Error:  fmt.Errorf("activity %s did not finish within %s: %w", activity.ID, timeout, resultErr),
+		}
+	}
+	return result
 }
 
 func (e *NatsActivityExecutor) persistState(activityContext api.ActivityContext, orchestration api.Orchestration, revision uint64) {

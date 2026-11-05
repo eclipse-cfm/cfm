@@ -16,6 +16,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -176,4 +177,92 @@ func TestFetchLoop_Check(t *testing.T) {
 
 	loop.inFlight.Store(true)
 	require.NoError(t, loop.Check(time.Minute), "a loop handling a message is alive")
+}
+
+// heartbeatMsg is a jetstream.Msg that counts how often it is reported as in progress.
+type heartbeatMsg struct {
+	fakeMsg
+	inProgress    atomic.Int32
+	inProgressErr error
+}
+
+func (m *heartbeatMsg) InProgress() error {
+	m.inProgress.Add(1)
+	return m.inProgressErr
+}
+
+// warnCountingMonitor counts warnings.
+type warnCountingMonitor struct {
+	system.NoopMonitor
+	warnings atomic.Int32
+}
+
+func (m *warnCountingMonitor) Warnf(string, ...any) { m.warnings.Add(1) }
+
+func TestFetchLoop_HeartbeatsWhileHandling(t *testing.T) {
+	msg := &heartbeatMsg{}
+	loop := &FetchLoop{HeartbeatInterval: 10 * time.Millisecond}
+
+	var duringHandling int32
+	loop.handleWithHeartbeat(t.Context(), msg, system.NoopMonitor{}, func(context.Context, jetstream.Msg) {
+		time.Sleep(55 * time.Millisecond)
+		duringHandling = msg.inProgress.Load()
+	})
+
+	assert.GreaterOrEqual(t, duringHandling, int32(3), "a slow handler must keep its message in progress")
+	afterHandling := msg.inProgress.Load()
+	time.Sleep(30 * time.Millisecond)
+	assert.Equal(t, afterHandling, msg.inProgress.Load(), "no heartbeat may be sent once the handler has returned")
+}
+
+func TestFetchLoop_NoHeartbeatForFastHandler(t *testing.T) {
+	msg := &heartbeatMsg{}
+	loop := &FetchLoop{HeartbeatInterval: time.Hour}
+
+	loop.handleWithHeartbeat(t.Context(), msg, system.NoopMonitor{}, func(context.Context, jetstream.Msg) {})
+
+	assert.Zero(t, msg.inProgress.Load())
+}
+
+func TestFetchLoop_HeartbeatStopsWhenHandlerPanics(t *testing.T) {
+	msg := &heartbeatMsg{}
+	loop := &FetchLoop{HeartbeatInterval: 5 * time.Millisecond}
+
+	assert.Panics(t, func() {
+		loop.handleWithHeartbeat(t.Context(), msg, system.NoopMonitor{}, func(context.Context, jetstream.Msg) {
+			time.Sleep(20 * time.Millisecond)
+			panic("boom")
+		})
+	})
+	afterPanic := msg.inProgress.Load()
+	time.Sleep(20 * time.Millisecond)
+	assert.Equal(t, afterPanic, msg.inProgress.Load())
+}
+
+func TestFetchLoop_HeartbeatErrors(t *testing.T) {
+	t.Run("already acknowledged is ignored", func(t *testing.T) {
+		msg := &heartbeatMsg{inProgressErr: fmt.Errorf("wrapped: %w", jetstream.ErrMsgAlreadyAckd)}
+		monitor := &warnCountingMonitor{}
+		loop := &FetchLoop{HeartbeatInterval: 5 * time.Millisecond}
+
+		loop.handleWithHeartbeat(t.Context(), msg, monitor, func(context.Context, jetstream.Msg) { time.Sleep(25 * time.Millisecond) })
+
+		assert.Positive(t, msg.inProgress.Load())
+		assert.Zero(t, monitor.warnings.Load())
+	})
+
+	t.Run("other errors are logged and the handler keeps running", func(t *testing.T) {
+		msg := &heartbeatMsg{inProgressErr: jetstream.ErrConnectionClosed}
+		monitor := &warnCountingMonitor{}
+		loop := &FetchLoop{HeartbeatInterval: 5 * time.Millisecond}
+
+		handled := false
+		loop.handleWithHeartbeat(t.Context(), msg, monitor, func(context.Context, jetstream.Msg) {
+			time.Sleep(25 * time.Millisecond)
+			handled = true
+		})
+
+		assert.True(t, handled)
+		assert.Positive(t, monitor.warnings.Load())
+	})
 }

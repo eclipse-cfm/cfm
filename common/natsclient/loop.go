@@ -44,6 +44,12 @@ type ConsumerFactory func(ctx context.Context) (jetstream.Consumer, error)
 //
 // The loop records when it last completed a fetch, so that health checks can detect a loop that is no longer
 // receiving messages.
+//
+// While a message is being handled, the loop periodically tells the server that it is still in progress, which resets
+// the consumer's AckWait. A slow handler therefore keeps its message instead of having it redelivered to another
+// consumer while it is still working on it. If the process dies, the heartbeat stops and the message is redelivered
+// once AckWait has passed. Handlers must bound their own run time, since the heartbeat keeps the message for as long as
+// the handler runs: RetriableMessageProcessor and the activity executor do so with a deadline.
 type FetchLoop struct {
 	// Recreate optionally re-obtains the consumer after it has been deleted. If nil, the loop keeps retrying the
 	// original consumer.
@@ -53,6 +59,9 @@ type FetchLoop struct {
 	RetryBackoff time.Duration
 	// MaxBackoff caps the retry delay. Defaults to 30 seconds.
 	MaxBackoff time.Duration
+	// HeartbeatInterval is how often an in-flight message is reported as in progress. It must be well below the
+	// consumer's AckWait. Defaults to a third of DefaultAckWait.
+	HeartbeatInterval time.Duration
 
 	lastFetch atomic.Int64
 	inFlight  atomic.Bool
@@ -76,7 +85,7 @@ func (l *FetchLoop) Run(ctx context.Context, consumer jetstream.Consumer, monito
 			return ctx.Err()
 		}
 
-		err := l.fetch(ctx, consumer, handle)
+		err := l.fetch(ctx, consumer, monitor, handle)
 		if err == nil {
 			backoff = initial
 			continue
@@ -108,7 +117,7 @@ func (l *FetchLoop) Run(ctx context.Context, consumer jetstream.Consumer, monito
 
 // fetch performs a single fetch round and handles the received messages. Errors raised while the batch was being
 // received are only reported through the batch, so it is checked once all messages have been handled.
-func (l *FetchLoop) fetch(ctx context.Context, consumer jetstream.Consumer, handle func(context.Context, jetstream.Msg)) error {
+func (l *FetchLoop) fetch(ctx context.Context, consumer jetstream.Consumer, monitor system.LogMonitor, handle func(context.Context, jetstream.Msg)) error {
 	batch, err := consumer.Fetch(1, jetstream.FetchMaxWait(fetchMaxWait))
 	if err != nil {
 		return err
@@ -116,7 +125,7 @@ func (l *FetchLoop) fetch(ctx context.Context, consumer jetstream.Consumer, hand
 
 	for message := range batch.Messages() {
 		l.inFlight.Store(true)
-		handle(ctx, message)
+		l.handleWithHeartbeat(ctx, message, monitor, handle)
 		l.inFlight.Store(false)
 	}
 
@@ -125,6 +134,43 @@ func (l *FetchLoop) fetch(ctx context.Context, consumer jetstream.Consumer, hand
 	}
 	l.lastFetch.Store(time.Now().UnixNano())
 	return nil
+}
+
+// handleWithHeartbeat runs the handler and reports the message as in progress every HeartbeatInterval until the
+// handler returns. It only returns once the heartbeat has stopped, so no heartbeat is sent for a message after it has
+// been handled. A heartbeat that is already on its way when the handler NAKs the message with a delay can still reach
+// the server after the NAK, which shortens that delay to AckWait. The window is tiny compared to the heartbeat
+// interval, and the message is then merely redelivered early.
+func (l *FetchLoop) handleWithHeartbeat(ctx context.Context, message jetstream.Msg, monitor system.LogMonitor, handle func(context.Context, jetstream.Msg)) {
+	interval := l.HeartbeatInterval
+	if interval <= 0 {
+		interval = DefaultAckWait / 3
+	}
+
+	stop := make(chan struct{})
+	stopped := make(chan struct{})
+	go func() {
+		defer close(stopped)
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-ticker.C:
+				// A heartbeat that races with the handler acknowledging the message is harmless
+				if err := message.InProgress(); err != nil && !errors.Is(err, jetstream.ErrMsgAlreadyAckd) {
+					monitor.Warnf("Failed to report message on %s as in progress: %v", message.Subject(), err)
+				}
+			}
+		}
+	}()
+	defer func() {
+		close(stop)
+		<-stopped
+	}()
+
+	handle(ctx, message)
 }
 
 // LastFetch returns when the loop last completed a fetch without error, or the zero time if it has never run.

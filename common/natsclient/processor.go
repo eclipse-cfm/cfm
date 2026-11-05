@@ -60,6 +60,9 @@ func initNatsMetrics() {
 // common/types), which acks the message. Retries stop at the message's last allowed delivery (MaxDeliver): the message
 // is then dead-lettered, which means it is terminated, logged at severe level and counted in the
 // cfm.nats.message.dead_lettered.total metric.
+//
+// The dispatcher runs under a deadline of DispatchTimeout. A dispatcher that fails because it ran out of time is
+// retried, however its error is classified.
 type RetriableMessageProcessor[T any] struct {
 	Client        MsgClient
 	Dispatcher    func(ctx context.Context, payload T) error
@@ -69,6 +72,8 @@ type RetriableMessageProcessor[T any] struct {
 	// MaxDeliver must match the MaxDeliver of the consumer the processor reads from. It defaults to DefaultMaxDeliver,
 	// which is what SetupConsumer and SetupMultiSubjectConsumer configure.
 	MaxDeliver int
+	// DispatchTimeout bounds how long the dispatcher may run. It defaults to DefaultDispatchTimeout.
+	DispatchTimeout time.Duration
 	// Loop drives message fetching; set Loop.Recreate to let the processor recover from a deleted consumer.
 	Loop FetchLoop
 }
@@ -117,12 +122,7 @@ func (n *RetriableMessageProcessor[T]) ProcessMessage(ctx context.Context, messa
 		return fmt.Errorf("failed to unmarshal message: %w", err)
 	}
 
-	var resultErr error
-	if n.DispatcherCtx != nil {
-		resultErr = n.DispatcherCtx(ctx, payload, message)
-	} else {
-		resultErr = n.Dispatcher(ctx, payload)
-	}
+	resultErr := n.dispatch(ctx, payload, message)
 	if resultErr == nil {
 		return AckMessage(message)
 	}
@@ -173,6 +173,29 @@ func TermOnPanic(message jetstream.Msg, monitor system.LogMonitor, err *error) {
 	if termErr := message.Term(); termErr != nil {
 		*err = errors.Join(*err, fmt.Errorf("failed to TERM message: %w", termErr))
 	}
+}
+
+// dispatch runs the dispatcher with a deadline of DispatchTimeout. FetchLoop keeps a message for as long as its handler
+// runs, so without the deadline a dispatcher that hangs would hold its message forever. An error caused by running out
+// of time is marked recoverable, so that the message is retried rather than dropped.
+func (n *RetriableMessageProcessor[T]) dispatch(ctx context.Context, payload T, message jetstream.Msg) error {
+	timeout := n.DispatchTimeout
+	if timeout <= 0 {
+		timeout = DefaultDispatchTimeout
+	}
+	dispatchCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	var err error
+	if n.DispatcherCtx != nil {
+		err = n.DispatcherCtx(dispatchCtx, payload, message)
+	} else {
+		err = n.Dispatcher(dispatchCtx, payload)
+	}
+	if err != nil && errors.Is(dispatchCtx.Err(), context.DeadlineExceeded) && ctx.Err() == nil {
+		return types.NewRecoverableWrappedError(err, "dispatching message on %s did not finish within %s", message.Subject(), timeout)
+	}
+	return err
 }
 
 func (n *RetriableMessageProcessor[T]) maxDeliver() int {
