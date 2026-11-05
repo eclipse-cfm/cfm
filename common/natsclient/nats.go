@@ -16,6 +16,7 @@ package natsclient
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -37,6 +38,8 @@ type NatsClient struct {
 	Connection *nats.Conn
 	JetStream  jetstream.JetStream
 	KVStore    jetstream.KeyValue
+	// Resources configures the streams this client creates.
+	Resources JetStreamConfig
 }
 
 // ClientConfig configures a NATS client connection.
@@ -49,6 +52,8 @@ type ClientConfig struct {
 	Auth AuthStrategy
 	// TLS enables TLS, and mutual TLS when a client certificate is set; nil uses the transport implied by URL.
 	TLS *TLSConfig
+	// Resources configures the streams and the key-value bucket the client creates when they don't exist yet.
+	Resources JetStreamConfig
 }
 
 // NewNatsClient creates and returns a new NatsClient instance connected according to the given config. Default
@@ -90,17 +95,45 @@ func NewNatsClient(cfg ClientConfig, extra ...nats.Option) (*NatsClient, error) 
 		return nil, fmt.Errorf("failed to create jetstream context: %w", err)
 	}
 
-	kvManager, err := jetStream.CreateOrUpdateKeyValue(context.Background(), jetstream.KeyValueConfig{Bucket: cfg.Bucket})
+	kvManager, err := setupKeyValue(context.Background(), jetStream, cfg.Bucket, cfg.Resources)
 	if err != nil {
 		connection.Close()
-		return nil, fmt.Errorf("failed to create jetstream key value store with bucket %s: %w", cfg.Bucket, err)
+		return nil, err
 	}
 
 	return &NatsClient{
 		Connection: connection,
 		JetStream:  jetStream,
 		KVStore:    kvManager,
+		Resources:  cfg.Resources,
 	}, nil
+}
+
+// setupKeyValue returns the key-value bucket, creating it with the configured resources if it does not exist. An existing
+// bucket is never updated, so a bucket provisioned out of band keeps its configuration.
+func setupKeyValue(ctx context.Context, js jetstream.JetStream, bucket string, resources JetStreamConfig) (jetstream.KeyValue, error) {
+	kv, err := js.KeyValue(ctx, bucket)
+	if err == nil {
+		return kv, nil
+	}
+	if !errors.Is(err, jetstream.ErrBucketNotFound) {
+		return nil, fmt.Errorf("unable to access jetstream key value store with bucket %s: %w", bucket, err)
+	}
+
+	kv, err = js.CreateKeyValue(ctx, jetstream.KeyValueConfig{
+		Bucket:   bucket,
+		Replicas: resources.replicas(),
+		MaxBytes: resources.KVMaxBytes,
+		Storage:  jetstream.FileStorage,
+	})
+	if errors.Is(err, jetstream.ErrBucketExists) {
+		// another component created the bucket concurrently
+		return js.KeyValue(ctx, bucket)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to create jetstream key value store with bucket %s: %w", bucket, err)
+	}
+	return kv, nil
 }
 
 // Close closes the NATS Connection.

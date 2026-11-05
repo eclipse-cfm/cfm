@@ -72,6 +72,11 @@ func Launch(shutdown <-chan struct{}) {
 		panic(fmt.Errorf("error launching Provision Manager: %w", err))
 	}
 
+	jetStreamConfig, err := natsclient.JetStreamFromConfig(vConfig)
+	if err != nil {
+		panic(fmt.Errorf("error launching Provision Manager: %w", err))
+	}
+
 	assembler := system.NewServiceAssembler(logMonitor, vConfig, mode)
 
 	assembler.Register(&routing.RouterServiceAssembly{})
@@ -86,7 +91,7 @@ func Launch(shutdown <-chan struct{}) {
 		assembler.Register(&memorystore.MemoryStoreServiceAssembly{})
 	}
 
-	assembler.Register(natsorchestration.NewOrchestratorServiceAssembly(natsclient.ClientConfig{URL: uri, Bucket: bucketValue, Auth: natsAuth, TLS: natsclient.TLSFromConfig(vConfig)}, streamValue))
+	assembler.Register(natsorchestration.NewOrchestratorServiceAssembly(natsclient.ClientConfig{URL: uri, Bucket: bucketValue, Auth: natsAuth, TLS: natsclient.TLSFromConfig(vConfig), Resources: jetStreamConfig}, streamValue))
 	assembler.Register(natsprovision.NewProvisionServiceAssembly(streamValue))
 	assembler.Register(&core.PMCoreServiceAssembly{})
 

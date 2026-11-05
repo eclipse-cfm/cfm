@@ -69,8 +69,9 @@ Adapting the file to a deployment:
 - Add one lifecycle agent user per agent. Its durable consumer name is the lower-cased agent name with spaces, `.`, `/`,
   `*` and `>` replaced by `-`. Grant `$JS.API.STREAM.UPDATE.<events-stream>` only if the agent is configured to create
   the event stream itself.
-- If the orchestration stream is provisioned out of band, remove `$JS.API.STREAM.CREATE.<stream>` and
-  `$JS.API.STREAM.UPDATE.<stream>` from all users. Components only call them when the stream does not exist.
+- If the orchestration stream and the KV bucket are provisioned out of band (section 4), remove
+  `$JS.API.STREAM.CREATE.<stream>` and `$JS.API.STREAM.CREATE.KV_<bucket>` from all users. Components only call them
+  when the stream or bucket does not exist.
 
 ### Known limitations
 
@@ -81,8 +82,42 @@ The permissions narrow what a compromised component can do, but some trust remai
   bucket. The TM mitigates forged or replayed responses by only applying a response whose `manifestId` matches the
   orchestration it started for that profile (or the PM's auto-compensation of it), but an agent can still forge the
   outcome of an in-flight orchestration. Signing envelopes would close this gap.
-- **All components may create and reconfigure the KV bucket.** The shared client setup calls create-or-update on the
-  bucket on start, so even the TM and lifecycle agents need `$JS.API.STREAM.CREATE`/`UPDATE.KV_<bucket>`, which lets them
-  change the bucket's configuration (but not its contents).
+- **All components may create the KV bucket.** The shared client setup creates the bucket on start when it is missing,
+  so even the TM and lifecycle agents need `$JS.API.STREAM.CREATE.KV_<bucket>` unless the bucket is provisioned out of
+  band. No component needs to update an existing bucket or the orchestration stream.
 - **Replies share the `_INBOX.>` namespace.** Components can subscribe to each other's request replies. NATS supports
   per-user inbox prefixes, but CFM does not configure them yet.
+
+## 4. Make JetStream resources durable
+
+CFM keeps orchestration messages in the orchestration stream (`<prefix>_STREAM`), orchestration state in the KV bucket
+(`<prefix>_BUCKET`, backed by the stream `KV_<bucket>`) and lifecycle events in the event stream. A component creates the
+orchestration stream and the bucket when they are missing, and a lifecycle agent creates the event stream only with
+`createStream=true`. Existing streams and buckets are never changed, so their configuration is whatever they were created
+with.
+
+When a component creates one of them, it uses file storage and these settings:
+
+| Key                               | Description                                                                 |
+|-----------------------------------|-----------------------------------------------------------------------------|
+| `nats.jetstream.replicas`         | Replicas of each created stream and of the KV bucket (default 1, at most 5) |
+| `nats.jetstream.stream.maxAge`    | Maximum message age in created streams, e.g. `168h` (default unlimited)     |
+| `nats.jetstream.stream.maxBytes`  | Maximum size of each created stream in bytes (default unlimited)            |
+| `nats.jetstream.kv.maxBytes`      | Maximum size of the KV bucket in bytes (default unlimited)                  |
+
+On a clustered NATS, use 3 replicas, so that orchestrations keep running and no messages or state are lost when a
+server goes down. Set the same values on every component, because whichever starts first creates the resources.
+
+Keep these in mind when setting limits:
+
+- A message that exceeds `stream.maxAge` is removed even if it was never processed, so the age must exceed the longest
+  time an orchestration activity may wait in the stream.
+- The KV bucket holds the state of every orchestration and is not cleaned up. Once it reaches `kv.maxBytes`, writes
+  fail and orchestrations stop. The bucket has no TTL, because the Provision Manager uses its entries to de-duplicate
+  orchestration requests.
+
+For production deployments, prefer provisioning the streams and the bucket out of band, for example with
+[NACK](https://github.com/nats-io/nack) or a Helm job, so their configuration is under version control. Create them
+with the same name, subjects and retention policy that CFM uses: a work queue stream on `event.*` for orchestrations, a
+KV bucket with history 1, and an interest-based stream on the lifecycle event subjects. Changing replicas or limits
+later is then done on the server, for example with `nats stream edit`.

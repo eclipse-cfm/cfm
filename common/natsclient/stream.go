@@ -27,7 +27,9 @@ const CFMOrchestrationSubject = CFMSubjectPrefix + "." + CFMOrchestration
 const CFMOrchestrationResponse = "cfm-orchestration-response"
 const CFMOrchestrationResponseSubject = CFMSubjectPrefix + "." + CFMOrchestrationResponse
 
-// SetupStream configures a JetStream stream used for component messaging. If the stream does not exist, it is created.
+// SetupStream configures a JetStream stream used for component messaging. If the stream does not exist, it is created
+// with the client's resource configuration. An existing stream is never updated, so a stream provisioned out of band
+// keeps its configuration.
 func SetupStream(ctx context.Context, client *NatsClient, streamName string) (jetstream.Stream, error) {
 	stream, err := client.JetStream.Stream(ctx, streamName)
 	if err == nil {
@@ -36,15 +38,32 @@ func SetupStream(ctx context.Context, client *NatsClient, streamName string) (je
 
 	// If stream doesn't exist, create it
 	if errors.Is(err, jetstream.ErrStreamNotFound) {
-		cfg := jetstream.StreamConfig{
+		return createStream(ctx, client, jetstream.StreamConfig{
 			Name:      streamName,
 			Retention: jetstream.WorkQueuePolicy,
 			Subjects:  []string{CFMSubjectPrefix + ".*"},
-		}
-		return client.JetStream.CreateOrUpdateStream(ctx, cfg)
+		})
 	}
 
 	return nil, fmt.Errorf("unable to access NATS stream: %w", err)
+}
+
+// createStream creates a file-backed stream with the client's replicas and limits. If another component created the
+// stream concurrently, the existing stream is returned unchanged.
+func createStream(ctx context.Context, client *NatsClient, cfg jetstream.StreamConfig) (jetstream.Stream, error) {
+	cfg.Storage = jetstream.FileStorage
+	cfg.Replicas = client.Resources.replicas()
+	cfg.MaxAge = client.Resources.StreamMaxAge
+	cfg.MaxBytes = client.Resources.streamMaxBytes()
+
+	stream, err := client.JetStream.CreateStream(ctx, cfg)
+	if errors.Is(err, jetstream.ErrStreamNameAlreadyInUse) {
+		return client.JetStream.Stream(ctx, cfg.Name)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("unable to create NATS stream %q: %w", cfg.Name, err)
+	}
+	return stream, nil
 }
 
 // SetupConsumer creates or updates a NATS JetStream consumer for a message processor. Messages are delivered at most
@@ -72,8 +91,8 @@ func setupSubjectConsumer(ctx context.Context, stream jetstream.Stream, subject 
 	})
 }
 
-// GetStream looks up an existing JetStream stream by name. If the stream does not exist, it creates it with default
-// configuration. Adding the agent's own subjects to an existing stream is done separately via EnsureStreamSubjects.
+// GetStream looks up an existing JetStream stream by name. If the stream does not exist, it creates it with the client's
+// resource configuration. The agent's own subjects are added to an existing stream via EnsureStreamSubjects.
 func GetStream(ctx context.Context, client *NatsClient, streamName string, subjects []string) (jetstream.Stream, error) {
 	stream, err := client.JetStream.Stream(ctx, streamName)
 
@@ -83,14 +102,16 @@ func GetStream(ctx context.Context, client *NatsClient, streamName string, subje
 	}
 	// If stream doesn't exist, create it with the desired subjects
 	if errors.Is(err, jetstream.ErrStreamNotFound) {
-		cfg := jetstream.StreamConfig{
+		stream, err = createStream(ctx, client, jetstream.StreamConfig{
 			Name:      streamName,
 			Retention: jetstream.InterestPolicy,
-			Storage:   jetstream.MemoryStorage,
 			Subjects:  subjects,
+		})
+		if err != nil {
+			return nil, err
 		}
-		// no need to call EnsureSteamSubjects, because we are creating the stream with the desired subjects
-		return client.JetStream.CreateStream(ctx, cfg)
+		// a no-op for a stream created here; adds the subjects if another component created the stream concurrently
+		return EnsureStreamSubjects(ctx, client, stream, subjects)
 	}
 	return nil, fmt.Errorf("unable to access NATS stream %q: %w", streamName, err)
 }
