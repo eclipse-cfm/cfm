@@ -15,12 +15,14 @@ package natsorchestration
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"go.opentelemetry.io/otel"
 )
 
@@ -72,29 +74,47 @@ func ReadOrchestration(ctx context.Context, orchestrationID string, client natsc
 	return orchestration, oEntry.Revision(), nil
 }
 
+// maxUpdateConflicts is how often UpdateOrchestration re-reads and retries an update that lost a race against a
+// concurrent update, before giving up.
+const maxUpdateConflicts = 50
+
 // UpdateOrchestration updates the orchestration state in the KV store using optimistic concurrency by comparing the
-// last known revision.
+// last known revision. If another update got there first, the orchestration is re-read and updateFn is applied again,
+// up to maxUpdateConflicts times. Any other error is returned straight away, so that callers can retry later instead of
+// spinning on a KV store that cannot take the write.
 func UpdateOrchestration(
 	ctx context.Context,
 	orchestration api.Orchestration,
 	revision uint64,
 	client natsclient.MsgClient,
 	updateFn func(*api.Orchestration)) (api.Orchestration, uint64, error) {
-	for {
+	for conflicts := 0; ; conflicts++ {
 		updateFn(&orchestration)
-		// TODO break after number of retries using exponential backoff
 		serialized, err := json.Marshal(orchestration)
 		if err != nil {
 			return api.Orchestration{}, 0, fmt.Errorf("failed to marshal orchestration %s: %w", orchestration.ID, err)
 		}
-		_, err = client.Update(ctx, orchestration.ID, serialized, revision)
+		newRevision, err := client.Update(ctx, orchestration.ID, serialized, revision)
 		if err == nil {
-			break
+			return orchestration, newRevision, nil
+		}
+		if !isRevisionConflict(err) {
+			return api.Orchestration{}, 0, fmt.Errorf("failed to update orchestration %s: %w", orchestration.ID, err)
+		}
+		if conflicts+1 >= maxUpdateConflicts {
+			return api.Orchestration{}, 0, fmt.Errorf("failed to update orchestration %s after %d conflicting updates: %w",
+				orchestration.ID, maxUpdateConflicts, err)
 		}
 		orchestration, revision, err = ReadOrchestration(ctx, orchestration.ID, client)
 		if err != nil {
 			return api.Orchestration{}, 0, fmt.Errorf("failed to read orchestration data for update: %w", err)
 		}
 	}
-	return orchestration, revision, nil
+}
+
+// isRevisionConflict reports whether a KV update failed because the entry was changed since the given revision was read
+// (or, for revision 0, because the entry already exists).
+func isRevisionConflict(err error) bool {
+	var jsErr *jetstream.APIError
+	return errors.As(err, &jsErr) && jsErr.ErrorCode == jetstream.JSErrCodeStreamWrongLastSequence
 }

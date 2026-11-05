@@ -233,7 +233,10 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 		return e.handleFatalError(activityContext, orchestration, revision, result.Error, message)
 
 	case api.ActivityResultWait:
-		e.persistState(activityContext, orchestration, revision)
+		if err := e.persistState(activityContext, orchestration, revision); err != nil {
+			// Acking would lose the state the activity produced for good, so run the activity again later
+			return natsclient.NakError(message, err)
+		}
 		return natsclient.AckMessage(message)
 
 	case api.ActivityResultSchedule:
@@ -245,7 +248,10 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 		otel.GetTextMapPropagator().Inject(ctx, m)
 		orchestration.EngineState.TraceContext = m["traceparent"]
 
-		e.persistState(activityContext, orchestration, revision)
+		if err := e.persistState(activityContext, orchestration, revision); err != nil {
+			// The rescheduled run would see stale state, so run the activity again from the last persisted state
+			return natsclient.NakError(message, err)
+		}
 		if err := message.NakWithDelay(result.WaitOnReschedule); err != nil {
 			return fmt.Errorf("failed to reschedule schedule activity %s: %w", oMessage.OrchestrationID, err)
 		}
@@ -291,7 +297,8 @@ func (e *NatsActivityExecutor) runActivity(ctx context.Context, orchestration ap
 	return result
 }
 
-func (e *NatsActivityExecutor) persistState(activityContext api.ActivityContext, orchestration api.Orchestration, revision uint64) {
+// persistState saves the data the activity produced and the engine's bookkeeping to the KV store.
+func (e *NatsActivityExecutor) persistState(activityContext api.ActivityContext, orchestration api.Orchestration, revision uint64) error {
 	engineState := orchestration.EngineState
 	if _, _, err := UpdateOrchestration(activityContext.Context(), orchestration, revision, e.Client, func(o *api.Orchestration) {
 		for key, value := range activityContext.Values() {
@@ -303,7 +310,9 @@ func (e *NatsActivityExecutor) persistState(activityContext api.ActivityContext,
 		o.EngineState.Merge(engineState)
 	}); err != nil {
 		e.Monitor.Warnf("Failed to persist orchestration state for %s: %v", orchestration.ID, err)
+		return fmt.Errorf("failed to persist orchestration state for %s: %w", orchestration.ID, err)
 	}
+	return nil
 }
 
 func (e *NatsActivityExecutor) processOnActivityCompletion(
@@ -445,7 +454,9 @@ func (e *NatsActivityExecutor) handleRetryError(
 		delay = natsclient.RetryDelay(retries)
 	}
 
-	e.persistState(activityContext, orchestration, revision)
+	// The message is redelivered either way; if the retry count could not be saved, the cap is still enforced by the
+	// consumer's MaxDeliver
+	_ = e.persistState(activityContext, orchestration, revision)
 	if err := message.NakWithDelay(delay); err != nil {
 		return fmt.Errorf("retriable failure when executing activity message and NAK response %s (errors: %w, %v)",
 			orchestration.ID, resultErr, err)
