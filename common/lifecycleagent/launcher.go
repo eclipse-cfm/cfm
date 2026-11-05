@@ -168,9 +168,14 @@ func loadAgentConfig(name string, configPrefix string, defaultSubjects []string,
 		panic(fmt.Errorf("error loading agent configuration: %w", err))
 	}
 
+	jetStreamConfig, err := natsclient.JetStreamFromConfig(vConfig)
+	if err != nil {
+		panic(fmt.Errorf("error loading agent configuration: %w", err))
+	}
+
 	return &agentConfig{
 		Name:         name,
-		ClientConfig: natsclient.ClientConfig{URL: uri, Bucket: bucketValue, Auth: auth, TLS: natsclient.TLSFromConfig(vConfig)},
+		ClientConfig: natsclient.ClientConfig{URL: uri, Bucket: bucketValue, Auth: auth, TLS: natsclient.TLSFromConfig(vConfig), Resources: jetStreamConfig},
 		StreamName:   streamValue,
 		Subjects:     subjects,
 		CreateStream: createStream,

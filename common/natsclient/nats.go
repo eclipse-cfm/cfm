@@ -37,6 +37,8 @@ type NatsClient struct {
 	Connection *nats.Conn
 	JetStream  jetstream.JetStream
 	KVStore    jetstream.KeyValue
+	// Resources configures the streams this client creates.
+	Resources JetStreamConfig
 }
 
 // ClientConfig configures a NATS client connection.
@@ -49,6 +51,8 @@ type ClientConfig struct {
 	Auth AuthStrategy
 	// TLS enables TLS, and mutual TLS when a client certificate is set; nil uses the transport implied by URL.
 	TLS *TLSConfig
+	// Resources configures the streams and the key-value bucket the client creates when they don't exist yet.
+	Resources JetStreamConfig
 }
 
 // NewNatsClient creates and returns a new NatsClient instance connected according to the given config. Default
@@ -100,6 +104,7 @@ func NewNatsClient(cfg ClientConfig, extra ...nats.Option) (*NatsClient, error) 
 		Connection: connection,
 		JetStream:  jetStream,
 		KVStore:    kvManager,
+		Resources:  cfg.Resources,
 	}, nil
 }
 
