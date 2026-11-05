@@ -55,11 +55,16 @@ func (a *PostgresServiceAssembly) Init(context *system.InitContext) error {
 		return fmt.Errorf("missing Postgres DSN configuration: %s", dsnKey)
 	}
 	dsn := context.Config.GetString(dsnKey)
+	pool, err := sqlstore.PoolFromConfig(context.Config)
+	if err != nil {
+		return fmt.Errorf("invalid database pool configuration: %w", err)
+	}
 
 	db, err := otelsql.Open(driverName, dsn)
 	if err != nil {
 		return fmt.Errorf("error connecting to DB at %s: %w", dsn, err)
 	}
+	pool.Apply(db)
 	a.db = db
 
 	txContext := sqlstore.NewDBTransactionContext(db)

@@ -49,11 +49,16 @@ func (a *PostgresServiceAssembly) Init(ictx *system.InitContext) error {
 		return fmt.Errorf("missing Postgres DSN configuration: %s", dsnKey)
 	}
 	dsn := ictx.Config.GetString(dsnKey)
+	pool, err := sqlstore.PoolFromConfig(ictx.Config)
+	if err != nil {
+		return fmt.Errorf("invalid database pool configuration: %w", err)
+	}
 
 	db, err := otelsql.Open(driverName, dsn, otelsql.WithAttributes(semconv.DBSystemNamePostgreSQL))
 	if err != nil {
 		return fmt.Errorf("error connecting to DB at %s: %w", dsn, err)
 	}
+	pool.Apply(db)
 
 	a.db = db
 	otelsql.RegisterDBStatsMetrics(db, otelsql.WithAttributes(semconv.DBSystemNamePostgreSQL))
