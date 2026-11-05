@@ -73,7 +73,7 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 				panic(err)
 			}
 
-			provider := tokenexchange.NewTokenExchangeProvider(
+			provider := tokenexchange.NewCachingTokenExchangeProvider(
 				tokenFilePath,
 				tokenexchange.WithTokenExchangeUrl(tokenExchangeURL),
 				tokenexchange.WithTokenExchangeAudience(audience),

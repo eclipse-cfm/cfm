@@ -23,8 +23,10 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/common/token"
 )
 
 type tokenExchangeResponse struct {
@@ -90,11 +92,29 @@ func NewTokenExchangeProvider(tokenFilePath string, opts ...ProviderOption) Toke
 	return provider
 }
 
+// NewCachingTokenExchangeProvider creates a TokenExchangeProvider and wraps it in a token.CachingTokenProvider, so
+// exchanged tokens are reused per scope and participant context until shortly before they expire.
+func NewCachingTokenExchangeProvider(tokenFilePath string, opts ...ProviderOption) *token.CachingTokenProvider {
+	return token.NewCachingTokenProvider(NewTokenExchangeProvider(tokenFilePath, opts...))
+}
+
 func (t TokenExchangeProvider) GetToken(ctx context.Context, scope string, participantContextID string) (string, error) {
+	exchanged, err := t.GetExpiringToken(ctx, scope, participantContextID)
+	if err != nil {
+		return "", err
+	}
+	return exchanged.Value, nil
+}
+
+// GetExpiringToken exchanges the subject token for a token bound to the participant context. The subject token is read
+// from the file on every call, because it is rotated on disk. ExpiresAt is nil if the response has no positive
+// expires_in.
+func (t TokenExchangeProvider) GetExpiringToken(ctx context.Context, scope string, participantContextID string) (*token.ExpiringToken, error) {
+	requestedAt := time.Now()
 	t.monitor.Debugw("reading subject token from file", "path", t.filePath)
 	content, err := os.ReadFile(t.filePath)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	formData := url.Values{}
@@ -108,30 +128,36 @@ func (t TokenExchangeProvider) GetToken(ctx context.Context, scope string, parti
 	t.monitor.Debugw("sending token exchange request", "url", t.tokenExchangeUrl, "scope", scope, "resource", participantContextID, "audience", t.tokenExchangeAudience)
 	req, err := http.NewRequestWithContext(ctx, "POST", t.tokenExchangeUrl+"/token", strings.NewReader(formData.Encode()))
 	if err != nil {
-		return "", fmt.Errorf("error creating token exchange request: %w", err)
+		return nil, fmt.Errorf("error creating token exchange request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := t.httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("error sending token exchange request: %w", err)
+		return nil, fmt.Errorf("error sending token exchange request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("error reading response body: %w", err)
+		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		t.monitor.Debugw("token exchange failed", "status", resp.StatusCode, "body", string(bodyBytes))
-		return "", fmt.Errorf("token exchange failed with status %d", resp.StatusCode)
+		return nil, fmt.Errorf("token exchange failed with status %d", resp.StatusCode)
 	}
 	var tokenResponse tokenExchangeResponse
 	err = json.Unmarshal(bodyBytes, &tokenResponse)
 	if err != nil {
-		return "", fmt.Errorf("error decoding token exchange response: %w", err)
+		return nil, fmt.Errorf("error decoding token exchange response: %w", err)
 	}
 
 	t.monitor.Debugw("token exchange successful", "scope", scope, "resource", participantContextID, "token_type", tokenResponse.TokenType, "expires_in", tokenResponse.ExpiresIn)
-	return tokenResponse.AccessToken, nil
+	exchanged := &token.ExpiringToken{Value: tokenResponse.AccessToken}
+	if tokenResponse.ExpiresIn > 0 {
+		// measured from before the request, so the cached lifetime never exceeds the real one
+		expiresAt := requestedAt.Add(time.Duration(tokenResponse.ExpiresIn) * time.Second)
+		exchanged.ExpiresAt = &expiresAt
+	}
+	return exchanged, nil
 }
