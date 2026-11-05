@@ -23,7 +23,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -272,4 +274,68 @@ func TestGetToken_TokenAppendedToUrl(t *testing.T) {
 	_, err := provider.GetToken(t.Context(), testScope, testParticipantContext)
 	require.NoError(t, err)
 	assert.Equal(t, "/token", capturedPath)
+}
+
+func TestGetExpiringToken_ExpiryFromExpiresIn(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(tokenResponse())
+	}))
+	defer server.Close()
+
+	provider := NewTokenExchangeProvider(writeTokenFile(t, testSubjectToken),
+		WithTokenExchangeUrl(server.URL),
+		WithHttpClient(&http.Client{}),
+	)
+
+	before := time.Now()
+	token, err := provider.GetExpiringToken(t.Context(), testScope, testParticipantContext)
+	after := time.Now()
+	require.NoError(t, err)
+	assert.Equal(t, testAccessToken, token.Value)
+	require.NotNil(t, token.ExpiresAt)
+	assert.False(t, token.ExpiresAt.Before(before.Add(time.Hour)))
+	assert.False(t, token.ExpiresAt.After(after.Add(time.Hour)))
+}
+
+func TestGetExpiringToken_NoExpiryWithoutExpiresIn(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(tokenExchangeResponse{AccessToken: testAccessToken})
+	}))
+	defer server.Close()
+
+	provider := NewTokenExchangeProvider(writeTokenFile(t, testSubjectToken),
+		WithTokenExchangeUrl(server.URL),
+		WithHttpClient(&http.Client{}),
+	)
+
+	token, err := provider.GetExpiringToken(t.Context(), testScope, testParticipantContext)
+	require.NoError(t, err)
+	assert.Nil(t, token.ExpiresAt)
+}
+
+func TestCachingTokenExchangeProvider_ExchangesOncePerScopeAndParticipant(t *testing.T) {
+	var exchanges atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		exchanges.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(tokenResponse())
+	}))
+	defer server.Close()
+
+	provider := NewCachingTokenExchangeProvider(writeTokenFile(t, testSubjectToken),
+		WithTokenExchangeUrl(server.URL),
+		WithHttpClient(&http.Client{}),
+	)
+
+	for range 3 {
+		token, err := provider.GetToken(t.Context(), testScope, testParticipantContext)
+		require.NoError(t, err)
+		assert.Equal(t, testAccessToken, token)
+	}
+	_, err := provider.GetToken(t.Context(), "other-scope", testParticipantContext)
+	require.NoError(t, err)
+
+	assert.Equal(t, int32(2), exchanges.Load())
 }
