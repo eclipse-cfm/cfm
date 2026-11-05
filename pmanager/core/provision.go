@@ -65,6 +65,14 @@ func (p provisionManager) Start(ctx context.Context, manifest *model.Orchestrati
 		if orch != nil {
 			// Already exists, return its representation
 			orchestration = orch
+			if orch.State != api.OrchestrationStateInitialized {
+				return nil
+			}
+			// Stored, but its start may not have completed, for example because the process died before its first
+			// activities were enqueued. Executing it again starts it if that is the case.
+			if err := p.orchestrator.Execute(ctx, orch); err != nil {
+				return executionError(err, orch.ID, manifestID)
+			}
 			return nil
 		}
 
@@ -76,7 +84,7 @@ func (p provisionManager) Start(ctx context.Context, manifest *model.Orchestrati
 		orch.CompensatedOrchestrationID = manifest.CompensatedManifestID
 		err = p.orchestrator.Execute(ctx, orch)
 		if err != nil {
-			return types.NewFatalWrappedError(err, "error executing orchestration %s for %s", orch.ID, manifestID)
+			return executionError(err, orch.ID, manifestID)
 		}
 		orchestration = orch
 		return nil
@@ -85,6 +93,15 @@ func (p provisionManager) Start(ctx context.Context, manifest *model.Orchestrati
 		return nil, err
 	}
 	return orchestration, nil
+}
+
+// executionError wraps an error from executing an orchestration. A recoverable error stays recoverable, so that the
+// caller retries the start, which resumes the orchestration.
+func executionError(err error, orchestrationID string, manifestID string) error {
+	if types.IsRecoverable(err) {
+		return types.NewRecoverableWrappedError(err, "error executing orchestration %s for %s", orchestrationID, manifestID)
+	}
+	return types.NewFatalWrappedError(err, "error executing orchestration %s for %s", orchestrationID, manifestID)
 }
 
 func (p provisionManager) Cancel(ctx context.Context, orchestrationID string) error {
