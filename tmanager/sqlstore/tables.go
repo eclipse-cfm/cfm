@@ -13,8 +13,9 @@
 package sqlstore
 
 import (
-	"database/sql"
 	"fmt"
+
+	"github.com/eclipse-cfm/cfm/common/sqlstore"
 )
 
 const (
@@ -26,7 +27,7 @@ const (
 
 // Note fields are quoted to avoid some IDEs (Goland) reformatting them to uppercase
 
-func createTenantsTable(db *sql.DB) error {
+func createTenantsTable(db sqlstore.Executor) error {
 	_, err := db.Exec(fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
 			id TEXT PRIMARY KEY,
@@ -37,7 +38,7 @@ func createTenantsTable(db *sql.DB) error {
 	return err
 }
 
-func createParticipantProfilesTable(db *sql.DB) error {
+func createParticipantProfilesTable(db sqlstore.Executor) error {
 	_, err := db.Exec(fmt.Sprintf(`
 			CREATE TABLE IF NOT EXISTS %s (
 				id VARCHAR(255) PRIMARY KEY,
@@ -56,7 +57,7 @@ func createParticipantProfilesTable(db *sql.DB) error {
 	return err
 }
 
-func createDataspaceProfilesTable(db *sql.DB) error {
+func createDataspaceProfilesTable(db sqlstore.Executor) error {
 	_, err := db.Exec(fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
 			id TEXT PRIMARY KEY,
@@ -70,7 +71,7 @@ func createDataspaceProfilesTable(db *sql.DB) error {
 	return err
 }
 
-func createCellsTable(db *sql.DB) error {
+func createCellsTable(db sqlstore.Executor) error {
 	_, err := db.Exec(fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
 			id TEXT PRIMARY KEY,

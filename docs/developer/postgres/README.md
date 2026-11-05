@@ -16,3 +16,8 @@ the database stay below the server's `max_connections`, leaving room for adminis
 | `db.connMaxIdleTime`  | Maximum time a connection stays idle before it is closed                    | 5m      |
 
 A request uses a single connection: store calls made while a transaction is open join that transaction.
+
+## Schema
+
+Each component creates its tables on startup if they don't exist. The statements run in one transaction under a
+Postgres advisory lock, so replicas, and TM and PM sharing a database, can start at the same time.

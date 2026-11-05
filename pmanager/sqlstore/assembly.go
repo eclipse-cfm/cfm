@@ -97,6 +97,10 @@ func (a *PostgresServiceAssembly) Finalize() error {
 }
 
 func createTables(db *sql.DB) error {
+	return sqlstore.CreateSchema(db, createTablesWith)
+}
+
+func createTablesWith(db sqlstore.Executor) error {
 	err := createActivityDefinitionsTable(db)
 	if err != nil {
 		return err
