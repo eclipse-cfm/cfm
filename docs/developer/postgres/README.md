@@ -15,3 +15,4 @@ the database stay below the server's `max_connections`, leaving room for adminis
 | `db.connMaxLifetime`  | Maximum time a connection is reused, for example `30m`                      | 30m     |
 | `db.connMaxIdleTime`  | Maximum time a connection stays idle before it is closed                    | 5m      |
 
+A request uses a single connection: store calls made while a transaction is open join that transaction.

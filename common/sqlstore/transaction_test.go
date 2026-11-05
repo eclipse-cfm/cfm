@@ -17,6 +17,7 @@ import (
 	"database/sql"
 	"errors"
 	"testing"
+	"time"
 
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
@@ -102,5 +103,71 @@ func TestDBTransactionContext(t *testing.T) {
 		err = testDB.QueryRow("SELECT COUNT(*) FROM test_table").Scan(&count)
 		assert.NoError(t, err)
 		assert.Equal(t, initialCount, count)
+	})
+}
+
+func TestDBTransactionContext_NestedExecuteJoinsTransaction(t *testing.T) {
+	setupTestDBTable(t)
+	defer CleanupTestData(t, testDB)
+	trxContext := NewDBTransactionContext(testDB)
+
+	count := func() int {
+		var count int
+		require.NoError(t, testDB.QueryRow("SELECT COUNT(*) FROM test_table").Scan(&count))
+		return count
+	}
+
+	t.Run("inner call runs in the outer transaction", func(t *testing.T) {
+		err := trxContext.Execute(t.Context(), func(outer context.Context) error {
+			outerTx := outer.Value(SQLTransactionKey).(*sql.Tx)
+			return trxContext.Execute(outer, func(inner context.Context) error {
+				assert.Same(t, outerTx, inner.Value(SQLTransactionKey).(*sql.Tx))
+				return nil
+			})
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("inner work rolls back with the outer transaction", func(t *testing.T) {
+		before := count()
+		err := trxContext.Execute(t.Context(), func(outer context.Context) error {
+			err := trxContext.Execute(outer, func(inner context.Context) error {
+				_, err := inner.Value(SQLTransactionKey).(*sql.Tx).Exec("INSERT INTO test_table (value) VALUES ('inner')")
+				return err
+			})
+			require.NoError(t, err)
+			return errors.New("outer failed")
+		})
+		require.Error(t, err)
+		assert.Equal(t, before, count())
+	})
+
+	t.Run("inner error is returned without ending the outer transaction", func(t *testing.T) {
+		before := count()
+		innerErr := errors.New("inner failed")
+		err := trxContext.Execute(t.Context(), func(outer context.Context) error {
+			err := trxContext.Execute(outer, func(context.Context) error { return innerErr })
+			assert.ErrorIs(t, err, innerErr)
+			// the outer transaction is still usable
+			_, err = outer.Value(SQLTransactionKey).(*sql.Tx).Exec("INSERT INTO test_table (value) VALUES ('outer')")
+			return err
+		})
+		require.NoError(t, err)
+		assert.Equal(t, before+1, count())
+	})
+
+	t.Run("nested calls use one connection", func(t *testing.T) {
+		db, err := sql.Open("postgres", testDSN)
+		require.NoError(t, err)
+		defer db.Close()
+		db.SetMaxOpenConns(1)
+		single := NewDBTransactionContext(db)
+
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		err = single.Execute(ctx, func(outer context.Context) error {
+			return single.Execute(outer, func(context.Context) error { return nil })
+		})
+		require.NoError(t, err)
 	})
 }
