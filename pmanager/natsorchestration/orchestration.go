@@ -23,11 +23,13 @@ import (
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/eclipse-cfm/cfm/common/types"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/nats-io/nats.go/jetstream"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -81,11 +83,17 @@ func (o *NatsOrchestrator) GetOrchestration(ctx context.Context, id string) (*ap
 //
 // A Jetstream KV entry is used to maintain durable state and is updated as the orchestration progresses. This
 // state is passed to the executors, which access and update it.
-
+//
+// Storing the orchestration and publishing its first activities are two separate steps, so a failure or a crash in
+// between leaves an orchestration that is stored but was never started. The orchestration is marked running only once
+// its first activities are published, and calling Execute again for an orchestration that is still initialized
+// publishes them again. Execute can therefore be retried until it succeeds. An error from publishing the activities is
+// recoverable for that reason.
 func (o *NatsOrchestrator) Execute(ctx context.Context, orchestration *api.Orchestration) error {
 	// TODO validate orchestration - this should include a check to see if there are no steps or steps with no activities
-	initOrchMetrics()
-	orchStartedCounter.Add(ctx, 1)
+	if len(getInitialActivities(orchestration)) == 0 {
+		return fmt.Errorf("orchestration has no activities: %s", orchestration.ID)
+	}
 
 	ctx, span := otel.GetTracerProvider().Tracer("cfm.pmanager.orchestrator").Start(ctx, "nats.execute_orchestration")
 	defer span.End()
@@ -105,27 +113,47 @@ func (o *NatsOrchestrator) Execute(ctx context.Context, orchestration *api.Orche
 		return fmt.Errorf("error marshalling orchestration: %w", err)
 	}
 
-	// Use update to check if the orchestration already exists
-	_, err = o.Client.Update(ctx, orchestration.ID, serializedOrchestration, 0)
+	// Revision 0 only succeeds if the orchestration does not exist yet
+	revision, err := o.Client.Update(ctx, orchestration.ID, serializedOrchestration, 0)
 	if err != nil {
-		var jsErr *jetstream.APIError
-		if errors.As(err, &jsErr) {
-			if jsErr.APIError().ErrorCode == jetstream.JSErrCodeStreamWrongLastSequence {
-				// Orchestration already exists, return
-				return nil
-			}
+		if !isRevisionConflict(err) {
+			return fmt.Errorf("error storing orchestration: %w", err)
 		}
-		return fmt.Errorf("error storing orchestration: %w", err)
+		// The orchestration already exists. Resume it if it was stored but its start did not complete.
+		existing, existingRevision, err := ReadOrchestration(ctx, orchestration.ID, o.Client)
+		if err != nil {
+			return types.NewRecoverableWrappedError(err, "error reading existing orchestration %s", orchestration.ID)
+		}
+		if existing.State != api.OrchestrationStateInitialized {
+			return nil
+		}
+		if o.monitor != nil {
+			o.monitor.Infof("Orchestration %s was stored but not started, starting it", orchestration.ID)
+		}
+		span.AddEvent("Resuming orchestration that was not started")
+		return o.start(ctx, existing, existingRevision)
 	}
 
-	activities := getInitialActivities(orchestration)
-	if len(activities) == 0 {
-		return fmt.Errorf("orchestration has no activities: %s", orchestration.ID)
+	initOrchMetrics()
+	orchStartedCounter.Add(ctx, 1)
+	return o.start(ctx, *orchestration, revision)
+}
+
+// start publishes the messages for the orchestration's first activities and then marks the orchestration running.
+func (o *NatsOrchestrator) start(ctx context.Context, orchestration api.Orchestration, revision uint64) error {
+	activities := getInitialActivities(&orchestration)
+	if err := EnqueueActivityMessages(ctx, orchestration.ID, activities, o.Client); err != nil {
+		return types.NewRecoverableWrappedError(err, "error enqueueing activities of orchestration %s", orchestration.ID)
 	}
-	span.AddEvent("Activity messages enqueued")
-	err = EnqueueActivityMessages(ctx, orchestration.ID, activities, o.Client)
-	if err != nil {
-		return err
+	trace.SpanFromContext(ctx).AddEvent("Activity messages enqueued")
+
+	// Activities may already have updated the orchestration, or even finished it, so only move it out of initialized
+	if _, _, err := UpdateOrchestration(ctx, orchestration, revision, o.Client, func(o *api.Orchestration) {
+		if o.State == api.OrchestrationStateInitialized {
+			o.SetState(api.OrchestrationStateRunning)
+		}
+	}); err != nil {
+		return types.NewRecoverableWrappedError(err, "error marking orchestration %s as running", orchestration.ID)
 	}
 	return nil
 }

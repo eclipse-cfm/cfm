@@ -137,8 +137,13 @@ outerLoop:
 		}
 	}
 
-	assert.Equal(t, api.OrchestrationStateErrored, finalOrchestration.State,
-		"Orchestration should be in error state after activity failure")
+	// A2 may record its completion before A1 records the failure, since nothing orders the two updates
+	assert.Eventually(t, func() bool {
+		finalOrchestration, _, err = ReadOrchestration(ctx, orchestration.ID, adapter)
+		return err == nil && finalOrchestration.State == api.OrchestrationStateErrored
+	}, 3*time.Second, 10*time.Millisecond, "Orchestration should be in error state after activity failure")
+	_, a2Completed := finalOrchestration.Completed["A2"]
+	assert.True(t, a2Completed, "the failure must not drop the completion of A2")
 }
 
 // FailingActivityProcessor wraps a TestActivityProcessor and always returns an error

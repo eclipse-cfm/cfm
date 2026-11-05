@@ -35,12 +35,14 @@ import (
 
 func TestProvisionManager_Start(t *testing.T) {
 	tests := []struct {
-		name           string
-		manifest       *model.OrchestrationManifest
-		setupStore     func(store api.DefinitionStore)
-		setupOrch      func(orch *mocks.MockOrchestrator)
-		expectedError  string
-		expectedResult *api.Orchestration
+		name          string
+		manifest      *model.OrchestrationManifest
+		setupStore    func(store api.DefinitionStore)
+		setupOrch     func(orch *mocks.MockOrchestrator)
+		expectedError string
+		// expectedRecoverable is whether the error must be recoverable, so that the start is retried
+		expectedRecoverable bool
+		expectedResult      *api.Orchestration
 	}{
 		{
 			name: "successful deployment with new orchestration",
@@ -92,12 +94,32 @@ func TestProvisionManager_Start(t *testing.T) {
 			},
 			setupOrch: func(orch *mocks.MockOrchestrator) {
 				existingOrch := &api.Orchestration{
-					ID: "test-orchestration-2",
+					ID:    "test-orchestration-2",
+					State: api.OrchestrationStateRunning,
 				}
 				orch.EXPECT().GetOrchestration(mock.Anything, "test-orchestration-2").Return(existingOrch, nil)
 			},
 			expectedResult: &api.Orchestration{
 				ID: "test-orchestration-2",
+			},
+		},
+		{
+			name: "deduplication - existing orchestration that was not started is executed again",
+			manifest: &model.OrchestrationManifest{
+				ID:                "test-orchestration-7",
+				OrchestrationType: "test-type",
+			},
+			setupStore: storeTestDefinition,
+			setupOrch: func(orch *mocks.MockOrchestrator) {
+				existingOrch := &api.Orchestration{
+					ID:    "test-orchestration-7",
+					State: api.OrchestrationStateInitialized,
+				}
+				orch.EXPECT().GetOrchestration(mock.Anything, "test-orchestration-7").Return(existingOrch, nil)
+				orch.EXPECT().Execute(mock.Anything, existingOrch).Return(nil)
+			},
+			expectedResult: &api.Orchestration{
+				ID: "test-orchestration-7",
 			},
 		},
 		{
@@ -166,6 +188,21 @@ func TestProvisionManager_Start(t *testing.T) {
 			},
 			expectedError: "error executing orchestration",
 		},
+		{
+			name: "orchestrator execute orchestration recoverable error",
+			manifest: &model.OrchestrationManifest{
+				ID:                "test-orchestration-8",
+				OrchestrationType: "test-type",
+			},
+			setupStore: storeTestDefinition,
+			setupOrch: func(orch *mocks.MockOrchestrator) {
+				orch.EXPECT().GetOrchestration(mock.Anything, "test-orchestration-8").Return(nil, nil)
+				orch.EXPECT().Execute(mock.Anything, mock.AnythingOfType("*api.Orchestration")).
+					Return(types.NewRecoverableError("enqueue failed"))
+			},
+			expectedError:       "error executing orchestration",
+			expectedRecoverable: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -194,6 +231,7 @@ func TestProvisionManager_Start(t *testing.T) {
 			if tt.expectedError != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.Equal(t, tt.expectedRecoverable, types.IsRecoverable(err))
 				assert.Nil(t, result)
 			} else {
 				require.NoError(t, err)
@@ -205,6 +243,15 @@ func TestProvisionManager_Start(t *testing.T) {
 			}
 		})
 	}
+}
+
+// storeTestDefinition stores a definition of type test-type with a single activity.
+func storeTestDefinition(store api.DefinitionStore) {
+	definition := &api.OrchestrationDefinition{
+		Type:       "test-type",
+		Activities: []api.Activity{{ID: "activity1", Type: "test-activity"}},
+	}
+	_, _ = store.StoreOrchestrationDefinition(context.Background(), definition)
 }
 
 // Test helper to verify orchestration instantiation
