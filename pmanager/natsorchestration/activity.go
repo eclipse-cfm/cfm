@@ -175,6 +175,18 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 		ctx = otel.GetTextMapPropagator().Extract(ctx, carrier)
 	}
 
+	if _, done := orchestration.Completed[oMessage.Activity.ID]; done && !finalDelivery {
+		// The activity already completed and the message was delivered again, for example because enqueueing the next
+		// step failed. Don't run the activity again; continue with the next step instead.
+		if orchestration.State == api.OrchestrationStateCompleted || orchestration.State == api.OrchestrationStateErrored {
+			return natsclient.AckMessage(message)
+		}
+		e.Monitor.Infof("Activity %s of orchestration %s already completed, continuing with the next step",
+			oMessage.Activity.ID, oMessage.OrchestrationID)
+		activityContext := api.NewActivityContext(ctx, orchestration.ID, oMessage.Activity, orchestration.ProcessingData, orchestration.OutputData)
+		return e.processOnActivityCompletion(activityContext, orchestration, revision, message, oMessage)
+	}
+
 	// Track attempt number for this activity — persisted across reschedules so all executions can be correlated
 	if orchestration.EngineState.Attempts == nil {
 		orchestration.EngineState.Attempts = make(map[string]int)

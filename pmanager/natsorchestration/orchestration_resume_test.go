@@ -101,3 +101,13 @@ func TestExecute_DoesNotRestartOrchestrationThatIsRunning(t *testing.T) {
 
 	assert.Equal(t, uint64(0), streamMessages(t, ctx, stream), "a running orchestration must not be enqueued again")
 }
+
+func TestEnqueueActivityMessages_DropsDuplicates(t *testing.T) {
+	ctx, client, stream := setupResumeTest(t)
+	activities := resumeTestOrchestration("O1", api.OrchestrationStateInitialized).Steps[0].Activities
+
+	require.NoError(t, EnqueueActivityMessages(ctx, "O1", activities, client))
+	require.NoError(t, EnqueueActivityMessages(ctx, "O1", activities, client))
+
+	assert.Equal(t, uint64(2), streamMessages(t, ctx, stream), "enqueueing the same activities again must not add messages")
+}

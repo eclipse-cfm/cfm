@@ -21,6 +21,7 @@ import (
 	"github.com/eclipse-cfm/cfm/common/mocks"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -131,6 +132,77 @@ func TestProcessMessage_PersistFailureRedeliversMessage(t *testing.T) {
 			assert.False(t, msg.acked, "a message whose state could not be saved must not be acked")
 			assert.True(t, msg.naked, "a message whose state could not be saved must be redelivered")
 			assert.NotEqual(t, time.Hour, msg.nakDelay, "the redelivery must not wait for the reschedule delay")
+		})
+	}
+}
+
+// failingProcessor is an api.ActivityProcessor that fails the test when it is called.
+type failingProcessor struct {
+	t *testing.T
+}
+
+func (p failingProcessor) Process(api.ActivityContext) api.ActivityResult {
+	p.t.Error("a completed activity must not run again")
+	return api.ActivityResult{Result: api.ActivityResultComplete}
+}
+func (p failingProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
+	return p.Process(ctx)
+}
+func (p failingProcessor) ProcessDispose(ctx api.ActivityContext) api.ActivityResult {
+	return p.Process(ctx)
+}
+
+func TestProcessMessage_CompletedActivityIsNotRunAgain(t *testing.T) {
+	tests := []struct {
+		name          string
+		state         api.OrchestrationState
+		expectNextRun bool
+	}{
+		{name: "running orchestration continues with the next step", state: api.OrchestrationStateRunning, expectNextRun: true},
+		{name: "completed orchestration is left alone", state: api.OrchestrationStateCompleted},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			orchestration := api.Orchestration{
+				ID:             "test-completed",
+				State:          tt.state,
+				ProcessingData: map[string]any{},
+				OutputData:     map[string]any{},
+				Completed:      map[string]struct{}{"A1": {}},
+				Steps: []api.OrchestrationStep{
+					{Activities: []api.Activity{{ID: "A1", Type: panicTestActivityType}}},
+					{Activities: []api.Activity{{ID: "A2", Type: panicTestActivityType}}},
+				},
+			}
+			serialized, err := json.Marshal(orchestration)
+			require.NoError(t, err)
+
+			mockClient := mocks.NewMockMsgClient(t)
+			mockClient.EXPECT().Get(mock.Anything, "test-completed").Return(panicTestEntry{value: serialized}, nil)
+			if tt.expectNextRun {
+				mockClient.EXPECT().Update(mock.Anything, "test-completed", mock.Anything, uint64(1)).Return(uint64(2), nil)
+				mockClient.EXPECT().PublishMsg(mock.Anything, mock.MatchedBy(func(msg *nats.Msg) bool {
+					return msg.Header.Get(jetstream.MsgIDHeader) == ActivityMessageID("test-completed", "A2")
+				})).Return(&jetstream.PubAck{}, nil).Once()
+			}
+
+			executor := &NatsActivityExecutor{
+				Client:            mockClient,
+				ActivityType:      panicTestActivityType,
+				ActivityProcessor: failingProcessor{t: t},
+				Monitor:           system.NoopMonitor{},
+			}
+
+			messageBytes, err := json.Marshal(api.ActivityMessage{
+				OrchestrationID: "test-completed",
+				Activity:        api.Activity{ID: "A1", Type: panicTestActivityType},
+			})
+			require.NoError(t, err)
+			msg := &panicTestMsg{data: messageBytes, numDelivered: 2}
+
+			require.NoError(t, executor.processMessage(t.Context(), msg))
+			assert.True(t, msg.acked)
 		})
 	}
 }
