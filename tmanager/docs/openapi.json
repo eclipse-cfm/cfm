@@ -1,5 +1,5 @@
 {
-  "openapi": "3.0.3",
+  "openapi": "3.1.2",
   "info": {
     "title": "Tenant Manager API",
     "description": "API for managing Tenants, Participant Profiles, Cells, and Dataspace Profiles",
@@ -24,7 +24,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/V1Alpha1Cell"
+                    "$ref": "#/components/schemas/V1alpha1Cell"
                   }
                 }
               }
@@ -39,7 +39,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/V1Alpha1NewCell"
+                "$ref": "#/components/schemas/V1alpha1NewCell"
               }
             }
           }
@@ -50,7 +50,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/V1Alpha1Cell"
+                  "$ref": "#/components/schemas/V1alpha1Cell"
                 }
               }
             }
@@ -91,7 +91,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/V1Alpha1DataspaceProfile"
+                    "$ref": "#/components/schemas/V1alpha1DataspaceProfile"
                   }
                 }
               }
@@ -106,7 +106,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/V1Alpha1NewDataspaceProfile"
+                "$ref": "#/components/schemas/V1alpha1NewDataspaceProfile"
               }
             }
           }
@@ -117,7 +117,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/V1Alpha1DataspaceProfile"
+                  "$ref": "#/components/schemas/V1alpha1DataspaceProfile"
                 }
               }
             }
@@ -126,25 +126,6 @@
       }
     },
     "/api/v1alpha1/dataspace-profiles/{id}": {
-      "delete": {
-        "summary": "Delete Dataspace Profile",
-        "description": "Deletes a Dataspace Profile by ID",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      },
       "get": {
         "summary": "Get Dataspace Profile",
         "description": "Retrieve a Dataspace Profile by ID",
@@ -164,10 +145,29 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/V1Alpha1DataspaceProfile"
+                  "$ref": "#/components/schemas/V1alpha1DataspaceProfile"
                 }
               }
             }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Dataspace Profile",
+        "description": "Deletes a Dataspace Profile by ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
           }
         }
       }
@@ -214,7 +214,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/V1Alpha1ParticipantProfile"
+                    "$ref": "#/components/schemas/V1alpha1ParticipantProfile"
                   }
                 }
               }
@@ -235,7 +235,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/V1Alpha1Tenant"
+                    "$ref": "#/components/schemas/V1alpha1Tenant"
                   }
                 }
               }
@@ -250,7 +250,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/V1Alpha1NewTenant"
+                "$ref": "#/components/schemas/V1alpha1NewTenant"
               }
             }
           }
@@ -261,7 +261,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/V1Alpha1Tenant"
+                  "$ref": "#/components/schemas/V1alpha1Tenant"
                 }
               }
             }
@@ -290,7 +290,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/V1Alpha1Tenant"
+                    "$ref": "#/components/schemas/V1alpha1Tenant"
                   }
                 }
               }
@@ -300,25 +300,6 @@
       }
     },
     "/api/v1alpha1/tenants/{id}": {
-      "delete": {
-        "summary": "Delete Tenant",
-        "description": "Deletes a Tenant by ID",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      },
       "get": {
         "summary": "Get Tenant",
         "description": "Retrieve a Tenant by ID",
@@ -338,10 +319,29 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/V1Alpha1Tenant"
+                  "$ref": "#/components/schemas/V1alpha1Tenant"
                 }
               }
             }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Tenant",
+        "description": "Deletes a Tenant by ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
           }
         }
       },
@@ -362,7 +362,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/V1Alpha1TenantPropertiesDiff"
+                "$ref": "#/components/schemas/V1alpha1TenantPropertiesDiff"
               }
             }
           }
@@ -373,7 +373,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/V1Alpha1Tenant"
+                  "$ref": "#/components/schemas/V1alpha1Tenant"
                 }
               }
             }
@@ -403,7 +403,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/V1Alpha1ParticipantProfile"
+                    "$ref": "#/components/schemas/V1alpha1ParticipantProfile"
                   }
                 }
               }
@@ -428,7 +428,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/V1Alpha1ParticipantProfile"
+                "$ref": "#/components/schemas/V1alpha1ParticipantProfile"
               }
             }
           }
@@ -439,7 +439,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/V1Alpha1ParticipantProfile"
+                  "$ref": "#/components/schemas/V1alpha1ParticipantProfile"
                 }
               }
             }
@@ -448,40 +448,6 @@
       }
     },
     "/api/v1alpha1/tenants/{id}/participant-profiles/{participantID}": {
-      "delete": {
-        "summary": "Dispose Participant Profile",
-        "description": "Dispose a Participant Profile",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "participantID",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/V1Alpha1ParticipantProfile"
-                }
-              }
-            }
-          }
-        }
-      },
       "get": {
         "summary": "Get Participant Profile",
         "description": "Get a Participant Profile",
@@ -509,7 +475,50 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/V1Alpha1ParticipantProfile"
+                  "$ref": "#/components/schemas/V1alpha1ParticipantProfile"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Dispose Participant Profile",
+        "description": "Dispose a Participant Profile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "participantID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/V1alpha1ParticipantProfile"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V1alpha1ParticipantProfile"
                 }
               }
             }
@@ -521,10 +530,10 @@
   "components": {
     "schemas": {
       "ModelQuery": {
+        "type": "object",
         "required": [
           "predicate"
         ],
-        "type": "object",
         "properties": {
           "limit": {
             "type": "integer",
@@ -539,14 +548,13 @@
           }
         }
       },
-      "V1Alpha1Cell": {
+      "V1alpha1Cell": {
+        "type": "object",
         "required": [
           "id",
           "version",
-          "state",
-          "stateTimestamp"
+          "state"
         ],
-        "type": "object",
         "properties": {
           "externalId": {
             "type": "string"
@@ -571,14 +579,40 @@
           }
         }
       },
-      "V1Alpha1DataspaceDeployment": {
+      "V1alpha1CredentialSpec": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "issuer",
+          "format"
+        ],
+        "properties": {
+          "format": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "issuer": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "V1alpha1DataspaceDeployment": {
+        "type": "object",
         "required": [
           "id",
           "version",
           "state",
           "stateTimestamp"
         ],
-        "type": "object",
         "properties": {
           "cellId": {
             "type": "string"
@@ -606,12 +640,12 @@
           }
         }
       },
-      "V1Alpha1DataspaceProfile": {
+      "V1alpha1DataspaceProfile": {
+        "type": "object",
         "required": [
           "id",
           "version"
         ],
-        "type": "object",
         "properties": {
           "artifacts": {
             "type": "array",
@@ -619,10 +653,27 @@
               "type": "string"
             }
           },
+          "dataspaceSpec": {
+            "type": "object",
+            "properties": {
+              "credentialSpecs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/V1alpha1CredentialSpec"
+                }
+              },
+              "protocolStack": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
           "deployments": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/V1Alpha1DataspaceDeployment"
+              "$ref": "#/components/schemas/V1alpha1DataspaceDeployment"
             }
           },
           "id": {
@@ -638,12 +689,11 @@
           }
         }
       },
-      "V1Alpha1NewCell": {
-        "required": [
-          "state",
-          "stateTimestamp"
-        ],
+      "V1alpha1NewCell": {
         "type": "object",
+        "required": [
+          "state"
+        ],
         "properties": {
           "externalId": {
             "type": "string"
@@ -661,7 +711,7 @@
           }
         }
       },
-      "V1Alpha1NewDataspaceProfile": {
+      "V1alpha1NewDataspaceProfile": {
         "type": "object",
         "properties": {
           "artifacts": {
@@ -670,13 +720,30 @@
               "type": "string"
             }
           },
+          "dataspaceSpec": {
+            "type": "object",
+            "properties": {
+              "credentialSpecs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/V1alpha1CredentialSpec"
+                }
+              },
+              "protocolStack": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
           "properties": {
             "type": "object",
             "additionalProperties": {}
           }
         }
       },
-      "V1Alpha1NewTenant": {
+      "V1alpha1NewTenant": {
         "type": "object",
         "properties": {
           "properties": {
@@ -685,13 +752,13 @@
           }
         }
       },
-      "V1Alpha1ParticipantProfile": {
+      "V1alpha1ParticipantProfile": {
+        "type": "object",
         "required": [
           "id",
           "version",
           "identifier"
         ],
-        "type": "object",
         "properties": {
           "error": {
             "type": "boolean"
@@ -705,9 +772,21 @@
           "identifier": {
             "type": "string"
           },
+          "participantRoles": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
           "properties": {
             "type": "object",
             "additionalProperties": {}
+          },
+          "tenantId": {
+            "type": "string"
           },
           "version": {
             "type": "integer",
@@ -716,17 +795,17 @@
           "vpas": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/V1Alpha1VirtualParticipantAgent"
+              "$ref": "#/components/schemas/V1alpha1VirtualParticipantAgent"
             }
           }
         }
       },
-      "V1Alpha1Tenant": {
+      "V1alpha1Tenant": {
+        "type": "object",
         "required": [
           "id",
           "version"
         ],
-        "type": "object",
         "properties": {
           "id": {
             "type": "string"
@@ -741,24 +820,23 @@
           }
         }
       },
-      "V1Alpha1TenantPropertiesDiff": {
+      "V1alpha1TenantPropertiesDiff": {
         "type": "object",
         "properties": {
           "properties": {
             "type": "object",
-            "additionalProperties": {},
-            "nullable": true
+            "additionalProperties": {}
           },
           "removed": {
             "type": "array",
             "items": {
               "type": "string"
-            },
-            "nullable": true
+            }
           }
         }
       },
-      "V1Alpha1VirtualParticipantAgent": {
+      "V1alpha1VirtualParticipantAgent": {
+        "type": "object",
         "required": [
           "id",
           "version",
@@ -767,7 +845,6 @@
           "type",
           "cellId"
         ],
-        "type": "object",
         "properties": {
           "cellId": {
             "type": "string"
