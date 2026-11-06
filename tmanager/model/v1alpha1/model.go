@@ -18,6 +18,10 @@ import (
 	"github.com/eclipse-cfm/cfm/common/model"
 )
 
+// Request DTOs declare their constraints with `validate` tags, which ReadPayload enforces and the OpenAPI generator turns
+// into required properties. Response-only DTOs use `required:"true"`, which only documents the response.
+
+// Entity holds the server-assigned identity of a returned entity.
 type Entity struct {
 	ID      string `json:"id" required:"true"`
 	Version int64  `json:"version" required:"true"`
@@ -34,8 +38,8 @@ type Tenant struct {
 
 type NewCell struct {
 	ExternalID     string         `json:"externalId"`
-	State          string         `json:"state" required:"true"`
-	StateTimestamp time.Time      `json:"stateTimestamp" required:"true"`
+	State          string         `json:"state" validate:"required"`
+	StateTimestamp time.Time      `json:"stateTimestamp"`
 	Properties     map[string]any `json:"properties,omitempty"`
 }
 
@@ -46,13 +50,13 @@ type Cell struct {
 
 type NewDataspaceProfile struct {
 	DataspaceSpec DataspaceSpec  `json:"dataspaceSpec,omitempty"`
-	Artifacts     []string       ` json:"artifacts,omitempty"`
+	Artifacts     []string       `json:"artifacts,omitempty"`
 	Properties    map[string]any `json:"properties,omitempty"`
 }
 
 type NewDataspaceProfileDeployment struct {
-	ProfileID string `json:"profileId" required:"true"`
-	CellID    string `json:"cellId,omitempty"`
+	ProfileID string `json:"profileId" validate:"required"`
+	CellID    string `json:"cellId" validate:"required"`
 }
 
 type DataspaceDeployment struct {
@@ -75,16 +79,17 @@ type DataspaceSpec struct {
 }
 
 type CredentialSpec struct {
-	Id              string `json:"id" required:"true"`
-	Type            string `json:"type" required:"true"`
-	Issuer          string `json:"issuer" required:"true"`
-	Format          string `json:"format" required:"true"`
+	Id              string `json:"id" validate:"required"`
+	Type            string `json:"type" validate:"required"`
+	Issuer          string `json:"issuer" validate:"required"`
+	Format          string `json:"format" validate:"required"`
 	ParticipantRole string `json:"role,omitempty"`
 }
 
 type NewParticipantProfileDeployment struct {
-	Identifier          string                    `json:"identifier" required:"true"`
-	CellID              string                    `json:"cellId" required:"true"`
+	Identifier string `json:"identifier" validate:"required"`
+	// CellID is not used yet: the cell is chosen by the cell selector
+	CellID              string                    `json:"cellId,omitempty"`
 	DataspaceProfileIDs []string                  `json:"dataspaceProfileIds,omitempty"`
 	ParticipantRoles    map[string][]string       `json:"participantRoles,omitempty"`
 	VPAProperties       map[string]map[string]any `json:"vpaProperties,omitempty"`

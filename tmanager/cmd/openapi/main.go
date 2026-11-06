@@ -31,6 +31,8 @@ func main() {
 		option.WithVersion("0.0.1"),
 		option.WithDescription("API for managing Tenants, Participant Profiles, Cells, and Dataspace Profiles"),
 		option.WithServer("http://localhost:8080", option.ServerDescription("Development server")),
+		// Request DTOs declare required fields with the validate tag that ReadPayload enforces
+		option.WithReflectorConfig(option.RequiredPropByValidateTag()),
 	)
 
 	generateTenantEndpoints(r)
