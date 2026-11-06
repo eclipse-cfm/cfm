@@ -39,8 +39,9 @@ type payloadNestedDto struct {
 
 func TestReadPayload_InvalidJSONMessages(t *testing.T) {
 	tests := []struct {
-		name    string
-		body    string
+		name string
+		body string
+		// message is a regular expression for the whole message
 		message string
 	}{
 		{"syntax error", `{"name": }`, "Invalid JSON at offset 10"},
@@ -50,7 +51,8 @@ func TestReadPayload_InvalidJSONMessages(t *testing.T) {
 		{"string for a boolean pointer", `{"enabled": "yes"}`, `Invalid JSON: field "enabled" must be a boolean`},
 		{"object for an array", `{"tags": {}}`, `Invalid JSON: field "tags" must be an array`},
 		{"nested field", `{"nested": {"value": "x"}}`, `Invalid JSON: field "nested.value" must be a number`},
-		{"map value", `{"labels": {"a": 1}}`, `Invalid JSON: field "labels.a" must be a string`},
+		// Go 1.27 includes the map key in the field path, earlier versions stop at the map
+		{"map value", `{"labels": {"a": 1}}`, `Invalid JSON: field "labels(\.a)?" must be a string`},
 		{"wrong top-level type", `[]`, "Invalid JSON"},
 		{"truncated body", `{"name": "x"`, "Invalid JSON at offset 12"},
 	}
@@ -68,7 +70,7 @@ func TestReadPayload_InvalidJSONMessages(t *testing.T) {
 
 			var response ErrorResponse
 			require.NoError(t, json.Unmarshal(w.body.Bytes(), &response))
-			assert.Equal(t, tc.message, response.Message)
+			assert.Regexp(t, "^"+tc.message+"$", response.Message)
 			assert.NotContains(t, response.Message, "payloadTestDto")
 			assert.NotContains(t, response.Message, "Go struct")
 		})
