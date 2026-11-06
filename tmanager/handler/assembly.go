@@ -27,6 +27,9 @@ import (
 const (
 	scopeTmRead  = "tenant-manager-api:read"
 	scopeTmWrite = "tenant-manager-api:write"
+	// scopeTmAdmin is needed to change platform resources that all tenants share (cells and dataspace profiles) and to
+	// see and manage tenants owned by other clients.
+	scopeTmAdmin = "tenant-manager-api:admin"
 )
 
 type response struct {
@@ -105,14 +108,14 @@ func (h *HandlerServiceAssembly) registerCellRoutes(router chi.Router, handler *
 			handler.getCells(w, req)
 		})
 		r.Post("/", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmWrite)) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmAdmin)) {
 				return
 			}
 			handler.createCell(w, req)
 		})
 		r.Route("/{cellID}", func(r chi.Router) {
 			r.Delete("/", func(w http.ResponseWriter, req *http.Request) {
-				if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmWrite)) {
+				if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmAdmin)) {
 					return
 				}
 				cellID, found := handler.ExtractPathVariable(w, req, "cellID")
@@ -134,7 +137,7 @@ func (h *HandlerServiceAssembly) registerDataspaceProfileRoutes(router chi.Route
 			handler.getDataspaceProfiles(w, req)
 		})
 		r.Post("/", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmWrite)) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmAdmin)) {
 				return
 			}
 			handler.createDataspaceProfile(w, req)
@@ -150,7 +153,7 @@ func (h *HandlerServiceAssembly) registerDataspaceProfileRoutes(router chi.Route
 			handler.getDataspaceProfile(w, req, id)
 		})
 		r.Delete("/{profileID}", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmWrite)) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmAdmin)) {
 				return
 			}
 			profileID, found := handler.ExtractPathVariable(w, req, "profileID")
@@ -161,7 +164,7 @@ func (h *HandlerServiceAssembly) registerDataspaceProfileRoutes(router chi.Route
 		})
 		r.Route("/{id}/deployments", func(r chi.Router) {
 			r.Post("/", func(w http.ResponseWriter, req *http.Request) {
-				if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmWrite)) {
+				if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopeTmAdmin)) {
 					return
 				}
 				id, found := handler.ExtractPathVariable(w, req, "id")

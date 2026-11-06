@@ -27,6 +27,9 @@ import (
 const (
 	scopePmRead  = "provision-manager-api:read"
 	scopePmWrite = "provision-manager-api:write"
+	// scopePmAdmin is needed to change activity and orchestration definitions, which decide what the agents do, and to
+	// see the processing and output data of orchestrations.
+	scopePmAdmin = "provision-manager-api:admin"
 )
 
 type response struct {
@@ -115,14 +118,14 @@ func (h *HandlerServiceAssembly) registerActivityDefinitionRoutes(router chi.Rou
 			handler.getActivityDefinitions(w, req)
 		})
 		r.Post("/", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopePmWrite)) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopePmAdmin)) {
 				return
 			}
 			handler.createActivityDefinition(w, req)
 		})
 		r.Route("/{activityType}", func(r chi.Router) {
 			r.Delete("/", func(w http.ResponseWriter, req *http.Request) {
-				if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopePmWrite)) {
+				if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopePmAdmin)) {
 					return
 				}
 				definitionType, found := handler.ExtractPathVariable(w, req, "activityType")
@@ -144,14 +147,14 @@ func (h *HandlerServiceAssembly) registerOrchestrationDefinitionRoutes(router ch
 			handler.getOrchestrationDefinitions(w, req)
 		})
 		r.Post("/", func(w http.ResponseWriter, req *http.Request) {
-			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopePmWrite)) {
+			if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopePmAdmin)) {
 				return
 			}
 			handler.createOrchestrationDefinition(w, req)
 		})
 		r.Route("/{templateRef}", func(r chi.Router) {
 			r.Delete("/", func(w http.ResponseWriter, req *http.Request) {
-				if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopePmWrite)) {
+				if !handler.IsAuthorized(w, req, cfmhandler.RequireScope(scopePmAdmin)) {
 					return
 				}
 				templateRef, found := handler.ExtractPathVariable(w, req, "templateRef")
