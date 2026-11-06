@@ -226,11 +226,17 @@ func (v *oidcValidator) Middleware() func(http.Handler) http.Handler {
 	}
 }
 
-// noopValidator is used when auth is disabled; its middleware passes every request through.
+// noopValidator is used when auth is disabled; its middleware attaches anonymous claims that grant every scope.
+// Authorization fails closed on requests without claims, so the claims must be attached explicitly.
 type noopValidator struct{}
 
 func (n *noopValidator) Middleware() func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler { return next }
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := context.WithValue(r.Context(), cfmauth.ContextKey{}, cfmauth.AnonymousClaims())
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }
 
 // extractScopes parses the standard space-separated "scope" claim (RFC 9068).

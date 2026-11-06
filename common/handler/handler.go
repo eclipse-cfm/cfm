@@ -177,12 +177,16 @@ func RequireScope(scope string) ClaimsRule {
 }
 
 // IsAuthorized checks whether the caller's token satisfies all given rules.
-// Returns true when all rules pass or when auth is disabled (no claims in context).
+// Returns true when all rules pass. It fails closed: a request without claims in its context was not authenticated
+// (for example, a route registered outside the auth middleware), so it writes a 401 and returns false. When auth is
+// disabled, the no-op validator attaches anonymous claims that satisfy every rule.
 // Returns false and writes a 403 naming the first failing rule.
 func (h HttpHandler) IsAuthorized(w http.ResponseWriter, r *http.Request, rules ...ClaimsRule) bool {
 	claims, ok := cfmauth.ClaimsFromContext(r.Context())
-	if !ok {
-		return true
+	if !ok || claims == nil {
+		h.Monitor.Warnw("Request has no authentication claims, refusing it", "path", r.URL.Path)
+		h.WriteError(w, "Not authenticated", http.StatusUnauthorized)
+		return false
 	}
 	for _, rule := range rules {
 		if !rule.check(claims) {
@@ -193,7 +197,8 @@ func (h HttpHandler) IsAuthorized(w http.ResponseWriter, r *http.Request, rules 
 	return true
 }
 
-// Principal returns the subject claim of the authenticated caller, or an empty string when auth is disabled.
+// Principal returns the subject claim of the authenticated caller, cfmauth.AnonymousSubject when auth is disabled, or
+// an empty string when the request carries no claims.
 func (h HttpHandler) Principal(r *http.Request) string {
 	claims, ok := cfmauth.ClaimsFromContext(r.Context())
 	if !ok {

@@ -35,6 +35,13 @@ func TestHasScope(t *testing.T) {
 		c := &Claims{}
 		assert.False(t, c.HasScope("read"))
 	})
+
+	t.Run("anonymous claims grant every scope", func(t *testing.T) {
+		c := AnonymousClaims()
+		assert.Equal(t, AnonymousSubject, c.Subject)
+		assert.True(t, c.HasScope("read"))
+		assert.True(t, c.HasScope("tenant-manager-api:write"))
+	})
 }
 
 func TestClaimsFromContext(t *testing.T) {

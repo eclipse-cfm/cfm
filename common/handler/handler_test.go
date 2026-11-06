@@ -339,11 +339,30 @@ func requestWithClaims(claims *cfmauth.Claims) *http.Request {
 func TestIsAuthorized(t *testing.T) {
 	handler := HttpHandler{Monitor: system.NoopMonitor{}}
 
-	t.Run("returns true when no claims in context (auth disabled)", func(t *testing.T) {
+	t.Run("returns false and writes 401 when no claims in context", func(t *testing.T) {
 		req, _ := http.NewRequest(http.MethodGet, "/", nil)
 		w := newMockResponseWriter()
 
 		result := handler.IsAuthorized(w, req, RequireScope("read"))
+
+		assert.False(t, result)
+		assert.Equal(t, http.StatusUnauthorized, w.statusCode)
+	})
+
+	t.Run("returns false and writes 401 when no claims in context and no rules", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/", nil)
+		w := newMockResponseWriter()
+
+		result := handler.IsAuthorized(w, req)
+
+		assert.False(t, result)
+		assert.Equal(t, http.StatusUnauthorized, w.statusCode)
+	})
+
+	t.Run("returns true for anonymous claims (auth disabled)", func(t *testing.T) {
+		w := newMockResponseWriter()
+
+		result := handler.IsAuthorized(w, requestWithClaims(cfmauth.AnonymousClaims()), RequireScope("read"), RequireScope("write"))
 
 		assert.True(t, result)
 		assert.Equal(t, 0, w.statusCode)
