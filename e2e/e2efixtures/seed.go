@@ -87,11 +87,13 @@ func CreateDataspaceProfile(apiClient *ApiClient) (*tv1alpha1.DataspaceProfile, 
 			ProtocolStack: []string{"dsp-2025-1", "dcp-2025-1"},
 			CredentialSpecs: []tv1alpha1.CredentialSpec{
 				{
+					Id:     "membership-credential",
 					Type:   MembershipCredential,
 					Issuer: IssuerDID,
 					Format: "VC1_0_JWT",
 				},
 				{
+					Id:              "governance-credential",
 					Type:            GovernanceCredential,
 					Issuer:          IssuerDID,
 					Format:          "VC1_0_JWT",

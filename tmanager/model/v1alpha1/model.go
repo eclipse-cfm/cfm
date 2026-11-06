@@ -75,7 +75,7 @@ type DataspaceProfile struct {
 
 type DataspaceSpec struct {
 	ProtocolStack   []string         `json:"protocolStack,omitempty"`
-	CredentialSpecs []CredentialSpec `json:"credentialSpecs,omitempty"`
+	CredentialSpecs []CredentialSpec `json:"credentialSpecs,omitempty" validate:"dive"`
 }
 
 type CredentialSpec struct {

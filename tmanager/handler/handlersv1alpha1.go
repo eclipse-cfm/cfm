@@ -261,7 +261,11 @@ func (h *TMHandler) createCell(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	cell := v1alpha1.NewAPICell(&newCell)
+	cell, err := v1alpha1.NewAPICell(&newCell)
+	if err != nil {
+		h.HandleError(w, err)
+		return
+	}
 
 	recordedCell, err := h.cellService.RecordExternalDeployment(req.Context(), cell)
 	if err != nil {

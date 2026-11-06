@@ -14,6 +14,7 @@ package v1alpha1
 
 import (
 	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/types"
 	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/google/uuid"
 )
@@ -210,8 +211,12 @@ func ToAPICell(input *Cell) *api.Cell {
 	}
 }
 
-func NewAPICell(input *NewCell) *api.Cell {
-	state, _ := api.ToDeploymentState(input.State)
+// NewAPICell converts a cell creation request. It returns a client error if the request names an unknown state.
+func NewAPICell(input *NewCell) (*api.Cell, error) {
+	state, err := api.ToDeploymentState(input.State)
+	if err != nil {
+		return nil, types.NewClientError("%s", err.Error())
+	}
 	return &api.Cell{
 		DeployableEntity: api.DeployableEntity{
 			Entity: api.Entity{
@@ -223,7 +228,7 @@ func NewAPICell(input *NewCell) *api.Cell {
 		},
 		ExternalID: input.ExternalID,
 		Properties: api.ToProperties(input.Properties),
-	}
+	}, nil
 }
 
 func ToDataspaceProfile(input *api.DataspaceProfile) *DataspaceProfile {

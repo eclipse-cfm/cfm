@@ -49,6 +49,19 @@ func TestRequestValidation(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "dataspace profile",
+			payload: &NewDataspaceProfile{DataspaceSpec: DataspaceSpec{CredentialSpecs: []CredentialSpec{
+				{Id: "c1", Type: "MembershipCredential", Issuer: "did:web:issuer", Format: "VC1_0_JWT"},
+			}}},
+		},
+		{
+			name: "dataspace profile with incomplete credential spec",
+			payload: &NewDataspaceProfile{DataspaceSpec: DataspaceSpec{CredentialSpecs: []CredentialSpec{
+				{Id: "c1", Type: "MembershipCredential", Issuer: "did:web:issuer"},
+			}}},
+			wantErr: true,
+		},
+		{
 			name:    "dataspace deployment",
 			payload: &NewDataspaceProfileDeployment{ProfileID: "dp1", CellID: "cell1"},
 		},
