@@ -33,8 +33,10 @@ func createTenantsTable(db sqlstore.Executor) error {
 			id TEXT PRIMARY KEY,
 			version INT DEFAULT 1,
 			properties JSONB
-		)
-	`, cfmTenantsTable))
+		);
+		ALTER TABLE %s ADD COLUMN IF NOT EXISTS owner VARCHAR(255);
+		CREATE INDEX IF NOT EXISTS idx_tenant_owner ON %s(owner)
+	`, cfmTenantsTable, cfmTenantsTable, cfmTenantsTable))
 	return err
 }
 
@@ -52,8 +54,10 @@ func createParticipantProfilesTable(db sqlstore.Executor) error {
 				error_detail TEXT,
 				properties JSONB
 			);
-			CREATE INDEX IF NOT EXISTS idx_participant_tenant ON %s(tenant_id)
-	`, cfmParticipantProfilesTable, cfmParticipantProfilesTable))
+			CREATE INDEX IF NOT EXISTS idx_participant_tenant ON %s(tenant_id);
+			ALTER TABLE %s ADD COLUMN IF NOT EXISTS owner VARCHAR(255);
+			CREATE INDEX IF NOT EXISTS idx_participant_owner ON %s(owner)
+	`, cfmParticipantProfilesTable, cfmParticipantProfilesTable, cfmParticipantProfilesTable, cfmParticipantProfilesTable))
 	return err
 }
 

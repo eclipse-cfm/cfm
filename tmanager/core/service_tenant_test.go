@@ -26,7 +26,7 @@ import (
 )
 
 func TestGetTenant(t *testing.T) {
-	ctx := context.Background()
+	ctx := allTenantsContext(context.Background())
 	service := newTestTenantService()
 
 	t.Run("get existing tenant", func(t *testing.T) {
@@ -52,7 +52,7 @@ func TestGetTenant(t *testing.T) {
 }
 
 func TestCreateTenant(t *testing.T) {
-	ctx := context.Background()
+	ctx := allTenantsContext(context.Background())
 	service := newTestTenantService()
 
 	t.Run("create valid tenant", func(t *testing.T) {
@@ -101,7 +101,7 @@ func TestCreateTenant(t *testing.T) {
 }
 
 func TestQueryTenants(t *testing.T) {
-	ctx := context.Background()
+	ctx := allTenantsContext(context.Background())
 	service := newTestTenantService()
 
 	// Populate store with test data
@@ -145,7 +145,7 @@ func TestQueryTenants(t *testing.T) {
 
 // TestCountTenants tests the QueryTenantsCount method
 func TestCountTenants(t *testing.T) {
-	ctx := context.Background()
+	ctx := allTenantsContext(context.Background())
 	tenantStore := memorystore.NewInMemoryEntityStore[*api.Tenant]()
 	service := &tenantService{
 		trxContext:  store.NoOpTransactionContext{},
@@ -183,7 +183,7 @@ func TestCountTenants(t *testing.T) {
 func TestGetTenants(t *testing.T) {
 
 	t.Run("get all tenants with pagination", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := allTenantsContext(context.Background())
 		service := newTestTenantService()
 		// Create multiple test tenants
 		tenants := []*api.Tenant{
@@ -226,7 +226,7 @@ func TestGetTenants(t *testing.T) {
 	})
 
 	t.Run("get tenants from empty store", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := allTenantsContext(context.Background())
 		service := newTestTenantService()
 		options := store.DefaultPaginationOptions()
 		results := make([]*api.Tenant, 0)
@@ -243,7 +243,7 @@ func TestGetTenants(t *testing.T) {
 func TestGetTenantsCount(t *testing.T) {
 
 	t.Run("count tenants in populated store", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := allTenantsContext(context.Background())
 		service := newTestTenantService()
 		// Create multiple test tenants
 		tenants := []*api.Tenant{
@@ -264,7 +264,7 @@ func TestGetTenantsCount(t *testing.T) {
 	})
 
 	t.Run("count tenants in empty store", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := allTenantsContext(context.Background())
 		service := newTestTenantService()
 		count, err := service.GetTenantsCount(ctx)
 
@@ -276,7 +276,7 @@ func TestGetTenantsCount(t *testing.T) {
 func TestDeleteTenant(t *testing.T) {
 
 	t.Run("delete existing tenant with no participants", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := allTenantsContext(context.Background())
 		service := newTestTenantService()
 		tenant := newTestTenant("tenant-delete-1")
 		created, err := service.CreateTenant(ctx, tenant)
@@ -295,7 +295,7 @@ func TestDeleteTenant(t *testing.T) {
 	})
 
 	t.Run("delete non-existent tenant returns error", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := allTenantsContext(context.Background())
 		service := newTestTenantService()
 		err := service.DeleteTenant(ctx, "non-existent-tenant")
 
@@ -305,14 +305,14 @@ func TestDeleteTenant(t *testing.T) {
 	})
 
 	t.Run("delete tenant with empty ID fails", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := allTenantsContext(context.Background())
 		service := newTestTenantService()
 		err := service.DeleteTenant(ctx, "")
 		require.Error(t, err)
 	})
 
 	t.Run("delete tenant with participants fails", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := allTenantsContext(context.Background())
 		service := newTestTenantService()
 		tenant := newTestTenant("tenant-delete-2")
 		created, err := service.CreateTenant(ctx, tenant)
@@ -334,7 +334,7 @@ func TestDeleteTenant(t *testing.T) {
 	})
 
 	t.Run("delete tenant after removing all participants", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := allTenantsContext(context.Background())
 		service := newTestTenantService()
 		// Setup: Create a tenant
 		tenant := newTestTenant("tenant-delete-3")
@@ -355,7 +355,7 @@ func TestDeleteTenant(t *testing.T) {
 	})
 
 	t.Run("delete tenant with multiple participants fails", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := allTenantsContext(context.Background())
 		service := newTestTenantService()
 		// Setup: Create a tenant
 		tenant := newTestTenant("tenant-delete-4")

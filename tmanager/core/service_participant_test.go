@@ -31,7 +31,7 @@ import (
 )
 
 func TestGetProfile(t *testing.T) {
-	ctx := context.Background()
+	ctx := allTenantsContext(context.Background())
 
 	t.Run("get existing participant profile", func(t *testing.T) {
 		service := newTestParticipantService()
@@ -73,7 +73,7 @@ func TestGetProfile(t *testing.T) {
 }
 
 func TestQueryProfiles(t *testing.T) {
-	ctx := context.Background()
+	ctx := allTenantsContext(context.Background())
 	service := newTestParticipantService()
 
 	// Populate store with test data
@@ -120,7 +120,7 @@ func TestQueryProfiles(t *testing.T) {
 }
 
 func TestQueryProfilesCount(t *testing.T) {
-	ctx := context.Background()
+	ctx := allTenantsContext(context.Background())
 	service := newTestParticipantService()
 
 	t.Run("count profiles in populated store", func(t *testing.T) {
@@ -155,7 +155,7 @@ func TestQueryProfilesCount(t *testing.T) {
 }
 
 func TestDeployProfile(t *testing.T) {
-	ctx := context.Background()
+	ctx := allTenantsContext(context.Background())
 
 	t.Run("deploy participant profile successfully", func(t *testing.T) {
 		service := newTestParticipantService()
@@ -369,7 +369,7 @@ func TestDeployProfile(t *testing.T) {
 }
 
 func TestDisposeProfile(t *testing.T) {
-	ctx := context.Background()
+	ctx := allTenantsContext(context.Background())
 
 	t.Run("dispose active participant profile successfully", func(t *testing.T) {
 		service := newTestParticipantService()
@@ -536,7 +536,7 @@ func TestDisposeProfile(t *testing.T) {
 }
 
 func TestVPACallbackHandlerDeploy(t *testing.T) {
-	ctx := context.Background()
+	ctx := allTenantsContext(context.Background())
 	service := newTestParticipantService()
 
 	profile := newTestParticipantProfile("tenant-1", "participant-1")
@@ -576,7 +576,7 @@ func TestVPACallbackHandlerDeploy(t *testing.T) {
 }
 
 func TestVPACallbackHandlerIgnoresUnexpectedResponses(t *testing.T) {
-	ctx := context.Background()
+	ctx := allTenantsContext(context.Background())
 
 	tests := []struct {
 		name     string
@@ -632,7 +632,7 @@ func TestVPACallbackHandlerIgnoresUnexpectedResponses(t *testing.T) {
 }
 
 func TestVPACallbackHandlerAppliesCompensation(t *testing.T) {
-	ctx := context.Background()
+	ctx := allTenantsContext(context.Background())
 	participantStore := memorystore.NewInMemoryEntityStore[*api.ParticipantProfile]()
 
 	profile := newTestParticipantProfile("tenant-1", "participant-1")
@@ -689,7 +689,7 @@ func TestVPACallbackHandlerAppliesCompensation(t *testing.T) {
 }
 
 func TestVPACallbackHandlerIgnoresDuplicateResponse(t *testing.T) {
-	ctx := context.Background()
+	ctx := allTenantsContext(context.Background())
 	participantStore := memorystore.NewInMemoryEntityStore[*api.ParticipantProfile]()
 
 	profile := newTestParticipantProfile("tenant-1", "participant-1")
@@ -726,7 +726,7 @@ func TestVPACallbackHandlerIgnoresDuplicateResponse(t *testing.T) {
 }
 
 func TestVPACallbackHandlerDispose(t *testing.T) {
-	ctx := context.Background()
+	ctx := allTenantsContext(context.Background())
 	service := newTestParticipantService()
 
 	profile := newTestParticipantProfile("tenant-1", "participant-1")
@@ -763,7 +763,7 @@ func TestVPACallbackHandlerDispose(t *testing.T) {
 }
 
 func TestVPACallbackHandlerFailedResponse(t *testing.T) {
-	ctx := context.Background()
+	ctx := allTenantsContext(context.Background())
 	participantStore := memorystore.NewInMemoryEntityStore[*api.ParticipantProfile]()
 
 	profile := newTestParticipantProfile("tenant-1", "participant-1")
@@ -799,7 +799,7 @@ func TestVPACallbackHandlerFailedResponse(t *testing.T) {
 }
 
 func TestVPACallbackHandlerNonExistentProfile(t *testing.T) {
-	ctx := context.Background()
+	ctx := allTenantsContext(context.Background())
 
 	handler := vpaCallbackHandler{
 		participantStore: memorystore.NewInMemoryEntityStore[*api.ParticipantProfile](),
@@ -823,7 +823,7 @@ func TestVPACallbackHandlerNonExistentProfile(t *testing.T) {
 }
 
 func TestGetFilteredProfiles(t *testing.T) {
-	ctx := context.Background()
+	ctx := allTenantsContext(context.Background())
 
 	t.Run("returns all profiles when no profile IDs specified", func(t *testing.T) {
 		service := newTestParticipantService()
@@ -1028,7 +1028,7 @@ func createTestTenant(t *testing.T, service *participantService, tenantID string
 }
 
 func TestDeployProfile_UnknownTenant(t *testing.T) {
-	ctx := t.Context()
+	ctx := allTenantsContext(t.Context())
 	service := newDeployableTestService(t)
 	mockClient := new(mockProvisionClient)
 	service.provisionClient = mockClient
@@ -1054,7 +1054,7 @@ func newDisposableTestProfile(t *testing.T, service *participantService) *api.Pa
 }
 
 func TestDeployProfile_SendsAfterCommit(t *testing.T) {
-	ctx := t.Context()
+	ctx := allTenantsContext(t.Context())
 	service := newDeployableTestService(t)
 	trxOpen := false
 	service.trxContext = recordingTrxContext{open: &trxOpen}
@@ -1072,7 +1072,7 @@ func TestDeployProfile_SendsAfterCommit(t *testing.T) {
 }
 
 func TestDeployProfile_SendFailureRemovesProfile(t *testing.T) {
-	ctx := t.Context()
+	ctx := allTenantsContext(t.Context())
 	service := newDeployableTestService(t)
 
 	mockClient := new(mockProvisionClient)
@@ -1088,7 +1088,7 @@ func TestDeployProfile_SendFailureRemovesProfile(t *testing.T) {
 }
 
 func TestDisposeProfile_SendsAfterCommit(t *testing.T) {
-	ctx := t.Context()
+	ctx := allTenantsContext(t.Context())
 	service := newTestParticipantService()
 	profile := newDisposableTestProfile(t, service)
 	trxOpen := false
@@ -1105,7 +1105,7 @@ func TestDisposeProfile_SendsAfterCommit(t *testing.T) {
 }
 
 func TestDisposeProfile_SendFailureRevertsProfile(t *testing.T) {
-	ctx := t.Context()
+	ctx := allTenantsContext(t.Context())
 	service := newTestParticipantService()
 	profile := newDisposableTestProfile(t, service)
 

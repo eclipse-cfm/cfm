@@ -34,11 +34,23 @@ type tenantService struct {
 
 func (t tenantService) GetTenant(ctx context.Context, tenantID string) (*api.Tenant, error) {
 	return store.Trx[api.Tenant](t.trxContext).AndReturn(ctx, func(ctx context.Context) (*api.Tenant, error) {
-		return t.tenantStore.FindByID(ctx, tenantID)
+		tenant, err := t.tenantStore.FindByID(ctx, tenantID)
+		if err != nil {
+			return nil, err
+		}
+		if err := checkTenantAccess(ctx, tenant); err != nil {
+			return nil, err
+		}
+		return tenant, nil
 	})
 }
 
 func (t tenantService) CreateTenant(ctx context.Context, tenant *api.Tenant) (*api.Tenant, error) {
+	access, err := api.TenantAccessFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	tenant.Owner = access.Subject()
 	return store.Trx[api.Tenant](t.trxContext).AndReturn(ctx, func(ctx context.Context) (*api.Tenant, error) {
 		return t.tenantStore.Create(ctx, tenant)
 	})
@@ -52,6 +64,9 @@ func (t tenantService) PatchTenant(ctx context.Context, id string, properties ma
 				return err
 			}
 			return fmt.Errorf("tenant %s not found: %w", id, err)
+		}
+		if err := checkTenantAccess(ctx, tenant); err != nil {
+			return err
 		}
 		for key, value := range properties {
 			tenant.Properties[key] = value
@@ -75,6 +90,9 @@ func (t tenantService) DeleteTenant(ctx context.Context, tenantID string) error 
 		if err != nil {
 			return err
 		}
+		if err := checkTenantAccess(ctx, tenant); err != nil {
+			return err
+		}
 
 		count, err := t.participantStore.CountByPredicate(ctx, &query.AtomicPredicate{
 			Field:    "tenantId",
@@ -94,29 +112,70 @@ func (t tenantService) DeleteTenant(ctx context.Context, tenantID string) error 
 }
 
 func (t tenantService) QueryTenants(ctx context.Context, predicate query.Predicate, options store.PaginationOptions) iter.Seq2[*api.Tenant, error] {
+	access, err := api.TenantAccessFromContext(ctx)
+	if err != nil {
+		return failedTenantIterator(err)
+	}
 	return t.executeStoreIterator(ctx, func(ctx context.Context) iter.Seq2[*api.Tenant, error] {
-		return t.tenantStore.FindByPredicatePaginated(ctx, predicate, options)
+		return t.tenantStore.FindByPredicatePaginated(ctx, access.Restrict(predicate), options)
 	})
 }
 
 func (t tenantService) GetTenants(ctx context.Context, options store.PaginationOptions) iter.Seq2[*api.Tenant, error] {
+	access, err := api.TenantAccessFromContext(ctx)
+	if err != nil {
+		return failedTenantIterator(err)
+	}
 	return t.executeStoreIterator(ctx, func(ctx context.Context) iter.Seq2[*api.Tenant, error] {
+		if access.IsRestricted() {
+			return t.tenantStore.FindByPredicatePaginated(ctx, access.Restrict(nil), options)
+		}
 		return t.tenantStore.GetAllPaginated(ctx, options)
 	})
 }
 
 func (t tenantService) GetTenantsCount(ctx context.Context) (int64, error) {
+	access, err := api.TenantAccessFromContext(ctx)
+	if err != nil {
+		return 0, err
+	}
+	if access.IsRestricted() {
+		return t.tenantStore.CountByPredicate(ctx, access.Restrict(nil))
+	}
 	return t.tenantStore.GetAllCount(ctx)
 }
 
 func (t tenantService) QueryTenantsCount(ctx context.Context, predicate query.Predicate) (int64, error) {
+	access, err := api.TenantAccessFromContext(ctx)
+	if err != nil {
+		return 0, err
+	}
 	var count int64
-	err := t.trxContext.Execute(ctx, func(ctx context.Context) error {
-		c, err := t.tenantStore.CountByPredicate(ctx, predicate)
+	err = t.trxContext.Execute(ctx, func(ctx context.Context) error {
+		c, err := t.tenantStore.CountByPredicate(ctx, access.Restrict(predicate))
 		count = c
 		return err
 	})
 	return count, err
+}
+
+// checkTenantAccess returns ErrNotFound when the caller may not access the tenant, so that callers cannot tell other
+// clients' tenants from tenants that don't exist.
+func checkTenantAccess(ctx context.Context, tenant *api.Tenant) error {
+	access, err := api.TenantAccessFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	if !access.Allows(tenant.Owner) {
+		return types.ErrNotFound
+	}
+	return nil
+}
+
+func failedTenantIterator(err error) iter.Seq2[*api.Tenant, error] {
+	return func(yield func(*api.Tenant, error) bool) {
+		yield(nil, err)
+	}
 }
 
 // executeStoreIterator wraps store iterator operations in a transaction context

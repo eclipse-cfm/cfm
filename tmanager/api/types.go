@@ -51,6 +51,9 @@ type DeployableEntity struct {
 // Tenant represents an organization. A tenant may have multiple organizational units (e.g., departments), or ParticipantProfiles.
 type Tenant struct {
 	Entity
+	// Owner is the subject of the client that created the tenant. Clients without the admin scope can only access the
+	// tenants they own. Tenants created before owners were recorded have no owner.
+	Owner      string     `json:"owner,omitempty"`
 	Properties Properties `json:"properties"`
 }
 
@@ -59,8 +62,11 @@ type Tenant struct {
 // (e.g., department).
 type ParticipantProfile struct {
 	Entity
-	Identifier          string                    `json:"identifier"`
-	TenantID            string                    `json:"tenantId"`
+	Identifier string `json:"identifier"`
+	TenantID   string `json:"tenantId"`
+	// Owner is copied from the profile's tenant when the profile is deployed, so that queries across tenants can be
+	// limited to the caller's own profiles.
+	Owner               string                    `json:"owner,omitempty"`
 	DataspaceProfileIDs []string                  `json:"dataspaceProfileIds"`
 	ParticipantRoles    map[string][]string       `json:"participantRoles"`
 	VPAs                []VirtualParticipantAgent `json:"vpas"`

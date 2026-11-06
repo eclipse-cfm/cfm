@@ -542,3 +542,57 @@ func setupTenantTable(t *testing.T, db *sql.DB) {
 	err := createTenantsTable(db)
 	require.NoError(t, err)
 }
+
+func TestTenantStore_Owner(t *testing.T) {
+	setupTenantTable(t, testDB)
+	defer cleanupTenantTestData(t, testDB)
+
+	ctx := context.Background()
+	tx, err := testDB.BeginTx(ctx, nil)
+	require.NoError(t, err)
+	defer tx.Rollback()
+	txCtx := context.WithValue(ctx, sqlstore.SQLTransactionKey, tx)
+
+	estore := newTenantStore()
+	for id, owner := range map[string]string{"tenant-a": "client-a", "tenant-b": "client-b"} {
+		_, err := estore.Create(txCtx, &api.Tenant{Entity: api.Entity{ID: id, Version: 1}, Owner: owner, Properties: map[string]any{}})
+		require.NoError(t, err)
+	}
+	// A tenant written before the owner column existed has a NULL owner.
+	_, err = tx.Exec(fmt.Sprintf("INSERT INTO %s (id, version, properties) VALUES ('tenant-legacy', 1, '{}')", cfmTenantsTable))
+	require.NoError(t, err)
+
+	found, err := estore.FindByID(txCtx, "tenant-a")
+	require.NoError(t, err)
+	assert.Equal(t, "client-a", found.Owner)
+
+	legacy, err := estore.FindByID(txCtx, "tenant-legacy")
+	require.NoError(t, err)
+	assert.Empty(t, legacy.Owner)
+
+	count, err := estore.CountByPredicate(txCtx, query.Eq(api.OwnerField, "client-b"))
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), count)
+
+	count, err = estore.CountByPredicate(txCtx, query.And(query.Eq("id", "tenant-a"), query.Eq(api.OwnerField, "client-b")))
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), count)
+}
+
+func TestCreateTenantsTable_AddsOwnerToExistingTable(t *testing.T) {
+	_, err := testDB.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", cfmTenantsTable))
+	require.NoError(t, err)
+	// The table as it was created before tenants had owners.
+	_, err = testDB.Exec(fmt.Sprintf("CREATE TABLE %s (id TEXT PRIMARY KEY, version INT DEFAULT 1, properties JSONB)", cfmTenantsTable))
+	require.NoError(t, err)
+	defer cleanupTenantTestData(t, testDB)
+
+	require.NoError(t, createTenantsTable(testDB))
+	// Running it again on every start must not fail.
+	require.NoError(t, createTenantsTable(testDB))
+
+	var count int
+	err = testDB.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_name = $1 AND column_name = 'owner'`, cfmTenantsTable).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+}

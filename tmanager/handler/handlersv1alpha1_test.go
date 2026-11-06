@@ -48,9 +48,11 @@ type fakeParticipantService struct {
 	api.ParticipantProfileService
 	queryErr   error
 	disposeErr error
+	queried    bool
 }
 
 func (f *fakeParticipantService) QueryProfiles(context.Context, query.Predicate, store.PaginationOptions) iter.Seq2[*api.ParticipantProfile, error] {
+	f.queried = true
 	return func(yield func(*api.ParticipantProfile, error) bool) {
 		yield(nil, f.queryErr)
 	}
@@ -72,8 +74,20 @@ func (f *fakeDataspaceService) DeployProfile(_ context.Context, profileID string
 	return nil
 }
 
+type fakeTenantService struct {
+	api.TenantService
+	getErr error
+}
+
+func (f *fakeTenantService) GetTenant(_ context.Context, tenantID string) (*api.Tenant, error) {
+	if f.getErr != nil {
+		return nil, f.getErr
+	}
+	return &api.Tenant{Entity: api.Entity{ID: tenantID}}, nil
+}
+
 func newTestHandler(participants api.ParticipantProfileService, dataspaces api.DataspaceProfileService) *TMHandler {
-	return NewHandler(nil, participants, nil, dataspaces, nil, system.NoopMonitor{})
+	return NewHandler(&fakeTenantService{}, participants, nil, dataspaces, nil, system.NoopMonitor{})
 }
 
 func TestGetProfilesForTenant_QueryError(t *testing.T) {
@@ -87,6 +101,18 @@ func TestGetProfilesForTenant_QueryError(t *testing.T) {
 
 	assert.Equal(t, http.StatusNotFound, w.Code)
 	assert.Equal(t, 1, w.writeHeaderCalls)
+}
+
+func TestGetProfilesForTenant_TenantNotAccessible(t *testing.T) {
+	participants := &fakeParticipantService{}
+	h := NewHandler(&fakeTenantService{getErr: types.ErrNotFound}, participants, nil, nil, nil, system.NoopMonitor{})
+	w := newHeaderCountingRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/tenants/t1/participant-profiles", nil)
+
+	h.getProfilesForTenant(w, req, "t1")
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.False(t, participants.queried)
 }
 
 func TestDisposeParticipantProfile_Error(t *testing.T) {

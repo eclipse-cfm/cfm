@@ -72,6 +72,12 @@ func (h *TMHandler) getProfilesForTenant(w http.ResponseWriter, req *http.Reques
 	if h.InvalidMethod(w, req, http.MethodGet) {
 		return
 	}
+	// Look the tenant up first, so that a tenant the caller may not access is reported as not found rather than as
+	// having no profiles.
+	if _, err := h.tenantService.GetTenant(req.Context(), tenantID); err != nil {
+		h.HandleError(w, err)
+		return
+	}
 	iter := h.participantService.QueryProfiles(req.Context(), query.Eq("tenantId", tenantID), store.DefaultPaginationOptions())
 	results := make([]v1alpha1.ParticipantProfile, 0)
 	for profile, err := range iter {

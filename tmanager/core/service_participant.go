@@ -49,14 +49,21 @@ func (p participantService) GetProfile(ctx context.Context, tenantID string, par
 		if profile.TenantID != tenantID {
 			return nil, types.ErrNotFound
 		}
+		if err := checkProfileAccess(ctx, profile); err != nil {
+			return nil, err
+		}
 		return profile, nil
 	})
 }
 
 func (p participantService) QueryProfilesCount(ctx context.Context, predicate query.Predicate) (int64, error) {
+	access, err := api.TenantAccessFromContext(ctx)
+	if err != nil {
+		return 0, err
+	}
 	var count int64
-	err := p.trxContext.Execute(ctx, func(ctx context.Context) error {
-		c, err := p.participantStore.CountByPredicate(ctx, predicate)
+	err = p.trxContext.Execute(ctx, func(ctx context.Context) error {
+		c, err := p.participantStore.CountByPredicate(ctx, access.Restrict(predicate))
 		count = c
 		return err
 	})
@@ -64,8 +71,14 @@ func (p participantService) QueryProfilesCount(ctx context.Context, predicate qu
 }
 
 func (p participantService) QueryProfiles(ctx context.Context, predicate query.Predicate, options store.PaginationOptions) iter.Seq2[*api.ParticipantProfile, error] {
+	access, err := api.TenantAccessFromContext(ctx)
+	if err != nil {
+		return func(yield func(*api.ParticipantProfile, error) bool) {
+			yield(nil, err)
+		}
+	}
 	return p.executeStoreIterator(ctx, func(ctx context.Context) iter.Seq2[*api.ParticipantProfile, error] {
-		return p.participantStore.FindByPredicatePaginated(ctx, predicate, options)
+		return p.participantStore.FindByPredicatePaginated(ctx, access.Restrict(predicate), options)
 	})
 }
 
@@ -76,7 +89,11 @@ func (p participantService) DeployProfile(ctx context.Context, tenantID string, 
 	result, err := store.Trx[api.ParticipantProfile](p.trxContext).AndReturn(ctx, func(ctx context.Context) (*api.ParticipantProfile, error) {
 		// The shared lock keeps the tenant from being deleted until the profile is committed, so that a concurrent
 		// DeleteTenant either sees the new profile or makes this deployment fail.
-		if _, err := p.tenantStore.FindByIDAndLock(ctx, tenantID, store.LockShared); err != nil {
+		tenant, err := p.tenantStore.FindByIDAndLock(ctx, tenantID, store.LockShared)
+		if err != nil {
+			return nil, err
+		}
+		if err := checkTenantAccess(ctx, tenant); err != nil {
 			return nil, err
 		}
 
@@ -101,6 +118,7 @@ func (p participantService) DeployProfile(ctx context.Context, tenantID string, 
 		if err != nil {
 			return nil, err
 		}
+		participantProfile.Owner = tenant.Owner
 
 		oManifest = model.OrchestrationManifest{
 			ID:                uuid.New().String(),
@@ -222,6 +240,9 @@ func (p participantService) DisposeProfile(ctx context.Context, tenantID string,
 		}
 		if profile.TenantID != tenantID {
 			return types.ErrNotFound
+		}
+		if err := checkProfileAccess(c, profile); err != nil {
+			return err
 		}
 		states := make([]string, 0, len(profile.VPAs))
 		for _, vpa := range profile.VPAs {
@@ -354,6 +375,18 @@ func isPendingOrchestration(profile *api.ParticipantProfile, response model.Orch
 	return manifestID == response.CompensatedManifestID &&
 		orchestrationType == model.VPADeployType.String() &&
 		response.OrchestrationType == model.VPADisposeType
+}
+
+// checkProfileAccess returns ErrNotFound when the caller may not access the participant profile.
+func checkProfileAccess(ctx context.Context, profile *api.ParticipantProfile) error {
+	access, err := api.TenantAccessFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	if !access.Allows(profile.Owner) {
+		return types.ErrNotFound
+	}
+	return nil
 }
 
 // executeStoreIterator wraps store iterator operations in a transaction context

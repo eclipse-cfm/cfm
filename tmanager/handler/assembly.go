@@ -82,6 +82,7 @@ func (h *HandlerServiceAssembly) Init(context *system.InitContext) error {
 }
 
 func (h *HandlerServiceAssembly) registerV1Alpha1(router chi.Router, handler *TMHandler) {
+	router.Use(handler.tenantAccessMiddleware)
 	h.registerTenantRoutes(router, handler)
 	h.registerProfileQueryRoutes(router, handler)
 	h.registerCellRoutes(router, handler)
