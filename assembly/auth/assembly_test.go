@@ -18,9 +18,55 @@ import (
 	"testing"
 
 	cfmauth "github.com/eclipse-cfm/cfm/common/auth"
+	"github.com/eclipse-cfm/cfm/common/system"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func newInitContext(mode system.RuntimeMode, settings map[string]any) *system.InitContext {
+	cfg := viper.New()
+	for k, v := range settings {
+		cfg.Set(k, v)
+	}
+	return &system.InitContext{
+		StartContext: system.StartContext{
+			Registry:   system.NewServiceRegistry(),
+			LogMonitor: system.NoopMonitor{},
+			Config:     cfg,
+			Mode:       mode,
+		},
+	}
+}
+
+func TestInit_AuthDisabled(t *testing.T) {
+	t.Run("refused in production mode", func(t *testing.T) {
+		ctx := newInitContext(system.ProductionMode, map[string]any{authEnabledKey: false})
+
+		err := (&AuthServiceAssembly{}).Init(ctx)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), allowDisabledKey)
+		_, found := ctx.Registry.ResolveOptional(ValidatorKey)
+		assert.False(t, found)
+	})
+
+	t.Run("allowed in production mode with explicit opt-in", func(t *testing.T) {
+		ctx := newInitContext(system.ProductionMode, map[string]any{authEnabledKey: false, allowDisabledKey: true})
+
+		require.NoError(t, (&AuthServiceAssembly{}).Init(ctx))
+		assert.IsType(t, &noopValidator{}, ctx.Registry.Resolve(ValidatorKey))
+	})
+
+	for _, mode := range []system.RuntimeMode{system.DevelopmentMode, system.DebugMode} {
+		t.Run("allowed in "+string(mode)+" mode", func(t *testing.T) {
+			ctx := newInitContext(mode, map[string]any{authEnabledKey: false})
+
+			require.NoError(t, (&AuthServiceAssembly{}).Init(ctx))
+			assert.IsType(t, &noopValidator{}, ctx.Registry.Resolve(ValidatorKey))
+		})
+	}
+}
 
 func TestNoopValidator_AttachesAnonymousClaims(t *testing.T) {
 	var got *cfmauth.Claims

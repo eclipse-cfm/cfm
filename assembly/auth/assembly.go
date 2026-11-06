@@ -29,6 +29,7 @@ const (
 	ValidatorKey system.ServiceType = "auth:Validator"
 
 	authEnabledKey     = "auth.enabled"
+	allowDisabledKey   = "auth.allowDisabled"
 	discoveryUrlKey    = "auth.discoveryUrl"
 	authAudienceKey    = "auth.audience"
 	audienceClaimKey   = "auth.audienceClaim"
@@ -45,7 +46,9 @@ type AuthValidator interface {
 }
 
 // AuthServiceAssembly wires up token validation via OIDC discovery.
-// When auth.enabled is false it registers a no-op validator so dependent assemblies always find the key.
+// When auth.enabled is false it registers a no-op validator so dependent assemblies always find the key. In production
+// mode, disabling auth additionally requires auth.allowDisabled, so that a single mis-set flag cannot switch off API
+// security.
 type AuthServiceAssembly struct {
 	system.DefaultServiceAssembly
 }
@@ -65,7 +68,10 @@ func (a *AuthServiceAssembly) Init(ctx *system.InitContext) error {
 	}
 
 	if !isAuthEnabled {
-		ctx.LogMonitor.Infof("Auth is disabled — all requests will be allowed")
+		if ctx.Mode == system.ProductionMode && !ctx.Config.GetBool(allowDisabledKey) {
+			return fmt.Errorf("%s=false is not allowed in production mode: enable auth, or also set %s to true", authEnabledKey, allowDisabledKey)
+		}
+		ctx.LogMonitor.Warnf("API authentication is DISABLED — every request is allowed with full access. Never run like this in a shared environment.")
 		ctx.Registry.Register(ValidatorKey, &noopValidator{})
 		return nil
 	}

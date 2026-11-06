@@ -40,6 +40,10 @@ claims that satisfy every rule, so all downstream authorization checks pass.
 
 > Note: authentication is **enabled by default**.
 
+In `production` mode (the default runtime mode), `auth.enabled=false` is refused at startup unless
+`auth.allowDisabled=true` is also set. A single mis-set flag must not switch off API security. Whenever auth is
+disabled, a warning is logged on startup.
+
 **Authorization** is enforced inside each handler via `handler.IsAuthorized(w, req, rules...)`. The function retrieves
 the `Claims` from the request context and evaluates each `ClaimsRule` against them. Two rules exist:
 
