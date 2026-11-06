@@ -53,5 +53,24 @@ func TestNewStatusError_KeepsBody(t *testing.T) {
 func TestNewStatusError_LimitsBody(t *testing.T) {
 	resp := &http.Response{StatusCode: http.StatusBadGateway, Body: io.NopCloser(strings.NewReader(strings.Repeat("x", 10*maxErrorBodyBytes)))}
 
-	assert.Len(t, NewStatusError("op", resp).Body, maxErrorBodyBytes)
+	assert.Equal(t, strings.Repeat("x", maxErrorBodyBytes)+" (truncated)", NewStatusError("op", resp).Body)
+}
+
+func TestReadErrorBody(t *testing.T) {
+	read := func(body string) string {
+		return ReadErrorBody(&http.Response{Body: io.NopCloser(strings.NewReader(body))})
+	}
+
+	assert.Equal(t, "", ReadErrorBody(nil))
+	assert.Equal(t, "", ReadErrorBody(&http.Response{}))
+	assert.Equal(t, "", read(""))
+	assert.Equal(t, `{"error": "bad"}`, read(`{"error": "bad"}`))
+	assert.Equal(t, "line one line two", read("line one\r\nline two\n"), "line breaks must not reach log lines")
+	assert.Equal(t, "a b", read("a\x00\x1b\tb"))
+	assert.Equal(t, "ok", read("o\xffk"), "invalid UTF-8 is dropped")
+	assert.Equal(t, strings.Repeat("x", maxErrorBodyBytes), read(strings.Repeat("x", maxErrorBodyBytes)), "a body at the limit is not truncated")
+
+	// A multibyte character split by the limit is dropped rather than kept as an invalid byte
+	split := read(strings.Repeat("x", maxErrorBodyBytes-1) + "é")
+	assert.Equal(t, strings.Repeat("x", maxErrorBodyBytes-1)+" (truncated)", split)
 }

@@ -19,7 +19,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 
@@ -99,8 +98,7 @@ func (i HttpApiClient) QueryCredentialsByType(ctx context.Context, holderID stri
 	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failed to query credentials on IssuerService: received status code %d, body: %s", resp.StatusCode, string(bodyBytes))
+		return nil, fmt.Errorf("failed to query credentials on IssuerService: received status code %d, body: %s", resp.StatusCode, httpx.ReadErrorBody(resp))
 	}
 
 	var credentials []IssuerCredentialResourceDto
@@ -130,8 +128,7 @@ func (i HttpApiClient) DeleteHolder(ctx context.Context, participantContextID st
 	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusNoContent {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to delete Holder on IssuerService: received status code %d, body: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("failed to delete Holder on IssuerService: received status code %d, body: %s", resp.StatusCode, httpx.ReadErrorBody(resp))
 	}
 	return nil
 }
@@ -172,8 +169,7 @@ func (i HttpApiClient) CreateHolder(ctx context.Context, participantContextID st
 	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to create Holder on ApiClient: received status code %d, body: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("failed to create Holder on ApiClient: received status code %d, body: %s", resp.StatusCode, httpx.ReadErrorBody(resp))
 	}
 	return nil
 }
@@ -197,8 +193,7 @@ func (i HttpApiClient) RevokeCredential(ctx context.Context, participantContextI
 	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to revoke credential with ID '%s' for participant context '%s': received status code %d with message [%s]", credentialID, participantContextID, resp.StatusCode, string(body))
+		return fmt.Errorf("failed to revoke credential with ID '%s' for participant context '%s': received status code %d with message [%s]", credentialID, participantContextID, resp.StatusCode, httpx.ReadErrorBody(resp))
 	}
 	return nil
 }
