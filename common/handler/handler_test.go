@@ -238,9 +238,9 @@ func TestHandleError(t *testing.T) {
 		assert.Equal(t, 500, response.Code)
 	})
 
-	t.Run("handles generic error", func(t *testing.T) {
+	t.Run("handles generic error without exposing its details", func(t *testing.T) {
 		w := newMockResponseWriter()
-		err := errors.New("generic error message")
+		err := errors.New(`pq: relation "tenants" does not exist`)
 
 		handler.HandleError(w, err)
 
@@ -250,8 +250,20 @@ func TestHandleError(t *testing.T) {
 		jsonErr := json.Unmarshal(w.body.Bytes(), &response)
 		require.NoError(t, jsonErr)
 
-		assert.NotEmpty(t, response.Message)
+		assert.Equal(t, "Internal server error occurred ["+response.ID+"]", response.Message)
+		assert.NotEmpty(t, response.ID)
+		assert.NotContains(t, w.body.String(), "tenants")
 		assert.Equal(t, 500, response.Code)
+	})
+
+	t.Run("handles recoverable error without exposing its details", func(t *testing.T) {
+		w := newMockResponseWriter()
+		err := types.NewRecoverableError("nats: timeout")
+
+		handler.HandleError(w, err)
+
+		assert.Equal(t, http.StatusInternalServerError, w.statusCode)
+		assert.NotContains(t, w.body.String(), "nats")
 	})
 }
 
