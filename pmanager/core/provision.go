@@ -15,6 +15,7 @@ package core
 import (
 	"context"
 	"errors"
+	"fmt"
 	"iter"
 
 	"github.com/eclipse-cfm/cfm/common/model"
@@ -63,6 +64,11 @@ func (p provisionManager) Start(ctx context.Context, manifest *model.Orchestrati
 		}
 
 		if orch != nil {
+			// The same manifest may be submitted again, for example when a start is retried. A different manifest that
+			// reuses the ID is refused, so that it can neither read nor resume another caller's orchestration.
+			if orch.OrchestrationType != manifest.OrchestrationType || orch.CorrelationID != manifest.CorrelationID {
+				return fmt.Errorf("orchestration %s already exists with a different type or correlation ID: %w", manifestID, types.ErrConflict)
+			}
 			// Already exists, return its representation
 			orchestration = orch
 			if orch.State != api.OrchestrationStateInitialized {

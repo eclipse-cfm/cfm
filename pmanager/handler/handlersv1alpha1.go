@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"net/http"
 
+	cfmauth "github.com/eclipse-cfm/cfm/common/auth"
 	. "github.com/eclipse-cfm/cfm/common/collection"
 	"github.com/eclipse-cfm/cfm/common/handler"
 	"github.com/eclipse-cfm/cfm/common/model"
@@ -119,7 +120,7 @@ func (h *PMHandler) createOrchestration(w http.ResponseWriter, req *http.Request
 		h.HandleError(w, err)
 		return
 	}
-	h.ResponseAccepted(w, orchestration)
+	h.ResponseAccepted(w, h.toOrchestrationResponse(req, orchestration))
 }
 
 func (h *PMHandler) health(w http.ResponseWriter, _ *http.Request) {
@@ -179,8 +180,24 @@ func (h *PMHandler) getOrchestration(w http.ResponseWriter, req *http.Request, i
 		return
 	}
 
+	h.ResponseOK(w, h.toOrchestrationResponse(req, orchestration))
+}
+
+// toOrchestrationResponse converts an orchestration to its API representation. Its processing and output data carry
+// the caller's payload and the values activities produced, so they are only returned to callers with the admin scope.
+func (h *PMHandler) toOrchestrationResponse(req *http.Request, orchestration *api.Orchestration) v1alpha1.Orchestration {
 	response := v1alpha1.ToOrchestration(orchestration)
-	h.ResponseOK(w, response)
+	if !canSeeOrchestrationData(req) {
+		response.ProcessingData = map[string]any{}
+		response.OutputData = map[string]any{}
+	}
+	return response
+}
+
+func canSeeOrchestrationData(req *http.Request) bool {
+	// When authentication is disabled, the anonymous claims grant the admin scope.
+	claims, ok := cfmauth.ClaimsFromContext(req.Context())
+	return ok && claims != nil && claims.HasScope(scopePmAdmin)
 }
 
 func (h *PMHandler) getActivityDefinitions(w http.ResponseWriter, req *http.Request) {
