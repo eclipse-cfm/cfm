@@ -23,7 +23,7 @@ import (
 )
 
 func TestPatchTenant(t *testing.T) {
-	ctx := context.Background()
+	ctx := allTenantsContext(context.Background())
 	service := newTestTenantService()
 
 	t.Run("patch tenant with add properties", func(t *testing.T) {

@@ -27,6 +27,7 @@ func newParticipantProfileStore() store.EntityStore[*api.ParticipantProfile] {
 		"version",
 		"identifier",
 		"tenant_id",
+		"owner",
 		"dataspace_profile_ids",
 		"participant_roles",
 		"vpas",
@@ -78,6 +79,11 @@ func recordToPProfileEntity(_ *sql.Tx, record *sqlstore.DatabaseRecord) (*api.Pa
 		profile.TenantID = tenantId
 	} else {
 		return nil, fmt.Errorf("invalid participant profile tenant ID reading record")
+	}
+
+	// Profiles deployed before owners were recorded have a NULL owner.
+	if owner, ok := record.Values["owner"].(string); ok {
+		profile.Owner = owner
 	}
 
 	if identifier, ok := record.Values["identifier"].(string); ok {
@@ -133,6 +139,7 @@ func pProfileEntityToRecord(profile *api.ParticipantProfile) (*sqlstore.Database
 	record.Values["id"] = profile.ID
 	record.Values["version"] = profile.Version
 	record.Values["tenant_id"] = profile.TenantID
+	record.Values["owner"] = profile.Owner
 	record.Values["identifier"] = profile.Identifier
 	record.Values["error"] = profile.Error
 	record.Values["error_detail"] = profile.ErrorDetail

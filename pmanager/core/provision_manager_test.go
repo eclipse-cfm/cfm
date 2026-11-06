@@ -94,8 +94,9 @@ func TestProvisionManager_Start(t *testing.T) {
 			},
 			setupOrch: func(orch *mocks.MockOrchestrator) {
 				existingOrch := &api.Orchestration{
-					ID:    "test-orchestration-2",
-					State: api.OrchestrationStateRunning,
+					ID:                "test-orchestration-2",
+					OrchestrationType: "test-type",
+					State:             api.OrchestrationStateRunning,
 				}
 				orch.EXPECT().GetOrchestration(mock.Anything, "test-orchestration-2").Return(existingOrch, nil)
 			},
@@ -112,8 +113,9 @@ func TestProvisionManager_Start(t *testing.T) {
 			setupStore: storeTestDefinition,
 			setupOrch: func(orch *mocks.MockOrchestrator) {
 				existingOrch := &api.Orchestration{
-					ID:    "test-orchestration-7",
-					State: api.OrchestrationStateInitialized,
+					ID:                "test-orchestration-7",
+					OrchestrationType: "test-type",
+					State:             api.OrchestrationStateInitialized,
 				}
 				orch.EXPECT().GetOrchestration(mock.Anything, "test-orchestration-7").Return(existingOrch, nil)
 				orch.EXPECT().Execute(mock.Anything, existingOrch).Return(nil)
@@ -121,6 +123,42 @@ func TestProvisionManager_Start(t *testing.T) {
 			expectedResult: &api.Orchestration{
 				ID: "test-orchestration-7",
 			},
+		},
+		{
+			name: "deduplication - existing orchestration of a different type is a conflict",
+			manifest: &model.OrchestrationManifest{
+				ID:                "test-orchestration-8",
+				OrchestrationType: "test-type",
+			},
+			setupStore: storeTestDefinition,
+			setupOrch: func(orch *mocks.MockOrchestrator) {
+				existingOrch := &api.Orchestration{
+					ID:                "test-orchestration-8",
+					OrchestrationType: "other-type",
+					State:             api.OrchestrationStateInitialized,
+				}
+				orch.EXPECT().GetOrchestration(mock.Anything, "test-orchestration-8").Return(existingOrch, nil)
+			},
+			expectedError: "already exists with a different type or correlation ID",
+		},
+		{
+			name: "deduplication - existing orchestration with a different correlation ID is a conflict",
+			manifest: &model.OrchestrationManifest{
+				ID:                "test-orchestration-9",
+				CorrelationID:     "profile-1",
+				OrchestrationType: "test-type",
+			},
+			setupStore: storeTestDefinition,
+			setupOrch: func(orch *mocks.MockOrchestrator) {
+				existingOrch := &api.Orchestration{
+					ID:                "test-orchestration-9",
+					CorrelationID:     "profile-2",
+					OrchestrationType: "test-type",
+					State:             api.OrchestrationStateRunning,
+				}
+				orch.EXPECT().GetOrchestration(mock.Anything, "test-orchestration-9").Return(existingOrch, nil)
+			},
+			expectedError: "already exists with a different type or correlation ID",
 		},
 		{
 			name: "orchestration definition not found",

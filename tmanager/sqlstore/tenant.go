@@ -23,7 +23,7 @@ import (
 )
 
 func newTenantStore() store.EntityStore[*api.Tenant] {
-	columnNames := []string{"id", "version", "properties"}
+	columnNames := []string{"id", "version", "owner", "properties"}
 	builder := sqlstore.NewPostgresJSONBBuilder().WithJSONBFieldTypes(map[string]sqlstore.JSONBFieldType{
 		"properties": sqlstore.JSONBFieldTypeScalar,
 	})
@@ -53,6 +53,11 @@ func recordToTenantEntity(_ *sql.Tx, record *sqlstore.DatabaseRecord) (*api.Tena
 		return nil, fmt.Errorf("invalid tenant version reading record")
 	}
 
+	// Tenants created before owners were recorded have a NULL owner.
+	if owner, ok := record.Values["owner"].(string); ok {
+		profile.Owner = owner
+	}
+
 	if bytes, ok := record.Values["properties"].([]byte); ok && bytes != nil {
 		if err := json.Unmarshal(bytes, &profile.Properties); err != nil {
 			return nil, err
@@ -69,6 +74,7 @@ func tenantEntityToRecord(profile *api.Tenant) (*sqlstore.DatabaseRecord, error)
 
 	record.Values["id"] = profile.ID
 	record.Values["version"] = profile.Version
+	record.Values["owner"] = profile.Owner
 
 	if profile.Properties != nil {
 		bytes, err := json.Marshal(profile.Properties)
