@@ -50,6 +50,7 @@ func TestTestAgent_Integration(t *testing.T) {
 	t.Setenv("PM_STREAM", streamName)
 	t.Setenv("PM_HTTPPORT", strconv.Itoa(fixtures.GetRandomPort(t)))
 	t.Setenv("PM_AUTH_ENABLED", "false")
+	t.Setenv("PM_AUTH_ALLOWDISABLED", "true")
 
 	// Create and start the test agent
 	shutdownChannel := make(chan struct{})

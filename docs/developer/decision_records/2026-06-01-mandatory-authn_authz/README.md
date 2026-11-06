@@ -35,10 +35,21 @@ HTTP router.
 validates incoming JWT bearer tokens using OIDC. By default, the IdP's OIDC discovery endpoint (
 `.well-known/openid-configuration`) is used to obtain the JWKS URL dynamically; alternatively an explicit JWKS URL can
 be configured. On success, the middleware extracts a `Claims` struct (subject, scopes, roles) and stores it in the
-request context. When auth is disabled (e.g. in tests), a no-op validator is registered instead, and all downstream
-authorization checks pass automatically.
+request context. When auth is disabled (e.g. in tests), a no-op validator is registered instead. It attaches anonymous
+claims that satisfy every rule, so all downstream authorization checks pass.
 
 > Note: authentication is **enabled by default**.
+
+When auth is enabled, `auth.audience` is mandatory, also when `auth.audienceClaim` names a claim other than `aud`.
+Otherwise, a token the IdP issued to any client would be accepted. Rejected tokens get a generic `401`; the verifier's
+reason is only logged.
+
+In `production` mode (the default runtime mode), two settings are refused at startup:
+
+- `auth.enabled=false`, unless `auth.allowDisabled=true` is also set. A single mis-set flag must not switch off API
+  security. Whenever auth is disabled, a warning is logged on startup.
+- `auth.skipIssuerCheck=true`. When the discovery URL differs from the issuer in the tokens, set `auth.expectedIssuer`
+  instead.
 
 **Authorization** is enforced inside each handler via `handler.IsAuthorized(w, req, rules...)`. The function retrieves
 the `Claims` from the request context and evaluates each `ClaimsRule` against them. Two rules exist:
@@ -46,9 +57,9 @@ the `Claims` from the request context and evaluates each `ClaimsRule` against th
 - `RequireScope(scope)` – the token's `scope` claim must contain the given value.
 - `RequireRole(roles...)` – the token must carry at least one of the given roles (OR logic). _This is not used yet_.
 
-When no claims are present (auth disabled), the call succeeds unconditionally. When claims are present but a rule is not
-satisfied, `IsAuthorized` writes the appropriate HTTP error (`401` for missing claims, `403` for insufficient claims)
-and returns `false`, causing the handler to abort.
+Authorization fails closed: when no claims are present, the request did not pass through the auth middleware (for
+example, a route registered outside the protected group), so `IsAuthorized` writes a `401` and returns `false`. When
+claims are present but a rule is not satisfied, it writes a `403`. In both cases the handler aborts.
 
 Health check endpoints (`/health`) sit outside the auth-protected route group and are always unauthenticated.
 

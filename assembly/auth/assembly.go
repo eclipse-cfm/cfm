@@ -29,6 +29,7 @@ const (
 	ValidatorKey system.ServiceType = "auth:Validator"
 
 	authEnabledKey     = "auth.enabled"
+	allowDisabledKey   = "auth.allowDisabled"
 	discoveryUrlKey    = "auth.discoveryUrl"
 	authAudienceKey    = "auth.audience"
 	audienceClaimKey   = "auth.audienceClaim"
@@ -45,7 +46,9 @@ type AuthValidator interface {
 }
 
 // AuthServiceAssembly wires up token validation via OIDC discovery.
-// When auth.enabled is false it registers a no-op validator so dependent assemblies always find the key.
+// When auth.enabled is false it registers a no-op validator so dependent assemblies always find the key. In production
+// mode, disabling auth additionally requires auth.allowDisabled, so that a single mis-set flag cannot switch off API
+// security.
 type AuthServiceAssembly struct {
 	system.DefaultServiceAssembly
 }
@@ -65,7 +68,10 @@ func (a *AuthServiceAssembly) Init(ctx *system.InitContext) error {
 	}
 
 	if !isAuthEnabled {
-		ctx.LogMonitor.Infof("Auth is disabled — all requests will be allowed")
+		if ctx.Mode == system.ProductionMode && !ctx.Config.GetBool(allowDisabledKey) {
+			return fmt.Errorf("%s=false is not allowed in production mode: enable auth, or also set %s to true", authEnabledKey, allowDisabledKey)
+		}
+		ctx.LogMonitor.Warnf("API authentication is DISABLED — every request is allowed with full access. Never run like this in a shared environment.")
 		ctx.Registry.Register(ValidatorKey, &noopValidator{})
 		return nil
 	}
@@ -78,9 +84,19 @@ func (a *AuthServiceAssembly) Init(ctx *system.InitContext) error {
 	}
 
 	audience := ctx.Config.GetString(authAudienceKey)
+	if audience == "" {
+		// Without an expected audience, any token the IdP issued to any client would be accepted.
+		return fmt.Errorf("%s must be configured when auth is enabled", authAudienceKey)
+	}
 	audienceClaim := ctx.GetConfigStrOrDefault(audienceClaimKey, "aud")
 	expectedIssuer := ctx.Config.GetString(expectedIssuerKet)
 	skipIssuerCheck := ctx.Config.GetBool(skipIssuerCheckKey)
+	if skipIssuerCheck {
+		if ctx.Mode == system.ProductionMode {
+			return fmt.Errorf("%s is not allowed in production mode: set %s instead if the discovery URL differs from the token issuer", skipIssuerCheckKey, expectedIssuerKet)
+		}
+		ctx.LogMonitor.Warnf("Token issuer check is DISABLED (%s)", skipIssuerCheckKey)
+	}
 
 	// When the IdP uses a non-standard claim for the audience (e.g. Keycloak uses azp
 	// instead of aud), disable the built-in aud check and validate the claim manually
@@ -195,8 +211,9 @@ func (v *oidcValidator) Middleware() func(http.Handler) http.Handler {
 
 			token, err := v.verifier.Verify(r.Context(), rawToken)
 			if err != nil {
+				// The verifier's error names the expected issuer and audience, so it is logged but not returned.
 				v.monitor.Warnw("token verification failed", "error", err)
-				writeUnauthorized(w, "invalid token: "+err.Error())
+				writeUnauthorized(w, "invalid token")
 				return
 			}
 
@@ -207,7 +224,7 @@ func (v *oidcValidator) Middleware() func(http.Handler) http.Handler {
 				return
 			}
 
-			if v.audienceClaim != "aud" && v.audience != "" {
+			if v.audienceClaim != "aud" {
 				if val, _ := rawClaims[v.audienceClaim].(string); val != v.audience {
 					v.monitor.Warnw("audience claim mismatch", "claim", v.audienceClaim, "expected", v.audience, "got", val)
 					writeUnauthorized(w, "invalid token audience")
@@ -226,11 +243,17 @@ func (v *oidcValidator) Middleware() func(http.Handler) http.Handler {
 	}
 }
 
-// noopValidator is used when auth is disabled; its middleware passes every request through.
+// noopValidator is used when auth is disabled; its middleware attaches anonymous claims that grant every scope.
+// Authorization fails closed on requests without claims, so the claims must be attached explicitly.
 type noopValidator struct{}
 
 func (n *noopValidator) Middleware() func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler { return next }
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := context.WithValue(r.Context(), cfmauth.ContextKey{}, cfmauth.AnonymousClaims())
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }
 
 // extractScopes parses the standard space-separated "scope" claim (RFC 9068).
