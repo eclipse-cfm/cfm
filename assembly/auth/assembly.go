@@ -84,9 +84,19 @@ func (a *AuthServiceAssembly) Init(ctx *system.InitContext) error {
 	}
 
 	audience := ctx.Config.GetString(authAudienceKey)
+	if audience == "" {
+		// Without an expected audience, any token the IdP issued to any client would be accepted.
+		return fmt.Errorf("%s must be configured when auth is enabled", authAudienceKey)
+	}
 	audienceClaim := ctx.GetConfigStrOrDefault(audienceClaimKey, "aud")
 	expectedIssuer := ctx.Config.GetString(expectedIssuerKet)
 	skipIssuerCheck := ctx.Config.GetBool(skipIssuerCheckKey)
+	if skipIssuerCheck {
+		if ctx.Mode == system.ProductionMode {
+			return fmt.Errorf("%s is not allowed in production mode: set %s instead if the discovery URL differs from the token issuer", skipIssuerCheckKey, expectedIssuerKet)
+		}
+		ctx.LogMonitor.Warnf("Token issuer check is DISABLED (%s)", skipIssuerCheckKey)
+	}
 
 	// When the IdP uses a non-standard claim for the audience (e.g. Keycloak uses azp
 	// instead of aud), disable the built-in aud check and validate the claim manually
@@ -201,8 +211,9 @@ func (v *oidcValidator) Middleware() func(http.Handler) http.Handler {
 
 			token, err := v.verifier.Verify(r.Context(), rawToken)
 			if err != nil {
+				// The verifier's error names the expected issuer and audience, so it is logged but not returned.
 				v.monitor.Warnw("token verification failed", "error", err)
-				writeUnauthorized(w, "invalid token: "+err.Error())
+				writeUnauthorized(w, "invalid token")
 				return
 			}
 
@@ -213,7 +224,7 @@ func (v *oidcValidator) Middleware() func(http.Handler) http.Handler {
 				return
 			}
 
-			if v.audienceClaim != "aud" && v.audience != "" {
+			if v.audienceClaim != "aud" {
 				if val, _ := rawClaims[v.audienceClaim].(string); val != v.audience {
 					v.monitor.Warnw("audience claim mismatch", "claim", v.audienceClaim, "expected", v.audience, "got", val)
 					writeUnauthorized(w, "invalid token audience")

@@ -40,9 +40,16 @@ claims that satisfy every rule, so all downstream authorization checks pass.
 
 > Note: authentication is **enabled by default**.
 
-In `production` mode (the default runtime mode), `auth.enabled=false` is refused at startup unless
-`auth.allowDisabled=true` is also set. A single mis-set flag must not switch off API security. Whenever auth is
-disabled, a warning is logged on startup.
+When auth is enabled, `auth.audience` is mandatory, also when `auth.audienceClaim` names a claim other than `aud`.
+Otherwise, a token the IdP issued to any client would be accepted. Rejected tokens get a generic `401`; the verifier's
+reason is only logged.
+
+In `production` mode (the default runtime mode), two settings are refused at startup:
+
+- `auth.enabled=false`, unless `auth.allowDisabled=true` is also set. A single mis-set flag must not switch off API
+  security. Whenever auth is disabled, a warning is logged on startup.
+- `auth.skipIssuerCheck=true`. When the discovery URL differs from the issuer in the tokens, set `auth.expectedIssuer`
+  instead.
 
 **Authorization** is enforced inside each handler via `handler.IsAuthorized(w, req, rules...)`. The function retrieves
 the `Claims` from the request context and evaluates each `ClaimsRule` against them. Two rules exist:
