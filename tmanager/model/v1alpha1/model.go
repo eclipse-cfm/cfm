@@ -18,13 +18,22 @@ import (
 	"github.com/eclipse-cfm/cfm/common/model"
 )
 
+// Request DTOs declare their constraints with `validate` tags, which ReadPayload enforces and the OpenAPI generator turns
+// into required properties. Response-only DTOs use `required:"true"`, which only documents the response.
+//
+// Request DTOs accept at most 100 entries in each map and list, map keys of at most 256 characters and strings of at
+// most 256 characters (512 for identifiers and issuers), so that a single request can't store arbitrarily large blobs.
+// Non-empty list elements are checked with min=1, because the OpenAPI generator reads any "required" in the tag as the
+// list itself being required.
+
+// Entity holds the server-assigned identity of a returned entity.
 type Entity struct {
 	ID      string `json:"id" required:"true"`
 	Version int64  `json:"version" required:"true"`
 }
 
 type NewTenant struct {
-	Properties map[string]any `json:"properties,omitempty"`
+	Properties map[string]any `json:"properties,omitempty" validate:"max=100,dive,keys,max=256,endkeys"`
 }
 
 type Tenant struct {
@@ -33,10 +42,10 @@ type Tenant struct {
 }
 
 type NewCell struct {
-	ExternalID     string         `json:"externalId"`
-	State          string         `json:"state" required:"true"`
-	StateTimestamp time.Time      `json:"stateTimestamp" required:"true"`
-	Properties     map[string]any `json:"properties,omitempty"`
+	ExternalID     string         `json:"externalId" validate:"max=256"`
+	State          string         `json:"state" validate:"required"`
+	StateTimestamp time.Time      `json:"stateTimestamp"`
+	Properties     map[string]any `json:"properties,omitempty" validate:"max=100,dive,keys,max=256,endkeys"`
 }
 
 type Cell struct {
@@ -46,13 +55,13 @@ type Cell struct {
 
 type NewDataspaceProfile struct {
 	DataspaceSpec DataspaceSpec  `json:"dataspaceSpec,omitempty"`
-	Artifacts     []string       ` json:"artifacts,omitempty"`
-	Properties    map[string]any `json:"properties,omitempty"`
+	Artifacts     []string       `json:"artifacts,omitempty" validate:"max=100,dive,min=1,max=256"`
+	Properties    map[string]any `json:"properties,omitempty" validate:"max=100,dive,keys,max=256,endkeys"`
 }
 
 type NewDataspaceProfileDeployment struct {
-	ProfileID string `json:"profileId" required:"true"`
-	CellID    string `json:"cellId,omitempty"`
+	ProfileID string `json:"profileId" validate:"required,max=256"`
+	CellID    string `json:"cellId" validate:"required,max=256"`
 }
 
 type DataspaceDeployment struct {
@@ -70,25 +79,26 @@ type DataspaceProfile struct {
 }
 
 type DataspaceSpec struct {
-	ProtocolStack   []string         `json:"protocolStack,omitempty"`
-	CredentialSpecs []CredentialSpec `json:"credentialSpecs,omitempty"`
+	ProtocolStack   []string         `json:"protocolStack,omitempty" validate:"max=100,dive,min=1,max=256"`
+	CredentialSpecs []CredentialSpec `json:"credentialSpecs,omitempty" validate:"max=100,dive"`
 }
 
 type CredentialSpec struct {
-	Id              string `json:"id" required:"true"`
-	Type            string `json:"type" required:"true"`
-	Issuer          string `json:"issuer" required:"true"`
-	Format          string `json:"format" required:"true"`
-	ParticipantRole string `json:"role,omitempty"`
+	Id              string `json:"id" validate:"required,max=256"`
+	Type            string `json:"type" validate:"required,max=256"`
+	Issuer          string `json:"issuer" validate:"required,max=512"`
+	Format          string `json:"format" validate:"required,max=256"`
+	ParticipantRole string `json:"role,omitempty" validate:"max=256"`
 }
 
 type NewParticipantProfileDeployment struct {
-	Identifier          string                    `json:"identifier" required:"true"`
-	CellID              string                    `json:"cellId" required:"true"`
-	DataspaceProfileIDs []string                  `json:"dataspaceProfileIds,omitempty"`
-	ParticipantRoles    map[string][]string       `json:"participantRoles,omitempty"`
-	VPAProperties       map[string]map[string]any `json:"vpaProperties,omitempty"`
-	Properties          map[string]any            `json:"properties,omitempty"`
+	Identifier string `json:"identifier" validate:"required,max=512"`
+	// CellID is not used yet: the cell is chosen by the cell selector
+	CellID              string                    `json:"cellId,omitempty" validate:"max=256"`
+	DataspaceProfileIDs []string                  `json:"dataspaceProfileIds,omitempty" validate:"max=100,dive,min=1,max=256"`
+	ParticipantRoles    map[string][]string       `json:"participantRoles,omitempty" validate:"max=100,dive,keys,max=256,endkeys,max=100,dive,min=1,max=256"`
+	VPAProperties       map[string]map[string]any `json:"vpaProperties,omitempty" validate:"max=100,dive,keys,max=256,endkeys,max=100,dive,keys,max=256,endkeys"`
+	Properties          map[string]any            `json:"properties,omitempty" validate:"max=100,dive,keys,max=256,endkeys"`
 }
 
 type ParticipantProfile struct {
@@ -116,6 +126,6 @@ type DeployableEntity struct {
 }
 
 type TenantPropertiesDiff struct {
-	Properties map[string]any `json:"properties"`
-	Removed    []string       `json:"removed"`
+	Properties map[string]any `json:"properties" validate:"max=100,dive,keys,max=256,endkeys"`
+	Removed    []string       `json:"removed" validate:"max=100,dive,max=256"`
 }

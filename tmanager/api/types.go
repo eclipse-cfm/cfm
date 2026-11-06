@@ -70,8 +70,8 @@ type ParticipantProfile struct {
 }
 
 type NewParticipantProfileDeployment struct {
-	Identifier          string              `json:"identifier" required:"true"`
-	CellID              string              `json:"cellId" required:"true"`
+	Identifier          string              `json:"identifier"`
+	CellID              string              `json:"cellId"`
 	DataspaceProfileIDs []string            `json:"dataspaceProfileIds,omitempty"`
 	ParticipantRoles    map[string][]string `json:"participantRoles,omitempty"`
 	VPAProperties       VPAPropMap          `json:"vpaProperties,omitempty"`

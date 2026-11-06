@@ -31,6 +31,8 @@ func main() {
 		option.WithVersion("0.0.1"),
 		option.WithDescription("API for managing Orchestrations, Orchestration Definitions, and Activity Definitions"),
 		option.WithServer("http://localhost:8080", option.ServerDescription("Development server")),
+		// Request DTOs declare required fields with the validate tag that ReadPayload enforces
+		option.WithReflectorConfig(option.RequiredPropByValidateTag()),
 	)
 
 	generateOrchestrationEndpoints(r)

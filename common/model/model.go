@@ -13,8 +13,11 @@
 package model
 
 import (
+	"errors"
 	"fmt"
+	"reflect"
 	"regexp"
+	"strings"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -121,6 +124,19 @@ func None() Query {
 func initValidator() *validator.Validate {
 	v := validator.New()
 
+	// Report fields by their JSON names, so that errors refer to what the client sent
+	v.RegisterTagNameFunc(func(field reflect.StructField) string {
+		name, _, _ := strings.Cut(field.Tag.Get("json"), ",")
+		switch name {
+		case "-":
+			return ""
+		case "":
+			return field.Name
+		default:
+			return name
+		}
+	})
+
 	_ = v.RegisterValidation("modeltype", func(fl validator.FieldLevel) bool {
 		value := fl.Field().String()
 		// Only allow alphanumeric, dots, underscores, and hyphens
@@ -133,4 +149,27 @@ func initValidator() *validator.Validate {
 		return ValidateParticipantContextID(fl.Field().String()) == nil
 	})
 	return v
+}
+
+// ValidationMessage describes a validation error returned by Validator as a list of the failed fields and checks, for
+// example "field 'dataspaceSpec.credentialSpecs[0].id' failed the 'required' check". Other errors are returned as is.
+func ValidationMessage(err error) string {
+	var fieldErrors validator.ValidationErrors
+	if !errors.As(err, &fieldErrors) {
+		return err.Error()
+	}
+	messages := make([]string, 0, len(fieldErrors))
+	for _, fieldError := range fieldErrors {
+		// The namespace starts with the name of the validated struct, which means nothing to the client
+		field := fieldError.Namespace()
+		if _, rest, found := strings.Cut(field, "."); found {
+			field = rest
+		}
+		check := fieldError.Tag()
+		if fieldError.Param() != "" {
+			check += "=" + fieldError.Param()
+		}
+		messages = append(messages, fmt.Sprintf("field '%s' failed the '%s' check", field, check))
+	}
+	return strings.Join(messages, "; ")
 }

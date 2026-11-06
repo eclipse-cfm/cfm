@@ -95,7 +95,7 @@ func (h HttpHandler) ReadPayload(w http.ResponseWriter, req *http.Request, paylo
 	}
 
 	if err := model.Validator.Struct(payload); err != nil {
-		h.WriteError(w, "Invalid payload: "+err.Error(), http.StatusBadRequest)
+		h.WriteError(w, "Invalid payload: "+model.ValidationMessage(err), http.StatusBadRequest)
 		return false
 	}
 	return true

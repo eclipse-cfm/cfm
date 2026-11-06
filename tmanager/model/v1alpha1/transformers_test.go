@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/types"
 	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -367,8 +368,9 @@ func TestNewAPICell(t *testing.T) {
 		},
 	}
 
-	result := NewAPICell(&input)
+	result, err := NewAPICell(&input)
 
+	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.NotEmpty(t, result.ID)             // Should generate a new UUID
 	assert.Equal(t, int64(0), result.Version) // Should be 0 for new cells
@@ -439,11 +441,19 @@ func TestTimestampUTCConversion(t *testing.T) {
 				Properties:     map[string]any{},
 			}
 
-			newCellResult := NewAPICell(&newCellInput)
+			newCellResult, err := NewAPICell(&newCellInput)
+			require.NoError(t, err)
 			assert.Equal(t, time.UTC, newCellResult.StateTimestamp.Location())
 			assert.Equal(t, baseTime.UTC(), newCellResult.StateTimestamp)
 		})
 	}
+}
+
+func TestNewAPICell_InvalidState(t *testing.T) {
+	_, err := NewAPICell(&NewCell{State: "running", StateTimestamp: time.Now()})
+
+	require.Error(t, err)
+	assert.True(t, types.IsClientError(err))
 }
 
 func TestEmptyAndNilInputs(t *testing.T) {

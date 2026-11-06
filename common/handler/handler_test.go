@@ -18,6 +18,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	cfmauth "github.com/eclipse-cfm/cfm/common/auth"
@@ -426,4 +428,46 @@ func TestWriteLinkHeaders(t *testing.T) {
 		`</items?offset=30&limit=10>; rel="last"`
 	assert.Equal(t, expected, w.Header().Get("Link"))
 	assert.Equal(t, "35", w.Header().Get("X-Total-Count"))
+}
+
+func TestReadPayload(t *testing.T) {
+	type nested struct {
+		ID string `json:"id" validate:"required"`
+	}
+	type payload struct {
+		Name  string   `json:"name" validate:"required"`
+		Items []nested `json:"items" validate:"dive"`
+	}
+	h := HttpHandler{Monitor: system.NoopMonitor{}}
+
+	t.Run("valid payload", func(t *testing.T) {
+		w := newMockResponseWriter()
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"name":"n","items":[{"id":"1"}]}`))
+
+		var p payload
+		assert.True(t, h.ReadPayload(w, req, &p))
+		assert.Equal(t, "n", p.Name)
+	})
+
+	t.Run("reports invalid fields by their JSON names", func(t *testing.T) {
+		w := newMockResponseWriter()
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"items":[{"id":""}]}`))
+
+		var p payload
+		assert.False(t, h.ReadPayload(w, req, &p))
+		assert.Equal(t, http.StatusBadRequest, w.statusCode)
+
+		var response ErrorResponse
+		require.NoError(t, json.Unmarshal(w.body.Bytes(), &response))
+		assert.Equal(t, "Invalid payload: field 'name' failed the 'required' check; field 'items[0].id' failed the 'required' check", response.Message)
+	})
+
+	t.Run("invalid JSON", func(t *testing.T) {
+		w := newMockResponseWriter()
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{`))
+
+		var p payload
+		assert.False(t, h.ReadPayload(w, req, &p))
+		assert.Equal(t, http.StatusBadRequest, w.statusCode)
+	})
 }

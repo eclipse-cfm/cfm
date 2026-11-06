@@ -345,3 +345,32 @@ func TestActivityTypeValidation(t *testing.T) {
 //		})
 //	}
 //}
+
+func TestOrchestrationTemplateValidation(t *testing.T) {
+	valid := []ActivityDto{{ID: "a1", Type: "cfm.edcv"}}
+	tests := []struct {
+		name       string
+		activities map[string][]ActivityDto
+		wantErr    bool
+	}{
+		{name: "valid activities", activities: map[string][]ActivityDto{"cfm.orchestration.vpa.deploy": valid}},
+		{name: "no activities", activities: map[string][]ActivityDto{}, wantErr: true},
+		{name: "activity without ID", activities: map[string][]ActivityDto{"cfm.orchestration.vpa.deploy": {{Type: "cfm.edcv"}}}, wantErr: true},
+		{name: "activity with invalid type", activities: map[string][]ActivityDto{"cfm.orchestration.vpa.deploy": {{ID: "a1", Type: "cfm/edcv"}}}, wantErr: true},
+		{name: "invalid activity in a later entry", activities: map[string][]ActivityDto{"cfm.orchestration.vpa.deploy": valid, "cfm.orchestration.vpa.dispose": {{ID: "a2"}}}, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			template := OrchestrationTemplate{ID: "t1", Activities: tt.activities}
+			definition := OrchestrationDefinitionDto{TemplateRef: "t1", Activities: tt.activities}
+			if tt.wantErr {
+				require.Error(t, model.Validator.Struct(&template))
+				require.Error(t, model.Validator.Struct(&definition))
+			} else {
+				require.NoError(t, model.Validator.Struct(&template))
+				require.NoError(t, model.Validator.Struct(&definition))
+			}
+		})
+	}
+}

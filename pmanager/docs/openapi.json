@@ -1,5 +1,5 @@
 {
-  "openapi": "3.0.3",
+  "openapi": "3.1.2",
   "info": {
     "title": "Provision Manager API",
     "description": "API for managing Orchestrations, Orchestration Definitions, and Activity Definitions",
@@ -14,6 +14,9 @@
   "paths": {
     "/api/v1alpha1/activity-definitions": {
       "get": {
+        "tags": [
+          "ActivityDefinition"
+        ],
         "summary": "Get Activity Definitions",
         "description": "Returns all Activity Definitions",
         "responses": {
@@ -24,7 +27,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/V1Alpha1ActivityDefinition"
+                    "$ref": "#/components/schemas/V1alpha1ActivityDefinitionDto"
                   }
                 }
               }
@@ -33,13 +36,16 @@
         }
       },
       "post": {
+        "tags": [
+          "ActivityDefinition"
+        ],
         "summary": "Create an Activity Definition",
         "description": "Create a new Activity Definition",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/V1Alpha1ActivityDefinition"
+                "$ref": "#/components/schemas/V1alpha1ActivityDefinitionDto"
               }
             }
           }
@@ -53,6 +59,9 @@
     },
     "/api/v1alpha1/activity-definitions/{type}": {
       "delete": {
+        "tags": [
+          "ActivityDefinition"
+        ],
         "summary": "Delete an Activity Definition",
         "description": "Delete a new Activity Definition",
         "parameters": [
@@ -74,6 +83,9 @@
     },
     "/api/v1alpha1/orchestration-definitions": {
       "get": {
+        "tags": [
+          "OrchestrationDefinition"
+        ],
         "summary": "Get Orchestration Definitions",
         "description": "Returns all Orchestration Definitions",
         "responses": {
@@ -84,7 +96,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/V1Alpha1OrchestrationDefinition"
+                    "$ref": "#/components/schemas/V1alpha1OrchestrationTemplate"
                   }
                 }
               }
@@ -93,31 +105,79 @@
         }
       },
       "post": {
-        "summary": "Create an Orchestration Definition",
-        "description": "Create a new Orchestration Definition",
+        "tags": [
+          "OrchestrationDefinition"
+        ],
+        "summary": "Create Orchestration Definition(s) from an OrchestrationTemplate",
+        "description": "Create Orchestration Definition(s) from an OrchestrationTemplate. The `id` field of the response contains a unique identifier (_template ID_ or _template-ref_), by which the generated Orchestration Definitions are referenced.",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/V1Alpha1OrchestrationDefinition"
+                "$ref": "#/components/schemas/V1alpha1OrchestrationTemplate"
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": "Created"
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V1alpha1IDResponse"
+                }
+              }
+            }
           }
         }
       }
     },
-    "/api/v1alpha1/orchestration-definitions/{type}": {
-      "delete": {
-        "summary": "Delete an Orchestration Definition",
-        "description": "Delete a new Orchestration Definition",
+    "/api/v1alpha1/orchestration-definitions/{templateRef}": {
+      "get": {
+        "tags": [
+          "OrchestrationDefinition"
+        ],
+        "summary": "Get all Orchestration Definitions by template ID",
+        "description": "Get all Orchestration Definitions that were generated based on the given template ID",
         "parameters": [
           {
-            "name": "type",
+            "name": "templateRef",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/V1alpha1OrchestrationDefinitionDto"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No OrchestrationDefinition with the given `templateRef` was found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "OrchestrationDefinition"
+        ],
+        "summary": "Delete all Orchestration Definitions for the given template ID",
+        "description": "Delete all Orchestration Definitions that were generated based on the given template ID",
+        "parameters": [
+          {
+            "name": "templateRef",
             "in": "path",
             "required": true,
             "schema": {
@@ -128,12 +188,18 @@
         "responses": {
           "200": {
             "description": "OK"
+          },
+          "404": {
+            "description": "No OrchestrationDefinition with the given `templateRef` was found"
           }
         }
       }
     },
     "/api/v1alpha1/orchestrations": {
       "post": {
+        "tags": [
+          "Orchestration"
+        ],
         "summary": "Execute an Orchestration",
         "description": "Execute an Orchestration",
         "requestBody": {
@@ -154,6 +220,9 @@
     },
     "/api/v1alpha1/orchestrations/query": {
       "post": {
+        "tags": [
+          "Orchestration"
+        ],
         "summary": "Perform an Orchestration query",
         "description": "Perform an Orchestration query",
         "requestBody": {
@@ -173,7 +242,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/V1Alpha1OrchestrationEntry"
+                    "$ref": "#/components/schemas/V1alpha1OrchestrationEntry"
                   }
                 }
               }
@@ -184,6 +253,9 @@
     },
     "/api/v1alpha1/orchestrations/{id}": {
       "get": {
+        "tags": [
+          "Orchestration"
+        ],
         "summary": "Get an Orchestration",
         "description": "Retrieve an Orchestration by ID",
         "parameters": [
@@ -202,7 +274,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/V1Alpha1Orchestration"
+                  "$ref": "#/components/schemas/V1alpha1Orchestration"
                 }
               }
             }
@@ -215,6 +287,11 @@
     "schemas": {
       "ModelOrchestrationManifest": {
         "type": "object",
+        "required": [
+          "id",
+          "correlationId",
+          "orchestrationType"
+        ],
         "properties": {
           "correlationId": {
             "type": "string"
@@ -232,10 +309,10 @@
         }
       },
       "ModelQuery": {
+        "type": "object",
         "required": [
           "predicate"
         ],
-        "type": "object",
         "properties": {
           "limit": {
             "type": "integer",
@@ -250,34 +327,11 @@
           }
         }
       },
-      "V1Alpha1Activity": {
+      "V1alpha1ActivityDefinitionDto": {
         "type": "object",
-        "properties": {
-          "dependsOn": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "discriminator": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "inputs": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/V1Alpha1MappingEntry"
-            }
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
-      "V1Alpha1ActivityDefinition": {
-        "type": "object",
+        "required": [
+          "type"
+        ],
         "properties": {
           "description": {
             "type": "string"
@@ -295,26 +349,46 @@
           }
         }
       },
-      "V1Alpha1MappingEntry": {
+      "V1alpha1ActivityDto": {
         "type": "object",
+        "required": [
+          "id",
+          "type"
+        ],
         "properties": {
-          "source": {
+          "dependsOn": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "id": {
             "type": "string"
           },
-          "target": {
+          "type": {
             "type": "string"
           }
         }
       },
-      "V1Alpha1Orchestration": {
+      "V1alpha1IDResponse": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "V1alpha1Orchestration": {
         "type": "object",
         "properties": {
           "completed": {
             "type": "object",
             "additionalProperties": {
               "type": "object"
-            },
-            "nullable": true
+            }
           },
           "correlationId": {
             "type": "string"
@@ -322,6 +396,9 @@
           "createdTimestamp": {
             "type": "string",
             "format": "date-time"
+          },
+          "definitionId": {
+            "type": "string"
           },
           "error": {
             "type": "string"
@@ -334,16 +411,15 @@
           },
           "outputData": {
             "type": "object",
-            "additionalProperties": {},
-            "nullable": true
+            "additionalProperties": {}
           },
           "processingData": {
             "type": "object",
-            "additionalProperties": {},
-            "nullable": true
+            "additionalProperties": {}
           },
           "state": {
-            "type": "integer"
+            "type": "integer",
+            "format": "int32"
           },
           "stateTimestamp": {
             "type": "string",
@@ -352,21 +428,26 @@
           "steps": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/V1Alpha1OrchestrationStep"
-            },
-            "nullable": true
+              "$ref": "#/components/schemas/V1alpha1OrchestrationStep"
+            }
           }
         }
       },
-      "V1Alpha1OrchestrationDefinition": {
+      "V1alpha1OrchestrationDefinitionDto": {
         "type": "object",
+        "required": [
+          "activities",
+          "templateRef"
+        ],
         "properties": {
           "activities": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/V1Alpha1Activity"
-            },
-            "nullable": true
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/V1alpha1ActivityDto"
+              }
+            }
           },
           "description": {
             "type": "string"
@@ -375,12 +456,12 @@
             "type": "object",
             "additionalProperties": {}
           },
-          "type": {
+          "templateRef": {
             "type": "string"
           }
         }
       },
-      "V1Alpha1OrchestrationEntry": {
+      "V1alpha1OrchestrationEntry": {
         "type": "object",
         "properties": {
           "correlationId": {
@@ -390,6 +471,9 @@
             "type": "string",
             "format": "date-time"
           },
+          "definitionId": {
+            "type": "string"
+          },
           "id": {
             "type": "string"
           },
@@ -397,7 +481,8 @@
             "type": "string"
           },
           "state": {
-            "type": "integer"
+            "type": "integer",
+            "format": "int32"
           },
           "stateTimestamp": {
             "type": "string",
@@ -405,15 +490,41 @@
           }
         }
       },
-      "V1Alpha1OrchestrationStep": {
+      "V1alpha1OrchestrationStep": {
         "type": "object",
         "properties": {
           "activities": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/V1Alpha1Activity"
-            },
-            "nullable": true
+              "$ref": "#/components/schemas/V1alpha1ActivityDto"
+            }
+          }
+        }
+      },
+      "V1alpha1OrchestrationTemplate": {
+        "type": "object",
+        "required": [
+          "activities"
+        ],
+        "properties": {
+          "activities": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/V1alpha1ActivityDto"
+              }
+            }
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "schema": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       }
