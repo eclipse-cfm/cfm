@@ -254,7 +254,8 @@ func (p TokenExchangeActivityProcessor) ProcessDeploy(ctx api.ActivityContext) a
 	}
 	exSpan.AddEvent("Verified token exchange")
 	exSpan.End()
-	p.Monitor.Debugf("token exchange successful. claims: %s", claims)
+	// Only identifying claims are logged: the others may carry more than an operator needs to see
+	p.Monitor.Debugf("token exchange successful for participant context %s: sub=%v, aud=%v", participantContextID, claims["sub"], claims["aud"])
 
 	// the processing data already holds the ID for further processing in other agents; also return it as output
 	ctx.SetOutputValue(participantContextIDKey, participantContextID)
@@ -394,14 +395,18 @@ func deriveParticipantContextID(orchestrationID string, activityID string) strin
 }
 
 // decodeJWTClaims base64-decodes the payload section of a JWT and returns it as a raw JSON string.
-func decodeJWTClaims(jwtToken string) (string, error) {
+func decodeJWTClaims(jwtToken string) (map[string]any, error) {
 	parts := strings.SplitN(jwtToken, ".", 3)
 	if len(parts) != 3 {
-		return "", fmt.Errorf("invalid JWT format")
+		return nil, fmt.Errorf("invalid JWT format")
 	}
 	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		return "", fmt.Errorf("error decoding JWT payload: %w", err)
+		return nil, fmt.Errorf("error decoding JWT payload: %w", err)
 	}
-	return string(payload), nil
+	var claims map[string]any
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return nil, fmt.Errorf("error parsing JWT payload: %w", err)
+	}
+	return claims, nil
 }

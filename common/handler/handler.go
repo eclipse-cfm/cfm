@@ -20,6 +20,7 @@ import (
 	"io"
 	"iter"
 	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -90,7 +91,7 @@ func (h HttpHandler) ReadPayload(w http.ResponseWriter, req *http.Request, paylo
 	defer req.Body.Close()
 
 	if err := json.Unmarshal(body, payload); err != nil {
-		h.WriteError(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
+		h.WriteError(w, jsonErrorMessage(err), http.StatusBadRequest)
 		return false
 	}
 
@@ -117,12 +118,54 @@ func (h HttpHandler) HandleError(w http.ResponseWriter, err error) {
 		} else {
 			h.WriteError(w, fmt.Sprintf("Client error: %v", clientErr), http.StatusBadRequest)
 		}
-	case types.IsFatal(err):
-		id := uuid.New().String()
-		h.Monitor.Infow("Internal Error [%s]: %v", id, err)
-		h.WriteError(w, fmt.Sprintf("Internal server error occurred [%s]", id), http.StatusInternalServerError)
 	default:
-		h.WriteError(w, fmt.Sprintf("Operation failed: %s", err.Error()), http.StatusInternalServerError)
+		// Fatal and unclassified errors carry internal details (database, NATS or driver messages), so the caller only
+		// gets an ID that correlates the response with the logged error.
+		id := uuid.New().String()
+		h.Monitor.Severef("Internal error [%s]: %v", id, err)
+		h.WriteErrorWithID(w, fmt.Sprintf("Internal server error occurred [%s]", id), http.StatusInternalServerError, id)
+	}
+}
+
+// jsonErrorMessage describes why a request body could not be decoded without exposing internal type names.
+func jsonErrorMessage(err error) string {
+	var syntaxErr *json.SyntaxError
+	if errors.As(err, &syntaxErr) {
+		return fmt.Sprintf("Invalid JSON at offset %d", syntaxErr.Offset)
+	}
+	var typeErr *json.UnmarshalTypeError
+	if errors.As(err, &typeErr) && typeErr.Field != "" {
+		if kind := jsonKind(typeErr.Type); kind != "" {
+			return fmt.Sprintf("Invalid JSON: field %q must be %s", typeErr.Field, kind)
+		}
+		return fmt.Sprintf("Invalid JSON: field %q has the wrong type", typeErr.Field)
+	}
+	return "Invalid JSON"
+}
+
+// jsonKind names the JSON type that decodes into t, or returns "" if there is no single one.
+func jsonKind(t reflect.Type) string {
+	if t == nil {
+		return ""
+	}
+	for t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	switch t.Kind() {
+	case reflect.String:
+		return "a string"
+	case reflect.Bool:
+		return "a boolean"
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64:
+		return "a number"
+	case reflect.Slice, reflect.Array:
+		return "an array"
+	case reflect.Map, reflect.Struct:
+		return "an object"
+	default:
+		return ""
 	}
 }
 

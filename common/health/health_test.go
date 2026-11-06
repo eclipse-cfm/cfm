@@ -16,6 +16,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -38,7 +39,7 @@ func serve(t *testing.T, handler http.HandlerFunc) (int, response) {
 func ok(context.Context) error { return nil }
 
 func TestRegistry_NoChecksIsUp(t *testing.T) {
-	r := NewRegistry()
+	r := NewRegistry(nil)
 
 	code, body := serve(t, r.LivenessHandler())
 	assert.Equal(t, http.StatusOK, code)
@@ -48,8 +49,19 @@ func TestRegistry_NoChecksIsUp(t *testing.T) {
 	assert.Equal(t, http.StatusOK, code)
 }
 
+// warnMonitor records the messages logged at warning level.
+type warnMonitor struct {
+	system.NoopMonitor
+	warnings []string
+}
+
+func (m *warnMonitor) Warnf(message string, args ...any) {
+	m.warnings = append(m.warnings, fmt.Sprintf(message, args...))
+}
+
 func TestRegistry_ReadinessFailureDoesNotFailLiveness(t *testing.T) {
-	r := NewRegistry()
+	monitor := &warnMonitor{}
+	r := NewRegistry(monitor)
 	r.AddLiveness("loop", ok)
 	r.AddReadiness("nats", func(context.Context) error { return errors.New("NATS connection is RECONNECTING") })
 
@@ -61,11 +73,12 @@ func TestRegistry_ReadinessFailureDoesNotFailLiveness(t *testing.T) {
 	assert.Equal(t, http.StatusServiceUnavailable, code)
 	assert.Equal(t, statusDown, body.Status)
 	assert.Equal(t, statusUp, body.Checks["loop"])
-	assert.Equal(t, "DOWN: NATS connection is RECONNECTING", body.Checks["nats"])
+	assert.Equal(t, statusDown, body.Checks["nats"], "the reason must not be served by the unauthenticated endpoint")
+	assert.Equal(t, []string{"Health check nats failed: NATS connection is RECONNECTING"}, monitor.warnings)
 }
 
 func TestRegistry_LivenessFailureFailsReadiness(t *testing.T) {
-	r := NewRegistry()
+	r := NewRegistry(nil)
 	r.AddLiveness("loop", func(context.Context) error { return errors.New("stuck") })
 
 	code, _ := serve(t, r.LivenessHandler())
@@ -86,7 +99,7 @@ func (l *fakeLoop) Check(maxAge time.Duration) error {
 }
 
 func TestRegistry_AddConsumerLoop(t *testing.T) {
-	r := NewRegistry()
+	r := NewRegistry(nil)
 	loop := &fakeLoop{}
 	r.AddConsumerLoop("consumer", loop)
 
@@ -116,7 +129,7 @@ func TestRegisterOptional(t *testing.T) {
 	RegisterOptional(services, func(*Registry) { called = true })
 	assert.False(t, called, "nothing is registered without a health registry")
 
-	registry := NewRegistry()
+	registry := NewRegistry(nil)
 	services.Register(RegistryKey, registry)
 	RegisterOptional(services, func(r *Registry) {
 		called = true

@@ -20,6 +20,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/natsclient"
@@ -502,7 +503,7 @@ func (e *NatsActivityExecutor) handleFatalError(
 		}
 		o.SetState(api.OrchestrationStateErrored)
 		o.EngineState.Merge(engineState)
-		o.EngineState.Error = resultErr.Error()
+		o.EngineState.Error = truncateError(resultErr.Error())
 		orchestration = *o
 	}); err != nil {
 		e.Monitor.Warnf("Failed to mark orchestration %s as fatal: %v", orchestration.ID, err)
@@ -523,6 +524,24 @@ func (e *NatsActivityExecutor) handleFatalError(
 			orchestration.ID, resultErr, err)
 	}
 	return fmt.Errorf("fatal failure while executing activity %s: %w", orchestration.ID, resultErr)
+}
+
+// maxPersistedErrorBytes bounds the error stored in an orchestration's engine state. The error is returned by the
+// Provision Manager API and may contain downstream response bodies, so a long error chain must not grow it without
+// limit.
+const maxPersistedErrorBytes = 2048
+
+// truncateError cuts message to at most maxPersistedErrorBytes, without splitting a multibyte character.
+func truncateError(message string) string {
+	if len(message) <= maxPersistedErrorBytes {
+		return message
+	}
+	const marker = " (truncated)"
+	cut := maxPersistedErrorBytes - len(marker)
+	for cut > 0 && !utf8.RuneStart(message[cut]) {
+		cut--
+	}
+	return message[:cut] + marker
 }
 
 // natsHeaderCarrier implements propagation.TextMapCarrier for NATS message headers

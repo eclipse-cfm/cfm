@@ -79,8 +79,7 @@ func (a HttpIdentityAPIClient) DeleteParticipantContext(ctx context.Context, par
 	case http.StatusOK:
 		return nil
 	default:
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to delete participant context on IdentityHub: received status code %d, body: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("failed to delete participant context on IdentityHub: received status code %d, body: %s", resp.StatusCode, httpx.ReadErrorBody(resp))
 	}
 }
 
@@ -105,10 +104,10 @@ func (a HttpIdentityAPIClient) QueryCredentialByType(ctx context.Context, partic
 	}
 	defer httpx.DrainAndClose(resp)
 
-	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get credential request state: received status code %d, body: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("failed to get credential request state: received status code %d, body: %s", resp.StatusCode, httpx.ReadErrorBody(resp))
 	}
+	body, _ := io.ReadAll(resp.Body)
 
 	var credentials []common.VerifiableCredentialResource
 	if err := json.Unmarshal(body, &credentials); err != nil {
@@ -145,8 +144,7 @@ func (a HttpIdentityAPIClient) RequestCredentials(ctx context.Context, participa
 	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("failed to request credentials for participant context on IdentityHub: received status code %d, body: %s", resp.StatusCode, string(body))
+		return "", fmt.Errorf("failed to request credentials for participant context on IdentityHub: received status code %d, body: %s", resp.StatusCode, httpx.ReadErrorBody(resp))
 	}
 
 	location := resp.Header.Get("Location")
@@ -188,10 +186,10 @@ func (a HttpIdentityAPIClient) GetCredentialRequestState(ctx context.Context, pa
 	}
 	defer httpx.DrainAndClose(resp)
 
-	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to get credential request state: received status code %d, body: %s", resp.StatusCode, string(body))
+		return "", fmt.Errorf("failed to get credential request state: received status code %d, body: %s", resp.StatusCode, httpx.ReadErrorBody(resp))
 	}
+	body, _ := io.ReadAll(resp.Body)
 
 	var stateResponse map[string]interface{}
 	if err := json.Unmarshal(body, &stateResponse); err != nil {
@@ -276,8 +274,7 @@ func (a HttpIdentityAPIClient) CreateParticipantContext(ctx context.Context, man
 	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to create participant context on IdentityHub: received status code %d, body: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("failed to create participant context on IdentityHub: received status code %d, body: %s", resp.StatusCode, httpx.ReadErrorBody(resp))
 	}
 
 	return nil

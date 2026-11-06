@@ -18,10 +18,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
+	"unicode"
 )
 
-// maxErrorBodyBytes bounds how much of an error response body is kept in a StatusError.
-const maxErrorBodyBytes = 4096
+// maxErrorBodyBytes bounds how much of an error response body is kept in an error. Error messages end up in logs and in
+// persisted orchestration state, so only the start of a body is kept.
+const maxErrorBodyBytes = 1024
 
 // StatusError is returned when a server answers with an unexpected HTTP status code. It classifies itself for
 // common/types: a transient status (see IsTransientStatus) makes it a recoverable error, any other status a client error.
@@ -35,12 +38,29 @@ type StatusError struct {
 
 // NewStatusError builds a StatusError from resp, keeping the start of the response body.
 func NewStatusError(operation string, resp *http.Response) *StatusError {
-	statusErr := &StatusError{Operation: operation, StatusCode: resp.StatusCode}
-	if resp.Body != nil {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBodyBytes))
-		statusErr.Body = string(body)
+	return &StatusError{Operation: operation, StatusCode: resp.StatusCode, Body: ReadErrorBody(resp)}
+}
+
+// ReadErrorBody returns the start of an error response's body as a single line that is safe to put into an error
+// message: at most 1 KiB is read, invalid UTF-8 is dropped, control characters such as line breaks are replaced by spaces, and a cut-off
+// body is marked as truncated. It returns "" if there is no body.
+func ReadErrorBody(resp *http.Response) string {
+	if resp == nil || resp.Body == nil {
+		return ""
 	}
-	return statusErr
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBodyBytes+1))
+	truncated := len(raw) > maxErrorBodyBytes
+	if truncated {
+		raw = raw[:maxErrorBodyBytes]
+	}
+	// Dropping invalid UTF-8 also drops a multibyte character split by the cut.
+	body := strings.ToValidUTF8(string(raw), "")
+	body = strings.Join(strings.FieldsFunc(body, unicode.IsControl), " ")
+	body = strings.TrimSpace(body)
+	if truncated && body != "" {
+		body += " (truncated)"
+	}
+	return body
 }
 
 func (e *StatusError) Error() string {

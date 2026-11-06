@@ -40,7 +40,7 @@ func (h *HealthServiceAssembly) Requires() []system.ServiceType {
 }
 
 func (h *HealthServiceAssembly) Init(ctx *system.InitContext) error {
-	h.registry = health.NewRegistry()
+	h.registry = health.NewRegistry(ctx.LogMonitor)
 	ctx.Registry.Register(health.RegistryKey, h.registry)
 	return nil
 }

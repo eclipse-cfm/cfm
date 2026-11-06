@@ -16,8 +16,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/eclipse-cfm/cfm/common/mocks"
 	"github.com/eclipse-cfm/cfm/common/natsclient"
@@ -162,6 +164,31 @@ func TestProcessMessage_FatalErrorRecordedInEngineState(t *testing.T) {
 	assert.Equal(t, api.OrchestrationStateErrored, written[0].State)
 	assert.Equal(t, "activity failed", written[0].EngineState.Error)
 	assert.Equal(t, "spoofed", written[0].ProcessingData["error"], "the payload is left as it was")
+}
+
+func TestProcessMessage_FatalErrorIsTruncatedInEngineState(t *testing.T) {
+	long := strings.Repeat("x", 3*maxPersistedErrorBytes)
+	processor := &resultTestProcessor{result: api.ActivityResult{Result: api.ActivityResultFatalError, Error: errors.New(long)}}
+
+	_, written, err := runEngineStateTest(t, processor, api.EngineState{})
+
+	require.Error(t, err)
+	require.Len(t, written, 1)
+	assert.Len(t, written[0].EngineState.Error, maxPersistedErrorBytes)
+	assert.True(t, strings.HasSuffix(written[0].EngineState.Error, " (truncated)"))
+}
+
+func TestTruncateError(t *testing.T) {
+	assert.Equal(t, "short", truncateError("short"))
+
+	exact := strings.Repeat("x", maxPersistedErrorBytes)
+	assert.Equal(t, exact, truncateError(exact))
+
+	// A multibyte character that straddles the cut is dropped as a whole
+	multibyte := truncateError(strings.Repeat("é", maxPersistedErrorBytes))
+	assert.True(t, utf8.ValidString(multibyte))
+	assert.LessOrEqual(t, len(multibyte), maxPersistedErrorBytes)
+	assert.True(t, strings.HasSuffix(multibyte, " (truncated)"))
 }
 
 func TestProcessMessage_AttemptCountedAcrossRedeliveries(t *testing.T) {

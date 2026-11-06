@@ -19,7 +19,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 
@@ -148,8 +147,7 @@ func (h HttpManagementAPIClient) DeleteParticipantContext(ctx context.Context, p
 	case http.StatusOK:
 		return nil
 	default:
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to delete participant context on control plane: received status code %d, body: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("failed to delete participant context on control plane: received status code %d, body: %s", resp.StatusCode, httpx.ReadErrorBody(resp))
 	}
 }
 
@@ -187,8 +185,7 @@ func (h HttpManagementAPIClient) CreateParticipantContext(ctx context.Context, m
 	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to create participant context on control plane: received status code %d, body: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("failed to create participant context on control plane: received status code %d, body: %s", resp.StatusCode, httpx.ReadErrorBody(resp))
 	}
 
 	return nil
@@ -261,8 +258,7 @@ func (h HttpManagementAPIClient) RegisterDataPlane(ctx context.Context, particip
 	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to register data plane on control plane: received status code %d, body: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("failed to register data plane on control plane: received status code %d, body: %s", resp.StatusCode, httpx.ReadErrorBody(resp))
 	}
 	return nil
 }
@@ -295,8 +291,7 @@ func (h HttpManagementAPIClient) UnregisterDataPlane(ctx context.Context, partic
 	case resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusBadRequest:
 		return nil
 	default:
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to unregister data plane on control plane: received status code %d, body: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("failed to unregister data plane on control plane: received status code %d, body: %s", resp.StatusCode, httpx.ReadErrorBody(resp))
 	}
 }
 
@@ -334,8 +329,7 @@ func (h HttpManagementAPIClient) AssociateProfiles(ctx context.Context, particip
 	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to associate dataspace profiles on control plane: received status code %d, body: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("failed to associate dataspace profiles on control plane: received status code %d, body: %s", resp.StatusCode, httpx.ReadErrorBody(resp))
 	}
 	return nil
 }

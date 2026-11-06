@@ -15,6 +15,8 @@ package natsprovision
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"sync/atomic"
 
 	"github.com/eclipse-cfm/cfm/common/model"
@@ -60,7 +62,7 @@ func newNatsProvisionHandler(
 							ID:                uuid.New().String(),
 							Success:           false,
 							CorrelationID:     manifest.CorrelationID,
-							ErrorDetail:       err.Error(),
+							ErrorDetail:       startErrorDetail(err, manifest.ID, monitor),
 							ManifestID:        manifest.ID,
 							OrchestrationType: manifest.OrchestrationType,
 							Properties:        make(map[string]any),
@@ -91,4 +93,17 @@ func (n *natsProvisionHandler) Init(ctx context.Context, consumer jetstream.Cons
 		}
 	}()
 	return nil
+}
+
+// startErrorDetail describes why an orchestration could not be started. The detail is stored on the participant profile
+// and returned by the Tenant Manager API, so only client errors, whose messages are written for the caller, are passed
+// through. Any other error is logged under an ID that the detail refers to.
+func startErrorDetail(err error, manifestID string, monitor system.LogMonitor) string {
+	var clientErr types.ClientError
+	if errors.As(err, &clientErr) && clientErr.IsClientError() {
+		return clientErr.Error()
+	}
+	id := uuid.New().String()
+	monitor.Severef("Orchestration for manifest %s could not be started [%s]: %v", manifestID, id, err)
+	return fmt.Sprintf("orchestration could not be started [%s]", id)
 }

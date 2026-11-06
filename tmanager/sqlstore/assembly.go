@@ -56,7 +56,8 @@ func (a *PostgresServiceAssembly) Init(ictx *system.InitContext) error {
 
 	db, err := otelsql.Open(driverName, dsn, otelsql.WithAttributes(semconv.DBSystemNamePostgreSQL))
 	if err != nil {
-		return fmt.Errorf("error connecting to DB at %s: %w", dsn, err)
+		// The DSN carries the password, so it is not part of the error
+		return fmt.Errorf("error opening database: %w", err)
 	}
 	pool.Apply(db)
 

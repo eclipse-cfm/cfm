@@ -17,11 +17,11 @@ package activity
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
 
+	"github.com/eclipse-cfm/cfm/common/httpx"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/common/token"
@@ -117,8 +117,7 @@ func (p CertoActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.Activ
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusCreated {
-		errorbody, _ := io.ReadAll(response.Body)
-		e := fmt.Errorf("failed to create participant context on Certo: received status code %d, body: %s", response.StatusCode, string(errorbody))
+		e := fmt.Errorf("failed to create participant context on Certo: received status code %d, body: %s", response.StatusCode, httpx.ReadErrorBody(response))
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: e}
 	}
 
@@ -163,8 +162,7 @@ func (p CertoActivityProcessor) ProcessDispose(ctx api.ActivityContext) api.Acti
 		return api.ActivityResult{Result: api.ActivityResultComplete}
 	}
 	if response.StatusCode != http.StatusNoContent {
-		errorBody, _ := io.ReadAll(response.Body)
-		p.Monitor.Warnf("failed to delete participant context on Certo: received status code %d, body: %s", response.StatusCode, string(errorBody))
+		p.Monitor.Warnf("failed to delete participant context on Certo: received status code %d, body: %s", response.StatusCode, httpx.ReadErrorBody(response))
 		return api.ActivityResult{Result: api.ActivityResultComplete}
 	}
 
