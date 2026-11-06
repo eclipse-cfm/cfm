@@ -63,11 +63,33 @@ type PostgresEntityStore[T store.EntityType] struct {
 }
 
 func (p *PostgresEntityStore[T]) FindByID(ctx context.Context, id string) (T, error) {
+	return p.findByID(ctx, id, "")
+}
+
+// FindByIDAndLock returns the entity and locks its row until the transaction ends: FOR SHARE for store.LockShared,
+// FOR UPDATE for store.LockExclusive.
+func (p *PostgresEntityStore[T]) FindByIDAndLock(ctx context.Context, id string, mode store.LockMode) (T, error) {
+	switch mode {
+	case store.LockShared:
+		return p.findByID(ctx, id, " FOR SHARE")
+	case store.LockExclusive:
+		return p.findByID(ctx, id, " FOR UPDATE")
+	default:
+		var zero T
+		return zero, fmt.Errorf("unsupported lock mode %d", mode)
+	}
+}
+
+func (p *PostgresEntityStore[T]) findByID(ctx context.Context, id string, lockClause string) (T, error) {
+	var zero T
 	selectClause := strings.Join(p.columnNames, ", ")
 
-	tx := getTxFromContext(ctx)
+	tx, err := getTxFromContext(ctx)
+	if err != nil {
+		return zero, err
+	}
 	row := tx.QueryRowContext(ctx,
-		fmt.Sprintf("SELECT %s FROM %s WHERE id = $1", selectClause, p.tableName),
+		fmt.Sprintf("SELECT %s FROM %s WHERE id = $1%s", selectClause, p.tableName, lockClause),
 		id,
 	)
 
@@ -77,9 +99,8 @@ func (p *PostgresEntityStore[T]) FindByID(ctx context.Context, id string) (T, er
 		scanValues[i] = new(any)
 	}
 
-	err := row.Scan(scanValues...)
+	err = row.Scan(scanValues...)
 	if err != nil {
-		var zero T
 		if errors.Is(err, sql.ErrNoRows) {
 			return zero, types.ErrNotFound
 		}
@@ -92,11 +113,15 @@ func (p *PostgresEntityStore[T]) FindByID(ctx context.Context, id string) (T, er
 
 func (p *PostgresEntityStore[T]) Exists(ctx context.Context, id string) (bool, error) {
 	var exists bool
-	row := getTxFromContext(ctx).QueryRowContext(ctx,
+	tx, err := getTxFromContext(ctx)
+	if err != nil {
+		return false, err
+	}
+	row := tx.QueryRowContext(ctx,
 		fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM %s WHERE id = $1)", p.tableName),
 		id,
 	)
-	err := row.Scan(&exists)
+	err = row.Scan(&exists)
 	if err != nil {
 		return false, fmt.Errorf("failed to check entity existence: %w", err)
 	}
@@ -104,6 +129,10 @@ func (p *PostgresEntityStore[T]) Exists(ctx context.Context, id string) (bool, e
 }
 
 func (p *PostgresEntityStore[T]) Create(ctx context.Context, entity T) (T, error) {
+	tx, err := getTxFromContext(ctx)
+	if err != nil {
+		return entity, err
+	}
 	record, err := p.entityToRecord(entity)
 	if err != nil {
 		return entity, fmt.Errorf("failed to convert entity to record: %w", err)
@@ -133,7 +162,7 @@ func (p *PostgresEntityStore[T]) Create(ctx context.Context, entity T) (T, error
 		scanValues[i] = new(any)
 	}
 
-	err = getTxFromContext(ctx).QueryRowContext(ctx,
+	err = tx.QueryRowContext(ctx,
 		fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s) RETURNING %s",
 			p.tableName, strings.Join(columnNames, ", "),
 			strings.Join(placeholders, ", "), selectClause),
@@ -146,10 +175,14 @@ func (p *PostgresEntityStore[T]) Create(ctx context.Context, entity T) (T, error
 
 	// Convert scan results to entity using the conversion function
 	returnedRecord := p.buildRecordFromScan(scanValues)
-	return p.recordToEntity(getTxFromContext(ctx), &returnedRecord)
+	return p.recordToEntity(tx, &returnedRecord)
 }
 
 func (p *PostgresEntityStore[T]) Update(ctx context.Context, entity T) error {
+	tx, err := getTxFromContext(ctx)
+	if err != nil {
+		return err
+	}
 	record, err := p.entityToRecord(entity)
 	if err != nil {
 		return fmt.Errorf("failed to convert entity to record: %w", err)
@@ -179,7 +212,7 @@ func (p *PostgresEntityStore[T]) Update(ctx context.Context, entity T) error {
 	values = append(values, entity.GetID())
 	idPlaceholder := fmt.Sprintf("$%d", paramIndex)
 
-	result, err := getTxFromContext(ctx).ExecContext(ctx,
+	result, err := tx.ExecContext(ctx,
 		fmt.Sprintf("UPDATE %s SET %s WHERE id = %s",
 			p.tableName, strings.Join(setClauses, ", "), idPlaceholder),
 		values...,
@@ -202,7 +235,11 @@ func (p *PostgresEntityStore[T]) Update(ctx context.Context, entity T) error {
 }
 
 func (p *PostgresEntityStore[T]) Delete(ctx context.Context, id string) error {
-	result, err := getTxFromContext(ctx).ExecContext(ctx,
+	tx, err := getTxFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	result, err := tx.ExecContext(ctx,
 		fmt.Sprintf("DELETE FROM %s WHERE id = $1", p.tableName),
 		id,
 	)
@@ -227,7 +264,11 @@ func (p *PostgresEntityStore[T]) GetAll(ctx context.Context) iter.Seq2[T, error]
 	return func(yield func(T, error) bool) {
 		selectClause := strings.Join(p.columnNames, ", ")
 
-		tx := getTxFromContext(ctx)
+		tx, err := getTxFromContext(ctx)
+		if err != nil {
+			yield(*(new(T)), err)
+			return
+		}
 		rows, err := tx.QueryContext(ctx,
 			fmt.Sprintf("SELECT %s FROM %s", selectClause, p.tableName),
 		)
@@ -274,10 +315,14 @@ func (p *PostgresEntityStore[T]) GetAll(ctx context.Context) iter.Seq2[T, error]
 
 func (p *PostgresEntityStore[T]) GetAllCount(ctx context.Context) (int64, error) {
 	var count int64
-	row := getTxFromContext(ctx).QueryRowContext(ctx,
+	tx, err := getTxFromContext(ctx)
+	if err != nil {
+		return 0, err
+	}
+	row := tx.QueryRowContext(ctx,
 		fmt.Sprintf("SELECT COUNT(*) FROM %s", p.tableName),
 	)
-	err := row.Scan(&count)
+	err = row.Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count entities: %w", err)
 	}
@@ -328,7 +373,10 @@ func (p *PostgresEntityStore[T]) CountByPredicate(ctx context.Context, predicate
 	var whereClause string
 	var args []any
 
-	tx := getTxFromContext(ctx)
+	tx, err := getTxFromContext(ctx)
+	if err != nil {
+		return 0, err
+	}
 
 	// Build WHERE clause if predicate is provided
 	if predicate != nil {
@@ -344,7 +392,7 @@ func (p *PostgresEntityStore[T]) CountByPredicate(ctx context.Context, predicate
 	}
 
 	row := tx.QueryRowContext(ctx, queryStr, args...)
-	err := row.Scan(&count)
+	err = row.Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count entities: %w", err)
 	}
@@ -355,7 +403,10 @@ func (p *PostgresEntityStore[T]) DeleteByPredicate(ctx context.Context, predicat
 	var whereClause string
 	var args []any
 
-	tx := getTxFromContext(ctx)
+	tx, err := getTxFromContext(ctx)
+	if err != nil {
+		return err
+	}
 
 	// Build WHERE clause if predicate is provided
 	if predicate != nil {
@@ -398,7 +449,11 @@ func (p *PostgresEntityStore[T]) queryEntities(
 		var whereClause string
 		var args []any
 
-		tx := getTxFromContext(ctx)
+		tx, err := getTxFromContext(ctx)
+		if err != nil {
+			yield(*(new(T)), err)
+			return
+		}
 
 		// Build WHERE clause if predicate is provided
 		if predicate != nil {
@@ -479,6 +534,13 @@ func (p *PostgresEntityStore[T]) buildRecordFromScan(scanValues []any) DatabaseR
 	return record
 }
 
-func getTxFromContext(ctx context.Context) *sql.Tx {
-	return ctx.Value(SQLTransactionKey).(*sql.Tx)
+// ErrNoTransaction is returned when a store is called outside a transaction.
+var ErrNoTransaction = errors.New("no transaction in context: store operations must run inside TransactionContext.Execute")
+
+func getTxFromContext(ctx context.Context) (*sql.Tx, error) {
+	tx, ok := ctx.Value(SQLTransactionKey).(*sql.Tx)
+	if !ok || tx == nil {
+		return nil, ErrNoTransaction
+	}
+	return tx, nil
 }

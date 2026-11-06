@@ -69,7 +69,9 @@ func (t tenantService) PatchTenant(ctx context.Context, id string, properties ma
 
 func (t tenantService) DeleteTenant(ctx context.Context, tenantID string) error {
 	return t.trxContext.Execute(ctx, func(ctx context.Context) error {
-		tenant, err := t.tenantStore.FindByID(ctx, tenantID)
+		// The exclusive lock waits for participant deployments that share-locked the tenant, so that the count below
+		// sees their profiles, and makes deployments that start later wait for this delete.
+		tenant, err := t.tenantStore.FindByIDAndLock(ctx, tenantID, store.LockExclusive)
 		if err != nil {
 			return err
 		}

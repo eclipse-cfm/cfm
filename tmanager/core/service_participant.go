@@ -34,6 +34,7 @@ type participantService struct {
 	provisionClient      api.ProvisionClient
 	trxContext           store.TransactionContext
 	participantStore     store.EntityStore[*api.ParticipantProfile]
+	tenantStore          store.EntityStore[*api.Tenant]
 	cellStore            store.EntityStore[*api.Cell]
 	dataspaceStore       store.EntityStore[*api.DataspaceProfile]
 	monitor              system.LogMonitor
@@ -73,6 +74,12 @@ func (p participantService) DeployProfile(ctx context.Context, tenantID string, 
 	// TODO perform property validation against a custom schema
 	var oManifest model.OrchestrationManifest
 	result, err := store.Trx[api.ParticipantProfile](p.trxContext).AndReturn(ctx, func(ctx context.Context) (*api.ParticipantProfile, error) {
+		// The shared lock keeps the tenant from being deleted until the profile is committed, so that a concurrent
+		// DeleteTenant either sees the new profile or makes this deployment fail.
+		if _, err := p.tenantStore.FindByIDAndLock(ctx, tenantID, store.LockShared); err != nil {
+			return nil, err
+		}
+
 		cells, err := collection.CollectAllDeref(p.cellStore.GetAll(ctx))
 		if err != nil {
 			return nil, err
@@ -120,6 +127,10 @@ func (p participantService) DeployProfile(ctx context.Context, tenantID string, 
 		specs := generateCredentialSpecs(participantProfile.ParticipantRoles, dProfiles)
 		oManifest.Payload[model.CredentialData] = specs
 
+		if err := p.lockReferences(ctx, participantProfile); err != nil {
+			return nil, err
+		}
+
 		setPendingOrchestration(participantProfile, oManifest)
 		result, err := p.participantStore.Create(ctx, participantProfile)
 		if err != nil {
@@ -143,6 +154,34 @@ func (p participantService) DeployProfile(ctx context.Context, tenantID string, 
 		return nil, sendErr
 	}
 	return result, nil
+}
+
+// lockReferences share-locks the cells and dataspace profiles the given profile references, so that they can't be deleted
+// until the profile is committed. A reference that was deleted after it was read is a conflict.
+func (p participantService) lockReferences(ctx context.Context, profile *api.ParticipantProfile) error {
+	cellIDs := make(map[string]struct{})
+	for _, vpa := range profile.VPAs {
+		if vpa.CellID != "" {
+			cellIDs[vpa.CellID] = struct{}{}
+		}
+	}
+	for cellID := range cellIDs {
+		if _, err := p.cellStore.FindByIDAndLock(ctx, cellID, store.LockShared); err != nil {
+			if errors.Is(err, types.ErrNotFound) {
+				return types.NewClientError("cell %s was deleted", cellID)
+			}
+			return err
+		}
+	}
+	for _, profileID := range profile.DataspaceProfileIDs {
+		if _, err := p.dataspaceStore.FindByIDAndLock(ctx, profileID, store.LockShared); err != nil {
+			if errors.Is(err, types.ErrNotFound) {
+				return types.NewClientError("dataspace profile %s was deleted", profileID)
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 // getFilteredProfiles filters dProfiles based on the given dataspace profile IDs. All profiles are returned if the ID list is empty.

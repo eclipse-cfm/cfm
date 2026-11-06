@@ -23,8 +23,10 @@ import (
 )
 
 type cellService struct {
-	trxContext store.TransactionContext
-	cellStore  store.EntityStore[*api.Cell]
+	trxContext       store.TransactionContext
+	cellStore        store.EntityStore[*api.Cell]
+	participantStore store.EntityStore[*api.ParticipantProfile]
+	dataspaceStore   store.EntityStore[*api.DataspaceProfile]
 }
 
 func (d cellService) RecordExternalDeployment(ctx context.Context, cell *api.Cell) (*api.Cell, error) {
@@ -42,8 +44,33 @@ func (d cellService) RecordExternalDeployment(ctx context.Context, cell *api.Cel
 	})
 }
 
+// DeleteCell deletes a cell that no participant VPA and no dataspace profile deployment uses, apart from disposed ones.
 func (t cellService) DeleteCell(ctx context.Context, cellID string) error {
 	return t.trxContext.Execute(ctx, func(ctx context.Context) error {
+		// The exclusive lock waits for deployments that share-locked the cell, so that the checks below see them, and
+		// makes deployments that start later wait for this delete.
+		if _, err := t.cellStore.FindByIDAndLock(ctx, cellID, store.LockExclusive); err != nil {
+			return err
+		}
+
+		for profile, err := range t.participantStore.FindByPredicate(ctx, query.Eq("vpas.cellId", cellID)) {
+			if err != nil {
+				return err
+			}
+			if participantUsesCell(profile, cellID) {
+				return types.NewClientError("cannot delete cell %s: participant profile %s has VPAs in it", cellID, profile.ID)
+			}
+		}
+
+		for profile, err := range t.dataspaceStore.FindByPredicate(ctx, query.Eq("deployments.cellId", cellID)) {
+			if err != nil {
+				return err
+			}
+			if dataspaceProfileUsesCell(profile, cellID) {
+				return types.NewClientError("cannot delete cell %s: dataspace profile %s is deployed to it", cellID, profile.ID)
+			}
+		}
+
 		return t.cellStore.Delete(ctx, cellID)
 	})
 }

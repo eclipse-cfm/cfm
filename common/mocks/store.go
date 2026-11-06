@@ -352,6 +352,66 @@ func (_c *MockEntityStore_FindByID_Call[T]) RunAndReturn(run func(context.Contex
 	return _c
 }
 
+// FindByIDAndLock provides a mock function with given fields: ctx, id, mode
+func (_m *MockEntityStore[T]) FindByIDAndLock(ctx context.Context, id string, mode store.LockMode) (T, error) {
+	ret := _m.Called(ctx, id, mode)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByIDAndLock")
+	}
+
+	var r0 T
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, store.LockMode) (T, error)); ok {
+		return rf(ctx, id, mode)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, store.LockMode) T); ok {
+		r0 = rf(ctx, id, mode)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(T)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, store.LockMode) error); ok {
+		r1 = rf(ctx, id, mode)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockEntityStore_FindByIDAndLock_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByIDAndLock'
+type MockEntityStore_FindByIDAndLock_Call[T store.EntityType] struct {
+	*mock.Call
+}
+
+// FindByIDAndLock is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id string
+//   - mode store.LockMode
+func (_e *MockEntityStore_Expecter[T]) FindByIDAndLock(ctx interface{}, id interface{}, mode interface{}) *MockEntityStore_FindByIDAndLock_Call[T] {
+	return &MockEntityStore_FindByIDAndLock_Call[T]{Call: _e.mock.On("FindByIDAndLock", ctx, id, mode)}
+}
+
+func (_c *MockEntityStore_FindByIDAndLock_Call[T]) Run(run func(ctx context.Context, id string, mode store.LockMode)) *MockEntityStore_FindByIDAndLock_Call[T] {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(store.LockMode))
+	})
+	return _c
+}
+
+func (_c *MockEntityStore_FindByIDAndLock_Call[T]) Return(_a0 T, _a1 error) *MockEntityStore_FindByIDAndLock_Call[T] {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockEntityStore_FindByIDAndLock_Call[T]) RunAndReturn(run func(context.Context, string, store.LockMode) (T, error)) *MockEntityStore_FindByIDAndLock_Call[T] {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindByPredicate provides a mock function with given fields: ctx, predicate
 func (_m *MockEntityStore[T]) FindByPredicate(ctx context.Context, predicate query.Predicate) iter.Seq2[T, error] {
 	ret := _m.Called(ctx, predicate)

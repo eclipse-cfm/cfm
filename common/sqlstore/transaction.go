@@ -31,7 +31,15 @@ func NewDBTransactionContext(db *sql.DB) *SQLTransactionContext {
 	return &SQLTransactionContext{db: db}
 }
 
+// Execute runs the operation in a transaction. If the context already carries a transaction, the operation joins it:
+// it runs on the same connection, and its error is returned to the caller without committing or rolling back, which is
+// left to the outermost Execute. A nested call therefore never needs a second connection, so callers holding a
+// transaction can't deadlock on a bounded pool, and nested work commits or rolls back together with the outer work.
 func (trxContext *SQLTransactionContext) Execute(ctx context.Context, operation func(context.Context) error) error {
+	if _, ok := ctx.Value(SQLTransactionKey).(*sql.Tx); ok {
+		return operation(ctx)
+	}
+
 	// begin transaction
 	tx, err := trxContext.db.BeginTx(ctx, nil)
 	if err != nil {

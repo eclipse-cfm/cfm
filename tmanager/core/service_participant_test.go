@@ -159,6 +159,7 @@ func TestDeployProfile(t *testing.T) {
 
 	t.Run("deploy participant profile successfully", func(t *testing.T) {
 		service := newTestParticipantService()
+		createTestTenant(t, service, "tenant-1")
 		mockClient := new(mockProvisionClient)
 
 		// Setup mock to accept any manifest
@@ -211,6 +212,7 @@ func TestDeployProfile(t *testing.T) {
 
 	t.Run("deploy participant with roles successfully", func(t *testing.T) {
 		service := newTestParticipantService()
+		createTestTenant(t, service, "tenant-1")
 		mockClient := new(mockProvisionClient)
 		credentialSpecs := []model.CredentialSpec{
 			{
@@ -279,6 +281,7 @@ func TestDeployProfile(t *testing.T) {
 
 	t.Run("deploy profile handles provision client error", func(t *testing.T) {
 		service := newTestParticipantService()
+		createTestTenant(t, service, "tenant-1")
 		mockClient := new(mockProvisionClient)
 
 		// Setup mock to return error
@@ -316,6 +319,7 @@ func TestDeployProfile(t *testing.T) {
 
 	t.Run("deploy to specific dataspace profile when multiple exist", func(t *testing.T) {
 		service := newTestParticipantService()
+		createTestTenant(t, service, "tenant-1")
 		mockClient := new(mockProvisionClient)
 
 		// Setup mock to accept manifest
@@ -969,6 +973,7 @@ func newTestParticipantService() *participantService {
 	return &participantService{
 		trxContext:       store.NoOpTransactionContext{},
 		participantStore: memorystore.NewInMemoryEntityStore[*api.ParticipantProfile](),
+		tenantStore:      memorystore.NewInMemoryEntityStore[*api.Tenant](),
 		cellStore:        memorystore.NewInMemoryEntityStore[*api.Cell](),
 		dataspaceStore:   memorystore.NewInMemoryEntityStore[*api.DataspaceProfile](),
 		participantGenerator: participantGenerator{
@@ -1007,6 +1012,7 @@ func (r recordingTrxContext) Execute(ctx context.Context, callback func(ctx cont
 
 func newDeployableTestService(t *testing.T) *participantService {
 	service := newTestParticipantService()
+	createTestTenant(t, service, "tenant-1")
 	cell := newTestCell("cell-1", "external-id")
 	cell.State = api.DeploymentStateActive
 	_, err := service.cellStore.Create(t.Context(), cell)
@@ -1014,6 +1020,26 @@ func newDeployableTestService(t *testing.T) *participantService {
 	_, err = service.dataspaceStore.Create(t.Context(), newTestDataspaceProfile("ds-1"))
 	require.NoError(t, err)
 	return service
+}
+
+func createTestTenant(t *testing.T, service *participantService, tenantID string) {
+	_, err := service.tenantStore.Create(t.Context(), &api.Tenant{Entity: api.Entity{ID: tenantID, Version: 1}, Properties: api.Properties{}})
+	require.NoError(t, err)
+}
+
+func TestDeployProfile_UnknownTenant(t *testing.T) {
+	ctx := t.Context()
+	service := newDeployableTestService(t)
+	mockClient := new(mockProvisionClient)
+	service.provisionClient = mockClient
+
+	_, err := service.DeployProfile(ctx, "unknown-tenant", &api.NewParticipantProfileDeployment{Identifier: "participant-identifier"})
+
+	require.ErrorIs(t, err, types.ErrNotFound)
+	mockClient.AssertNotCalled(t, "Send", mock.Anything, mock.Anything)
+	count, err := service.participantStore.GetAllCount(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), count)
 }
 
 func newDisposableTestProfile(t *testing.T, service *participantService) *api.ParticipantProfile {

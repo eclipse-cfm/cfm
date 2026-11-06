@@ -589,3 +589,21 @@ func createBuilder() *JSONBSQLBuilder {
 	})
 	return &builder
 }
+
+// TestStore_NoTransaction tests that store calls outside a transaction return an error instead of panicking
+func TestStore_NoTransaction(t *testing.T) {
+	setupEntityTable(t)
+	defer CleanupTestData(t, testDB)
+	columnNames := []string{"id", "value", "version", "created_at", "metadata"}
+	estore := NewPostgresEntityStore("test_entities", columnNames, recordToEntity, entityToRecord, *createBuilder())
+	ctx := t.Context()
+
+	_, err := estore.FindByID(ctx, "entity-1")
+	assert.ErrorIs(t, err, ErrNoTransaction)
+	_, err = estore.GetAllCount(ctx)
+	assert.ErrorIs(t, err, ErrNoTransaction)
+	assert.ErrorIs(t, estore.Delete(ctx, "entity-1"), ErrNoTransaction)
+	for _, err := range estore.GetAll(ctx) {
+		assert.ErrorIs(t, err, ErrNoTransaction)
+	}
+}

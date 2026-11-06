@@ -66,6 +66,7 @@ func (a *TMCoreServiceAssembly) Init(context *system.InitContext) error {
 		provisionClient:      provisionClient,
 		trxContext:           trxContext,
 		participantStore:     participantStore,
+		tenantStore:          tenantStore,
 		dataspaceStore:       dataspaceStore,
 		cellStore:            cellStore,
 		monitor:              context.LogMonitor,
@@ -73,14 +74,17 @@ func (a *TMCoreServiceAssembly) Init(context *system.InitContext) error {
 	context.Registry.Register(api.ParticipantProfileServiceKey, participantService)
 
 	context.Registry.Register(api.CellServiceKey, cellService{
-		trxContext: trxContext,
-		cellStore:  cellStore,
+		trxContext:       trxContext,
+		cellStore:        cellStore,
+		participantStore: participantStore,
+		dataspaceStore:   dataspaceStore,
 	})
 
 	context.Registry.Register(api.DataspaceProfileServiceKey, dataspaceProfileService{
-		trxContext:   trxContext,
-		profileStore: dataspaceStore,
-		cellStore:    cellStore,
+		trxContext:       trxContext,
+		profileStore:     dataspaceStore,
+		cellStore:        cellStore,
+		participantStore: participantStore,
 	})
 
 	registry := context.Registry.Resolve(api.ProvisionHandlerRegistryKey).(api.ProvisionHandlerRegistry)

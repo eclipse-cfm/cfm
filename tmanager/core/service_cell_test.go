@@ -78,6 +78,56 @@ func TestDeleteCell(t *testing.T) {
 	})
 }
 
+func TestDeleteCell_InUse(t *testing.T) {
+	t.Run("participant VPA in the cell blocks the delete", func(t *testing.T) {
+		ctx := t.Context()
+		service := newTestCellService()
+		_, err := service.RecordExternalDeployment(ctx, newTestCell("cell-1", "external-id"))
+		require.NoError(t, err)
+		_, err = service.participantStore.Create(ctx, newTestParticipantProfile("tenant-1", "participant-1"))
+		require.NoError(t, err)
+
+		err = service.DeleteCell(ctx, "cell-1")
+
+		require.ErrorContains(t, err, "participant profile participant-1")
+		assert.True(t, types.IsClientError(err))
+		_, err = service.cellStore.FindByID(ctx, "cell-1")
+		require.NoError(t, err)
+	})
+
+	t.Run("disposed participant VPA does not block the delete", func(t *testing.T) {
+		ctx := t.Context()
+		service := newTestCellService()
+		_, err := service.RecordExternalDeployment(ctx, newTestCell("cell-1", "external-id"))
+		require.NoError(t, err)
+		profile := newTestParticipantProfile("tenant-1", "participant-1")
+		profile.VPAs[0].State = api.DeploymentStateDisposed
+		_, err = service.participantStore.Create(ctx, profile)
+		require.NoError(t, err)
+
+		require.NoError(t, service.DeleteCell(ctx, "cell-1"))
+	})
+
+	t.Run("dataspace profile deployment in the cell blocks the delete", func(t *testing.T) {
+		ctx := t.Context()
+		service := newTestCellService()
+		_, err := service.RecordExternalDeployment(ctx, newTestCell("cell-1", "external-id"))
+		require.NoError(t, err)
+		profile := newTestDataspaceProfile("dataspace-1")
+		profile.Deployments = []api.DataspaceDeployment{{
+			DeployableEntity: api.DeployableEntity{Entity: api.Entity{ID: "deployment-1"}, State: api.DeploymentStateActive},
+			CellID:           "cell-1",
+		}}
+		_, err = service.dataspaceStore.Create(ctx, profile)
+		require.NoError(t, err)
+
+		err = service.DeleteCell(ctx, "cell-1")
+
+		require.ErrorContains(t, err, "dataspace profile dataspace-1")
+		assert.True(t, types.IsClientError(err))
+	})
+}
+
 func TestListCells(t *testing.T) {
 
 	t.Run("list all cells from populated store", func(t *testing.T) {
@@ -139,7 +189,9 @@ func newTestCell(id string, externalId string) *api.Cell {
 
 func newTestCellService() *cellService {
 	return &cellService{
-		trxContext: store.NoOpTransactionContext{},
-		cellStore:  memorystore.NewInMemoryEntityStore[*api.Cell](),
+		trxContext:       store.NoOpTransactionContext{},
+		cellStore:        memorystore.NewInMemoryEntityStore[*api.Cell](),
+		participantStore: memorystore.NewInMemoryEntityStore[*api.ParticipantProfile](),
+		dataspaceStore:   memorystore.NewInMemoryEntityStore[*api.DataspaceProfile](),
 	}
 }

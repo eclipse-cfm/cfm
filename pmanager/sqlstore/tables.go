@@ -13,8 +13,9 @@
 package sqlstore
 
 import (
-	"database/sql"
 	"fmt"
+
+	"github.com/eclipse-cfm/cfm/common/sqlstore"
 )
 
 const (
@@ -25,7 +26,7 @@ const (
 
 // Note fields are quoted to avoid some IDEs (Goland) reformatting them to uppercase
 
-func createOrchestrationEntriesTable(db *sql.DB) error {
+func createOrchestrationEntriesTable(db sqlstore.Executor) error {
 	_, err := db.Exec(fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
 			id VARCHAR(255) PRIMARY KEY,
@@ -41,7 +42,7 @@ func createOrchestrationEntriesTable(db *sql.DB) error {
 	return err
 }
 
-func createOrchestrationDefinitionsTable(db *sql.DB) error {
+func createOrchestrationDefinitionsTable(db sqlstore.Executor) error {
 	_, err := db.Exec(fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
 		    id VARCHAR(255) PRIMARY KEY,
@@ -58,7 +59,7 @@ func createOrchestrationDefinitionsTable(db *sql.DB) error {
 	return err
 }
 
-func createActivityDefinitionsTable(db *sql.DB) error {
+func createActivityDefinitionsTable(db sqlstore.Executor) error {
 	_, err := db.Exec(fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
 		    id VARCHAR(255) PRIMARY KEY,
