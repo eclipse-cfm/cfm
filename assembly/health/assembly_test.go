@@ -72,7 +72,7 @@ func TestHealthServiceAssembly_ServesEndpoints(t *testing.T) {
 	recorder = httptest.NewRecorder()
 	mw.router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, health.ReadinessPath, nil))
 	assert.Equal(t, http.StatusServiceUnavailable, recorder.Code)
-	assert.Contains(t, recorder.Body.String(), "unreachable")
+	assert.JSONEq(t, `{"status":"DOWN","checks":{"db":"DOWN"}}`, recorder.Body.String())
 }
 
 func TestAgentAssemblies_OptIn(t *testing.T) {

@@ -57,12 +57,18 @@ type Registry struct {
 	mu        sync.RWMutex
 	liveness  map[string]Check
 	readiness map[string]Check
+	monitor   system.LogMonitor
 }
 
-func NewRegistry() *Registry {
+// NewRegistry creates a registry that logs why a check failed to monitor, which may be nil.
+func NewRegistry(monitor system.LogMonitor) *Registry {
+	if monitor == nil {
+		monitor = system.NoopMonitor{}
+	}
 	return &Registry{
 		liveness:  make(map[string]Check),
 		readiness: make(map[string]Check),
+		monitor:   monitor,
 	}
 }
 
@@ -127,8 +133,11 @@ func (r *Registry) serve(w http.ResponseWriter, req *http.Request, checks map[st
 	result := response{Status: statusUp, Checks: make(map[string]string, len(checks))}
 	for _, name := range names {
 		if err := checks[name](ctx); err != nil {
+			// The endpoints are unauthenticated, so the reason, which may name hosts or contain driver errors, is only
+			// logged
+			r.monitor.Warnf("Health check %s failed: %v", name, err)
 			result.Status = statusDown
-			result.Checks[name] = statusDown + ": " + err.Error()
+			result.Checks[name] = statusDown
 		} else {
 			result.Checks[name] = statusUp
 		}
