@@ -16,15 +16,47 @@ be used by client applications such as onboarding apps to manipulate tenant- or 
 
 ### Scope-based access control
 
-In an initial implementation, each API is protected by a read-scope and a write-scope:
+Each API is protected by a read scope, a write scope and an admin scope:
 
 - `tenant-manager-api:read`: scope needed by all read-only APIs exposed by TM
-- `tenant-manager-api:write`: scope needed by all write APIs exposed by TM
+- `tenant-manager-api:write`: scope needed to create, change and delete tenants and to deploy and dispose participant
+  profiles
+- `tenant-manager-api:admin`: scope needed to create and delete cells, and to create, delete and deploy dataspace
+  profiles. These are platform resources that all tenants share. The scope also lifts the tenant ownership restriction
+  described below.
 - `provision-manager-api:read`: scope needed by all read-only APIs exposed by PM
-- `provision-manager-api:write`: scope needed by all write APIs exposed by PM
+- `provision-manager-api:write`: scope needed to start orchestrations
+- `provision-manager-api:admin`: scope needed to create and delete activity and orchestration definitions, which decide
+  what the agents do. Only callers with this scope get the `processingData` and `outputData` of an orchestration, which
+  carry the payload it was started with and the values its activities produced. Other callers get empty maps.
 
 Note that sometimes read-only APIs are implemented as `POST` endpoints, e.g. when issuing a query. In these cases,
-the `read` scope is sufficient.
+the `read` scope is sufficient. The admin scopes don't imply the read or write scopes: a client that manages tenants of
+other clients needs both the write and the admin scope.
+
+### Tenant ownership
+
+A tenant is owned by the client that created it: TM records the subject (`sub`) of the caller's token as the tenant's
+owner. A participant profile is owned by the owner of its tenant. A caller without `tenant-manager-api:admin` can only
+see and change the tenants and participant profiles it owns:
+
+- getting, changing or deleting another client's tenant, and any request below `/tenants/{id}/participant-profiles`
+  for it, returns `404`, as if the tenant didn't exist;
+- listing and querying tenants and participant profiles only returns the caller's own. The owner condition is added to
+  the caller's query predicate on the server, so the predicate cannot widen the result.
+
+A token without a subject is refused with `403` unless it has the admin scope. Tenants and participant profiles that
+were created before owners were recorded have no owner, so only admin callers can reach them. When auth is disabled,
+the anonymous claims carry every scope, so callers have full access and new tenants are owned by `anonymous`.
+
+The handler attaches the caller's access to the request context, and the tenant and participant profile services read
+it from there. A service call without an access in its context is refused rather than treated as unrestricted.
+
+### Orchestration IDs
+
+The ID of an orchestration is chosen by the caller and de-duplicates starts: submitting the same manifest again returns
+the existing orchestration, which lets a caller retry a start, and resumes it when its start didn't complete. A manifest
+that reuses the ID of an orchestration of a different type or correlation ID is refused with `409`.
 
 ### Implementation
 
