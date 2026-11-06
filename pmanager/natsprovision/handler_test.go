@@ -16,6 +16,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"iter"
 	"testing"
 
@@ -98,7 +99,8 @@ func TestNatsProvisionHandler_Dispatcher_ValidResponseStructure(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.False(t, response.Success)
-	assert.Equal(t, "provision failed", response.ErrorDetail)
+	assert.Regexp(t, `^orchestration could not be started \[[0-9a-f-]{36}\]$`, response.ErrorDetail)
+	assert.NotContains(t, response.ErrorDetail, "provision failed")
 	assert.Equal(t, "test-manifest-id", response.ManifestID)
 	assert.Equal(t, model.VPADeployType, response.OrchestrationType)
 	assert.NotEmpty(t, response.ID) // Should have a generated UUID
@@ -107,6 +109,47 @@ func TestNatsProvisionHandler_Dispatcher_ValidResponseStructure(t *testing.T) {
 
 	mockProvisionManager.AssertExpectations(t)
 	mockClient.AssertExpectations(t)
+}
+
+func TestNatsProvisionHandler_Dispatcher_ErrorDetail(t *testing.T) {
+	testCases := []struct {
+		name     string
+		error    error
+		expected string
+	}{
+		{"ClientError", types.NewClientError("orchestration type 'x' not found"), "orchestration type 'x' not found"},
+		{"wrapped ClientError", fmt.Errorf("transaction failed: %w", types.NewClientError("Missing required field: id")), "Missing required field: id"},
+		{"FatalError", types.NewFatalWrappedError(errors.New("nats: key value store error"), "error performing de-duplication"), ""},
+		{"StandardError", errors.New(`pq: relation "orchestration_definitions" does not exist`), ""},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockClient := mocks.NewMockMsgClient(t)
+			mockProvisionManager := &MockProvisionManager{}
+			handler := newNatsProvisionHandler(mockClient, mockProvisionManager, system.NoopMonitor{})
+
+			ctx := context.Background()
+			manifest := model.OrchestrationManifest{ID: "test-manifest-id", OrchestrationType: model.VPADeployType}
+			mockProvisionManager.On("Start", ctx, &manifest).Return(nil, tc.error)
+
+			var capturedPayload []byte
+			mockClient.EXPECT().Publish(ctx, natsclient.CFMOrchestrationResponseSubject, mock.Anything).
+				Run(func(ctx context.Context, subject string, payload []byte, opts ...jetstream.PublishOpt) {
+					capturedPayload = payload
+				}).Return(&jetstream.PubAck{}, nil)
+
+			require.NoError(t, handler.RetriableMessageProcessor.Dispatcher(ctx, manifest))
+
+			var response model.OrchestrationResponse
+			require.NoError(t, json.Unmarshal(capturedPayload, &response))
+			if tc.expected != "" {
+				assert.Equal(t, tc.expected, response.ErrorDetail)
+			} else {
+				assert.Regexp(t, `^orchestration could not be started \[[0-9a-f-]{36}\]$`, response.ErrorDetail)
+			}
+		})
+	}
 }
 
 func TestNatsProvisionHandler_Dispatcher_ErrorTypes(t *testing.T) {
