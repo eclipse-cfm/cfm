@@ -66,7 +66,7 @@ func (p RegistrationActivityProcessor) ProcessDeploy(ctx api.ActivityContext) ap
 		span.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error reading vpa data: %w", err)}
 	}
-	if err := p.IssuerService.CreateHolder(ctx.Context(), regData.ParticipantContextId, regData.DID, holderID, regData.HolderName, properties); err != nil {
+	if err := p.IssuerService.CreateHolder(ctx.Context(), regData.DID, holderID, regData.HolderName, properties); err != nil {
 		span.RecordError(err)
 		// todo: inspect error if it is retryable
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error creating holder in ApiClient: %w", err)}
@@ -81,7 +81,7 @@ func (p RegistrationActivityProcessor) ProcessDispose(ctx api.ActivityContext) a
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Registration activity for orchestration %s: %w", ctx.OID(), err)}
 	}
 	holderID := regData.DID
-	if err := p.IssuerService.DeleteHolder(ctx.Context(), regData.ParticipantContextId, holderID); err != nil {
+	if err := p.IssuerService.DeleteHolder(ctx.Context(), holderID); err != nil {
 		// todo: inspect error if it is retryable
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("registration rollback: error deleting holder in IssuerService: %w", err)}
 	}

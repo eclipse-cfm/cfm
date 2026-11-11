@@ -386,19 +386,19 @@ type MockIssuerService struct {
 	recorded      regData
 }
 
-func (m *MockIssuerService) QueryCredentialsByType(ctx context.Context, participantContextID string, holderID string, credentialType string) ([]issuerservice.IssuerCredentialResourceDto, error) {
+func (m *MockIssuerService) QueryCredentialsByType(ctx context.Context, holderID string, credentialType string) ([]issuerservice.IssuerCredentialResourceDto, error) {
 	return nil, nil
 }
 
-func (m *MockIssuerService) DeleteHolder(ctx context.Context, participantContextID string, holderID string) error {
+func (m *MockIssuerService) DeleteHolder(ctx context.Context, holderID string) error {
 	return m.expectedError
 }
 
-func (m *MockIssuerService) RevokeCredential(ctx context.Context, participantContextID string, credentialID string) error {
+func (m *MockIssuerService) RevokeCredential(ctx context.Context, credentialID string) error {
 	return nil
 }
 
-func (m *MockIssuerService) CreateHolder(ctx context.Context, participantContextID string, did string, holderID string, name string, properties map[string]any) error {
+func (m *MockIssuerService) CreateHolder(ctx context.Context, did string, holderID string, name string, properties map[string]any) error {
 	m.recorded.did = did
 	m.recorded.holderID = holderID
 	m.recorded.name = name
