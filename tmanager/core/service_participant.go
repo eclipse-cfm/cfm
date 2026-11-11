@@ -501,7 +501,10 @@ func (h vpaCallbackHandler) handle(
 			handler(profile, response)
 		default:
 			profile.Error = true
-			profile.ErrorDetail = response.ErrorDetail
+			// The compensation of a failed deployment must not replace the reason the deployment failed
+			if response.CompensatedManifestID == "" || profile.ErrorDetail == "" {
+				profile.ErrorDetail = response.ErrorDetail
+			}
 			handler(profile, response)
 		}
 		err = h.participantStore.Update(c, profile)

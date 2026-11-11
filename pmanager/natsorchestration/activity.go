@@ -406,7 +406,7 @@ func (e *NatsActivityExecutor) handleOrchestrationCompletion(
 	orchDurationHistogram.Record(activityContext.Context(), float64(time.Since(orchestration.CreatedTimestamp).Milliseconds()),
 		metric.WithAttributes(attribute.String("result", "success")))
 
-	err = e.publishResponse(activityContext, orchestration)
+	err = e.publishResponse(activityContext, orchestration, "")
 	if err != nil {
 		return err
 	}
@@ -414,12 +414,16 @@ func (e *NatsActivityExecutor) handleOrchestrationCompletion(
 	return natsclient.AckMessage(message)
 }
 
-func (e *NatsActivityExecutor) publishResponse(activityContext api.ActivityContext, orchestration api.Orchestration) error {
+// publishResponse reports the outcome of an orchestration to its initiator. A non-empty errorDetail reports a failure
+// and says why; it is passed in rather than read from the orchestration, because the orchestration may not carry the
+// error if recording it failed.
+func (e *NatsActivityExecutor) publishResponse(activityContext api.ActivityContext, orchestration api.Orchestration, errorDetail string) error {
 	response := &model.OrchestrationResponse{
 		ID:                    uuid.New().String(),
 		ManifestID:            orchestration.ID,
 		CorrelationID:         orchestration.CorrelationID,
-		Success:               orchestration.State != api.OrchestrationStateErrored,
+		Success:               errorDetail == "" && orchestration.State != api.OrchestrationStateErrored,
+		ErrorDetail:           errorDetail,
 		OrchestrationType:     orchestration.OrchestrationType,
 		Properties:            orchestration.OutputData,
 		CompensatedManifestID: orchestration.CompensatedOrchestrationID,
@@ -488,6 +492,7 @@ func (e *NatsActivityExecutor) handleFatalError(
 	message jetstream.Msg) error {
 	// Update the orchestration before acking back. If the update fails, just log it to ensure the ack is sent to avoid message re-delivery
 	engineState := orchestration.EngineState
+	errorDetail := truncateError(resultErr.Error())
 	if _, _, err := UpdateOrchestration(activityContext.Context(), orchestration, revision, e.Client, func(o *api.Orchestration) {
 		if o.ProcessingData == nil {
 			o.ProcessingData = make(map[string]any)
@@ -503,7 +508,7 @@ func (e *NatsActivityExecutor) handleFatalError(
 		}
 		o.SetState(api.OrchestrationStateErrored)
 		o.EngineState.Merge(engineState)
-		o.EngineState.Error = truncateError(resultErr.Error())
+		o.EngineState.Error = errorDetail
 		orchestration = *o
 	}); err != nil {
 		e.Monitor.Warnf("Failed to mark orchestration %s as fatal: %v", orchestration.ID, err)
@@ -514,7 +519,7 @@ func (e *NatsActivityExecutor) handleFatalError(
 	orchDurationHistogram.Record(activityContext.Context(), float64(time.Since(orchestration.CreatedTimestamp).Milliseconds()),
 		metric.WithAttributes(attribute.String("result", "fatal")))
 
-	err := e.publishResponse(activityContext, orchestration)
+	err := e.publishResponse(activityContext, orchestration, errorDetail)
 	if err != nil {
 		return err
 	}
@@ -526,9 +531,9 @@ func (e *NatsActivityExecutor) handleFatalError(
 	return fmt.Errorf("fatal failure while executing activity %s: %w", orchestration.ID, resultErr)
 }
 
-// maxPersistedErrorBytes bounds the error stored in an orchestration's engine state. The error is returned by the
-// Provision Manager API and may contain downstream response bodies, so a long error chain must not grow it without
-// limit.
+// maxPersistedErrorBytes bounds the error stored in an orchestration's engine state and sent in its response. The error
+// is returned by the Provision Manager API and, as a participant profile's error detail, by the Tenant Manager API. It
+// may contain downstream response bodies, so a long error chain must not grow it without limit.
 const maxPersistedErrorBytes = 2048
 
 // truncateError cuts message to at most maxPersistedErrorBytes, without splitting a multibyte character.
