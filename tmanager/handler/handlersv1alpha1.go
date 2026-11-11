@@ -15,6 +15,7 @@ package handler
 import (
 	"net/http"
 
+	cfmauth "github.com/eclipse-cfm/cfm/common/auth"
 	"github.com/eclipse-cfm/cfm/common/handler"
 	"github.com/eclipse-cfm/cfm/common/query"
 	"github.com/eclipse-cfm/cfm/common/store"
@@ -64,7 +65,7 @@ func (h *TMHandler) getParticipantProfile(
 		return
 	}
 
-	response := v1alpha1.ToParticipantProfile(profile)
+	response := toParticipantProfileResponse(req, profile)
 	h.ResponseOK(w, response)
 }
 
@@ -85,7 +86,7 @@ func (h *TMHandler) getProfilesForTenant(w http.ResponseWriter, req *http.Reques
 			h.HandleError(w, err)
 			return
 		}
-		transformed := v1alpha1.ToParticipantProfile(profile)
+		transformed := toParticipantProfileResponse(req, profile)
 		results = append(results, *transformed)
 	}
 	h.ResponseOK(w, results)
@@ -126,7 +127,7 @@ func (h *TMHandler) deployParticipantProfile(
 	}
 
 	span.AddEvent("Profile deployed successfully", trace.WithAttributes(attribute.String("profile.id", profile.ID)))
-	response := v1alpha1.ToParticipantProfile(profile)
+	response := toParticipantProfileResponse(req, profile)
 	h.ResponseAccepted(w, response)
 }
 
@@ -158,9 +159,26 @@ func (h *TMHandler) queryParticipantProfiles(w http.ResponseWriter, req *http.Re
 		h.participantService.QueryProfilesCount,
 		h.participantService.QueryProfiles,
 		func(profile *api.ParticipantProfile) any {
-			return v1alpha1.ToParticipantProfile(profile)
+			return toParticipantProfileResponse(req, profile)
 		},
 		h.txContext)
+}
+
+// toParticipantProfileResponse converts a participant profile to its API representation. The error cause is the error
+// of the activity that failed, which may quote internal addresses and downstream responses, so it is only returned to
+// callers with the admin scope. Other callers see the error flag and the error detail, which is written for them.
+func toParticipantProfileResponse(req *http.Request, profile *api.ParticipantProfile) *v1alpha1.ParticipantProfile {
+	response := v1alpha1.ToParticipantProfile(profile)
+	if !canSeeErrorCause(req) {
+		response.ErrorCause = ""
+	}
+	return response
+}
+
+func canSeeErrorCause(req *http.Request) bool {
+	// When authentication is disabled, the anonymous claims grant the admin scope.
+	claims, ok := cfmauth.ClaimsFromContext(req.Context())
+	return ok && claims != nil && claims.HasScope(scopeTmAdmin)
 }
 
 func (h *TMHandler) createTenant(w http.ResponseWriter, req *http.Request) {

@@ -72,7 +72,11 @@ type ParticipantProfile struct {
 	VPAs                []VirtualParticipantAgent `json:"vpas"`
 	Properties          Properties                `json:"properties"`
 	Error               bool                      `json:"error"`
-	ErrorDetail         string                    `json:"errorDetail"`
+	// ErrorDetail says why the profile is in error in words written for the profile's owner.
+	ErrorDetail string `json:"errorDetail"`
+	// ErrorCause is the underlying error, for example of the activity that failed. It may quote internal addresses and
+	// downstream responses, so it is only returned to callers with the admin scope.
+	ErrorCause string `json:"errorCause"`
 }
 
 type NewParticipantProfileDeployment struct {

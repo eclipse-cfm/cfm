@@ -1003,3 +1003,40 @@ func TestParticipantProfileStore_Owner(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), count)
 }
+
+func TestParticipantProfileStore_ErrorCause(t *testing.T) {
+	setupParticipantProfileTable(t, testDB)
+	defer cleanupParticipantProfileTestData(t, testDB)
+
+	ctx := context.Background()
+	tx, err := testDB.BeginTx(ctx, nil)
+	require.NoError(t, err)
+	defer tx.Rollback()
+	txCtx := context.WithValue(ctx, sqlstore.SQLTransactionKey, tx)
+
+	estore := newParticipantProfileStore()
+	for _, id := range []string{"pprofile-failed", "pprofile-legacy"} {
+		_, err := estore.Create(txCtx, &api.ParticipantProfile{
+			Entity:      api.Entity{ID: id, Version: 1},
+			Identifier:  "did:web:" + id,
+			TenantID:    "tenant-1",
+			Properties:  map[string]any{},
+			Error:       true,
+			ErrorDetail: "activity A1 of orchestration o1 failed",
+			ErrorCause:  "unexpected status 500",
+		})
+		require.NoError(t, err)
+	}
+	// Profiles stored before the column was added have no error cause
+	_, err = tx.Exec(fmt.Sprintf("UPDATE %s SET error_cause = NULL WHERE id = 'pprofile-legacy'", cfmParticipantProfilesTable))
+	require.NoError(t, err)
+
+	found, err := estore.FindByID(txCtx, "pprofile-failed")
+	require.NoError(t, err)
+	assert.Equal(t, "activity A1 of orchestration o1 failed", found.ErrorDetail)
+	assert.Equal(t, "unexpected status 500", found.ErrorCause)
+
+	legacy, err := estore.FindByID(txCtx, "pprofile-legacy")
+	require.NoError(t, err)
+	assert.Empty(t, legacy.ErrorCause)
+}

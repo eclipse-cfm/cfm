@@ -763,6 +763,9 @@
           "error": {
             "type": "boolean"
           },
+          "errorCause": {
+            "type": "string"
+          },
           "errorDetail": {
             "type": "string"
           },

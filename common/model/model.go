@@ -74,8 +74,12 @@ type OrchestrationResponse struct {
 	CorrelationID     string            `json:"correlationId" validate:"required"`
 	OrchestrationType OrchestrationType `json:"orchestrationType" validate:"required"`
 	Success           bool              `json:"success"`
-	ErrorDetail       string            `json:"errorDetail,omitempty"`
-	Properties        map[string]any    `json:"properties"`
+	// ErrorDetail says why the orchestration failed in words written for the caller that started it.
+	ErrorDetail string `json:"errorDetail,omitempty"`
+	// ErrorCause is the underlying error of a failed orchestration. It may quote internal addresses and downstream
+	// responses, so it must only be shown to operators.
+	ErrorCause string         `json:"errorCause,omitempty"`
+	Properties map[string]any `json:"properties"`
 	// CompensatedManifestID references the failed orchestration this orchestration compensated, if any.
 	CompensatedManifestID string `json:"compensatedManifestId,omitempty"`
 }

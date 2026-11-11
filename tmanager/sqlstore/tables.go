@@ -56,8 +56,9 @@ func createParticipantProfilesTable(db sqlstore.Executor) error {
 			);
 			CREATE INDEX IF NOT EXISTS idx_participant_tenant ON %s(tenant_id);
 			ALTER TABLE %s ADD COLUMN IF NOT EXISTS owner VARCHAR(255);
-			CREATE INDEX IF NOT EXISTS idx_participant_owner ON %s(owner)
-	`, cfmParticipantProfilesTable, cfmParticipantProfilesTable, cfmParticipantProfilesTable, cfmParticipantProfilesTable))
+			CREATE INDEX IF NOT EXISTS idx_participant_owner ON %s(owner);
+			ALTER TABLE %s ADD COLUMN IF NOT EXISTS error_cause TEXT
+	`, cfmParticipantProfilesTable, cfmParticipantProfilesTable, cfmParticipantProfilesTable, cfmParticipantProfilesTable, cfmParticipantProfilesTable))
 	return err
 }
 

@@ -686,6 +686,52 @@ func TestVPACallbackHandlerAppliesCompensation(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, api.DeploymentStateDisposed, updated.VPAs[0].State)
 	assert.NotContains(t, updated.Properties, pendingOrchestrationKey)
+	assert.True(t, updated.Error)
+	assert.Equal(t, "failed", updated.ErrorDetail, "a successful compensation keeps the reason the deployment failed")
+}
+
+func TestVPACallbackHandlerFailedCompensationKeepsDeployError(t *testing.T) {
+	ctx := allTenantsContext(context.Background())
+	participantStore := memorystore.NewInMemoryEntityStore[*api.ParticipantProfile]()
+
+	profile := newTestParticipantProfile("tenant-1", "participant-1")
+	setPendingOrchestration(profile, model.OrchestrationManifest{ID: "deploy-1", OrchestrationType: model.VPADeployType})
+	createdProfile, err := participantStore.Create(ctx, profile)
+	require.NoError(t, err)
+
+	handler := vpaCallbackHandler{
+		participantStore: participantStore,
+		trxContext:       store.NoOpTransactionContext{},
+		monitor:          system.NoopMonitor{},
+	}
+
+	require.NoError(t, handler.handleDeploy(ctx, model.OrchestrationResponse{
+		ID:                "response-1",
+		ManifestID:        "deploy-1",
+		CorrelationID:     createdProfile.ID,
+		OrchestrationType: model.VPADeployType,
+		Success:           false,
+		ErrorDetail:       "activity A1 of orchestration deploy-1 failed",
+		ErrorCause:        "activity A1 failed 10 times: not ready",
+	}))
+
+	compensation := model.OrchestrationResponse{
+		ID:                    "response-2",
+		ManifestID:            "compensation-1",
+		CorrelationID:         createdProfile.ID,
+		OrchestrationType:     model.VPADisposeType,
+		Success:               false,
+		ErrorDetail:           "activity A2 of orchestration compensation-1 failed",
+		ErrorCause:            "cannot delete participant context",
+		CompensatedManifestID: "deploy-1",
+	}
+	require.NoError(t, handler.handleDispose(ctx, compensation))
+
+	updated, err := participantStore.FindByID(ctx, createdProfile.ID)
+	require.NoError(t, err)
+	assert.True(t, updated.Error)
+	assert.Equal(t, "activity A1 of orchestration deploy-1 failed", updated.ErrorDetail)
+	assert.Equal(t, "activity A1 failed 10 times: not ready", updated.ErrorCause)
 }
 
 func TestVPACallbackHandlerIgnoresDuplicateResponse(t *testing.T) {
