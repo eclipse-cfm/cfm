@@ -305,22 +305,27 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenInvalidStateReceived(t *t
 }
 
 func TestOnboardingActivityProcessor_ProcessDispose(t *testing.T) {
+	queriedHolderIDs := make([]string, 0)
+	revokedIDs := make([]string, 0)
 	processor := OnboardingActivityProcessor{
 		Monitor: system.NoopMonitor{},
 		IssuerServiceApiClient: MockIssuerServiceApiClient{
 			expectedCredentials: []issuerservice.IssuerCredentialResourceDto{
 				{
-					ID:                   "",
-					ParticipantContextID: "test-participant",
+					ID:                   "test-credential-id",
+					ParticipantContextID: "test-issuer",
 					CredentialFormat:     common.CredentialFormat_VCDM20_COSE,
-					VerifiableCredential: common.VerifiableCredential{},
+					VerifiableCredential: common.VerifiableCredential{ID: "test-vc-id"},
 				},
 			},
+			queriedHolderIDs: &queriedHolderIDs,
+			revokedIDs:       &revokedIDs,
 		},
 	}
 
 	var processingData = map[string]any{
 		"participantContextId": "test-participant",
+		"cfm.participant.id":   "did:web:test-participant",
 		"cfm.vpa.credentials": []any{
 			map[string]string{
 				"id":     "id",
@@ -346,6 +351,40 @@ func TestOnboardingActivityProcessor_ProcessDispose(t *testing.T) {
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	assert.NoError(t, result.Error)
+	assert.Equal(t, []string{"did:web:test-participant"}, queriedHolderIDs, "credentials must be queried by the holder's DID")
+	assert.Equal(t, []string{"test-credential-id"}, revokedIDs, "the credential resource ID must be revoked, not the VC ID")
+}
+
+func TestOnboardingActivityProcessor_ProcessDispose_MissingParticipantID(t *testing.T) {
+	processor := OnboardingActivityProcessor{
+		Monitor:                system.NoopMonitor{},
+		IssuerServiceApiClient: MockIssuerServiceApiClient{},
+	}
+
+	var processingData = map[string]any{
+		"participantContextId": "test-participant",
+		"cfm.vpa.credentials": []any{
+			map[string]string{
+				"id":     "id",
+				"format": "format",
+				"issuer": "issuer",
+				"type":   "type",
+			},
+		},
+	}
+
+	activity := api.Activity{
+		ID:            "test-activity",
+		Type:          "edcv",
+		Discriminator: api.DisposeDiscriminator,
+	}
+
+	activityContext := api.NewActivityContext(context.Background(), "orch-123", activity, processingData, make(map[string]any))
+
+	result := processor.ProcessDispose(activityContext)
+
+	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
+	assert.Error(t, result.Error)
 }
 
 func TestOnboardingActivityProcessor_ProcessDispose_RevocationFails(t *testing.T) {
@@ -368,6 +407,7 @@ func TestOnboardingActivityProcessor_ProcessDispose_RevocationFails(t *testing.T
 
 	var processingData = map[string]any{
 		"participantContextId": "test-participant",
+		"cfm.participant.id":   "did:web:test-participant",
 		"cfm.vpa.credentials": []any{
 			map[string]string{
 				"id":     "id",
@@ -409,6 +449,7 @@ func TestOnboardingActivityProcessor_ProcessDispose_NoCredentials(t *testing.T) 
 
 	var processingData = map[string]any{
 		"participantContextId": "test-participant",
+		"cfm.participant.id":   "did:web:test-participant",
 		"cfm.vpa.credentials": []any{
 			map[string]string{
 				"id":     "id",
@@ -457,6 +498,7 @@ func TestOnboardingActivityProcessor_ProcessDispose_FirstTypeWithoutCredentials(
 
 	var processingData = map[string]any{
 		"participantContextId": "test-participant",
+		"cfm.participant.id":   "did:web:test-participant",
 		"cfm.vpa.credentials": []any{
 			map[string]string{
 				"id":     "id-1",
@@ -488,7 +530,7 @@ func TestOnboardingActivityProcessor_ProcessDispose_FirstTypeWithoutCredentials(
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	assert.NoError(t, result.Error)
-	assert.Equal(t, []string{"cred-2"}, revokedIDs, "credentials of later types must still be revoked when an earlier type has none")
+	assert.Equal(t, []string{"test-credential-id"}, revokedIDs, "credentials of later types must still be revoked when an earlier type has none")
 }
 
 type MockIdentityHubClient struct {
@@ -524,9 +566,13 @@ type MockIssuerServiceApiClient struct {
 	expectedCredentials []issuerservice.IssuerCredentialResourceDto
 	credentialsByType   map[string][]issuerservice.IssuerCredentialResourceDto
 	revokedIDs          *[]string
+	queriedHolderIDs    *[]string
 }
 
-func (m MockIssuerServiceApiClient) QueryCredentialsByType(ctx context.Context, participantContextID string, credentialType string) ([]issuerservice.IssuerCredentialResourceDto, error) {
+func (m MockIssuerServiceApiClient) QueryCredentialsByType(ctx context.Context, participantContextID string, holderID string, credentialType string) ([]issuerservice.IssuerCredentialResourceDto, error) {
+	if m.queriedHolderIDs != nil {
+		*m.queriedHolderIDs = append(*m.queriedHolderIDs, holderID)
+	}
 	if m.credentialsByType != nil {
 		return m.credentialsByType[credentialType], nil
 	}

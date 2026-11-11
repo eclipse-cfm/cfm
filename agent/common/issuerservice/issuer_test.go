@@ -107,10 +107,8 @@ func TestHttpApiClient_CreateHolder_ApiReturnsError(t *testing.T) {
 }
 
 func TestHttpApiClient_RevokeCredential(t *testing.T) {
-	template := "/v1/participants/.*/credentials/.*/revoke"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		matched, _ := regexp.MatchString(template, r.URL.Path)
-		if matched && r.Method == http.MethodPost {
+		if r.URL.Path == "/v1/participants/test-issuer/credentials/test-credential-id/revoke" && r.Method == http.MethodPost {
 			w.WriteHeader(http.StatusOK)
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -119,7 +117,7 @@ func TestHttpApiClient_RevokeCredential(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
+	tp.On("GetToken", mock.Anything, ScopeApiAdmin, "test-participant").Return("test token", nil)
 	client := HttpApiClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -127,7 +125,7 @@ func TestHttpApiClient_RevokeCredential(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	err := client.RevokeCredential(t.Context(), "did:web:test-participant", "test-credential-id")
+	err := client.RevokeCredential(t.Context(), "test-participant", "test-credential-id")
 	require.NoError(t, err)
 }
 
@@ -257,11 +255,11 @@ func TestHttpApiClient_DeleteHolder_AuthError(t *testing.T) {
 }
 
 func TestHttpApiClient_QueryCredentialsByType(t *testing.T) {
-	template := "/v1/participants/.*/credentials/query"
+	template := "^/v1/participants/test-issuer/credentials/query$"
 	credentials := []IssuerCredentialResourceDto{
 		{
 			ID:                   "cred-1",
-			ParticipantContextID: "did:web:test-participant",
+			ParticipantContextID: "test-issuer",
 			CredentialFormat:     common.CredentialFormat_VCDM10_JWT,
 			VerifiableCredential: common.VerifiableCredential{
 				ID:           "vc-1",
@@ -296,7 +294,7 @@ func TestHttpApiClient_QueryCredentialsByType(t *testing.T) {
 	defer server.Close()
 
 	tp := mocks.NewMockTokenProvider(t)
-	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("test token", nil)
+	tp.On("GetToken", mock.Anything, ScopeApiAdmin, "test-participant").Return("test token", nil)
 	client := HttpApiClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
@@ -304,11 +302,11 @@ func TestHttpApiClient_QueryCredentialsByType(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	result, err := client.QueryCredentialsByType(t.Context(), "did:web:test-participant", "MembershipCredential")
+	result, err := client.QueryCredentialsByType(t.Context(), "test-participant", "did:web:test-participant", "MembershipCredential")
 	require.NoError(t, err)
 	require.Len(t, result, 1)
 	assert.Equal(t, "cred-1", result[0].ID)
-	assert.Equal(t, "did:web:test-participant", result[0].ParticipantContextID)
+	assert.Equal(t, "test-issuer", result[0].ParticipantContextID)
 }
 
 func TestHttpApiClient_QueryCredentialsByType_AuthError(t *testing.T) {
@@ -321,7 +319,7 @@ func TestHttpApiClient_QueryCredentialsByType_AuthError(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	result, err := client.QueryCredentialsByType(t.Context(), "did:web:test-participant", "MembershipCredential")
+	result, err := client.QueryCredentialsByType(t.Context(), "test-participant", "did:web:test-participant", "MembershipCredential")
 	require.ErrorContains(t, err, "auth error")
 	require.Nil(t, result)
 }
@@ -347,7 +345,7 @@ func TestHttpApiClient_QueryCredentialsByType_ApiReturnsError(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	result, err := client.QueryCredentialsByType(t.Context(), "did:web:test-participant", "MembershipCredential")
+	result, err := client.QueryCredentialsByType(t.Context(), "test-participant", "did:web:test-participant", "MembershipCredential")
 	require.ErrorContains(t, err, "failed to query credentials on IssuerService")
 	require.Nil(t, result)
 }
@@ -375,7 +373,7 @@ func TestHttpApiClient_QueryCredentialsByType_InvalidJson(t *testing.T) {
 		HttpClient:    &http.Client{},
 	}
 
-	result, err := client.QueryCredentialsByType(t.Context(), "did:web:test-participant", "MembershipCredential")
+	result, err := client.QueryCredentialsByType(t.Context(), "test-participant", "did:web:test-participant", "MembershipCredential")
 	require.ErrorContains(t, err, "error parsing credentials response")
 	require.Nil(t, result)
 }
@@ -392,9 +390,9 @@ func TestHttpApiClient_RevokeCredential_EscapesPathSegments(t *testing.T) {
 	client := HttpApiClient{
 		BaseURL:       server.URL,
 		TokenProvider: tp,
-		IssuerID:      "test-issuer",
+		IssuerID:      "../other?force=true#",
 		HttpClient:    &http.Client{},
 	}
 
-	require.NoError(t, client.RevokeCredential(t.Context(), "../other?force=true#", "a/b"))
+	require.NoError(t, client.RevokeCredential(t.Context(), "test-participant", "a/b"))
 }
