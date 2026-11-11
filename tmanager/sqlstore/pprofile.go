@@ -33,6 +33,7 @@ func newParticipantProfileStore() store.EntityStore[*api.ParticipantProfile] {
 		"vpas",
 		"error",
 		"error_detail",
+		"error_cause",
 		"properties"}
 
 	builder := sqlstore.NewPostgresJSONBBuilder().
@@ -104,6 +105,11 @@ func recordToPProfileEntity(_ *sql.Tx, record *sqlstore.DatabaseRecord) (*api.Pa
 		return nil, fmt.Errorf("invalid participant profile error detail reading record")
 	}
 
+	// The column was added later, so it is NULL for profiles stored before
+	if errorCause, ok := record.Values["error_cause"].(string); ok {
+		profile.ErrorCause = errorCause
+	}
+
 	if bytes, ok := record.Values["properties"].([]byte); ok && bytes != nil {
 		if err := json.Unmarshal(bytes, &profile.Properties); err != nil {
 			return nil, err
@@ -143,6 +149,7 @@ func pProfileEntityToRecord(profile *api.ParticipantProfile) (*sqlstore.Database
 	record.Values["identifier"] = profile.Identifier
 	record.Values["error"] = profile.Error
 	record.Values["error_detail"] = profile.ErrorDetail
+	record.Values["error_cause"] = profile.ErrorCause
 
 	if profile.DataspaceProfileIDs != nil {
 		bytes, err := json.Marshal(profile.DataspaceProfileIDs)

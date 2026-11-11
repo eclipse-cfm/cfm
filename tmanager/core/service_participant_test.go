@@ -711,7 +711,8 @@ func TestVPACallbackHandlerFailedCompensationKeepsDeployError(t *testing.T) {
 		CorrelationID:     createdProfile.ID,
 		OrchestrationType: model.VPADeployType,
 		Success:           false,
-		ErrorDetail:       "activity A1 failed 10 times: not ready",
+		ErrorDetail:       "activity A1 of orchestration deploy-1 failed",
+		ErrorCause:        "activity A1 failed 10 times: not ready",
 	}))
 
 	compensation := model.OrchestrationResponse{
@@ -720,7 +721,8 @@ func TestVPACallbackHandlerFailedCompensationKeepsDeployError(t *testing.T) {
 		CorrelationID:         createdProfile.ID,
 		OrchestrationType:     model.VPADisposeType,
 		Success:               false,
-		ErrorDetail:           "cannot delete participant context",
+		ErrorDetail:           "activity A2 of orchestration compensation-1 failed",
+		ErrorCause:            "cannot delete participant context",
 		CompensatedManifestID: "deploy-1",
 	}
 	require.NoError(t, handler.handleDispose(ctx, compensation))
@@ -728,7 +730,8 @@ func TestVPACallbackHandlerFailedCompensationKeepsDeployError(t *testing.T) {
 	updated, err := participantStore.FindByID(ctx, createdProfile.ID)
 	require.NoError(t, err)
 	assert.True(t, updated.Error)
-	assert.Equal(t, "activity A1 failed 10 times: not ready", updated.ErrorDetail)
+	assert.Equal(t, "activity A1 of orchestration deploy-1 failed", updated.ErrorDetail)
+	assert.Equal(t, "activity A1 failed 10 times: not ready", updated.ErrorCause)
 }
 
 func TestVPACallbackHandlerIgnoresDuplicateResponse(t *testing.T) {

@@ -80,6 +80,7 @@ func ToParticipantProfile(input *api.ParticipantProfile) *ParticipantProfile {
 		Properties:       input.Properties,
 		Error:            input.Error,
 		ErrorDetail:      input.ErrorDetail,
+		ErrorCause:       input.ErrorCause,
 	}
 }
 

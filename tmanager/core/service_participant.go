@@ -504,6 +504,7 @@ func (h vpaCallbackHandler) handle(
 			// The compensation of a failed deployment must not replace the reason the deployment failed
 			if response.CompensatedManifestID == "" || profile.ErrorDetail == "" {
 				profile.ErrorDetail = response.ErrorDetail
+				profile.ErrorCause = response.ErrorCause
 			}
 			handler(profile, response)
 		}

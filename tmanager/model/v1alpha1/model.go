@@ -110,6 +110,8 @@ type ParticipantProfile struct {
 	Properties       map[string]any            `json:"properties,omitempty"`
 	Error            bool                      `json:"error"`
 	ErrorDetail      string                    `json:"errorDetail,omitempty"`
+	// ErrorCause is the underlying error. It is only returned to callers with the admin scope.
+	ErrorCause string `json:"errorCause,omitempty"`
 }
 
 type VirtualParticipantAgent struct {

@@ -91,7 +91,8 @@ func TestProcessMessage_FatalErrorIsReportedInResponse(t *testing.T) {
 
 	require.Len(t, responses, 1)
 	assert.False(t, responses[0].Success)
-	assert.Equal(t, "activity failed", responses[0].ErrorDetail)
+	assert.Equal(t, "activity A1 of orchestration test-response failed", responses[0].ErrorDetail)
+	assert.Equal(t, "activity failed", responses[0].ErrorCause)
 	assert.Equal(t, "test-response", responses[0].ManifestID)
 	assert.Equal(t, "profile-1", responses[0].CorrelationID)
 }
@@ -103,17 +104,19 @@ func TestProcessMessage_ExhaustedRetriesAreReportedInResponse(t *testing.T) {
 
 	require.Len(t, responses, 1)
 	assert.False(t, responses[0].Success)
-	assert.Equal(t, "activity A1 failed 10 times: not ready", responses[0].ErrorDetail)
+	assert.Equal(t, "activity A1 of orchestration test-response failed", responses[0].ErrorDetail)
+	assert.Equal(t, "activity A1 failed 10 times: not ready", responses[0].ErrorCause)
 }
 
-func TestProcessMessage_ErrorDetailInResponseIsTruncated(t *testing.T) {
+func TestProcessMessage_ErrorCauseInResponseIsTruncated(t *testing.T) {
 	long := strings.Repeat("x", 3*maxPersistedErrorBytes)
 	processor := &resultTestProcessor{result: api.ActivityResult{Result: api.ActivityResultFatalError, Error: errors.New(long)}}
 
 	responses := runResponseTest(t, processor, api.EngineState{}, nil)
 
 	require.Len(t, responses, 1)
-	assert.Len(t, responses[0].ErrorDetail, maxPersistedErrorBytes)
+	assert.Len(t, responses[0].ErrorCause, maxPersistedErrorBytes)
+	assert.NotContains(t, responses[0].ErrorDetail, "xxx", "the detail for the caller does not quote the error")
 }
 
 // If the errored state cannot be recorded, the response must still report the failure and its reason.
@@ -124,7 +127,8 @@ func TestProcessMessage_FatalErrorIsReportedWhenStateUpdateFails(t *testing.T) {
 
 	require.Len(t, responses, 1)
 	assert.False(t, responses[0].Success)
-	assert.Equal(t, "activity failed", responses[0].ErrorDetail)
+	assert.Equal(t, "activity A1 of orchestration test-response failed", responses[0].ErrorDetail)
+	assert.Equal(t, "activity failed", responses[0].ErrorCause)
 }
 
 func TestProcessMessage_SuccessResponseHasNoErrorDetail(t *testing.T) {
@@ -135,4 +139,5 @@ func TestProcessMessage_SuccessResponseHasNoErrorDetail(t *testing.T) {
 	require.Len(t, responses, 1)
 	assert.True(t, responses[0].Success)
 	assert.Empty(t, responses[0].ErrorDetail)
+	assert.Empty(t, responses[0].ErrorCause)
 }

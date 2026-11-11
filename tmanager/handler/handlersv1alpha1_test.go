@@ -14,17 +14,20 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"iter"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	cfmauth "github.com/eclipse-cfm/cfm/common/auth"
 	"github.com/eclipse-cfm/cfm/common/query"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/common/types"
 	"github.com/eclipse-cfm/cfm/tmanager/api"
+	"github.com/eclipse-cfm/cfm/tmanager/model/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -49,6 +52,11 @@ type fakeParticipantService struct {
 	queryErr   error
 	disposeErr error
 	queried    bool
+	profile    *api.ParticipantProfile
+}
+
+func (f *fakeParticipantService) GetProfile(context.Context, string, string) (*api.ParticipantProfile, error) {
+	return f.profile, nil
 }
 
 func (f *fakeParticipantService) QueryProfiles(context.Context, query.Predicate, store.PaginationOptions) iter.Seq2[*api.ParticipantProfile, error] {
@@ -164,4 +172,35 @@ func TestDeployDataspaceProfile(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Empty(t, dataspaces.deployedProfileID)
 	})
+}
+
+func TestGetParticipantProfile_ErrorCauseRequiresAdminScope(t *testing.T) {
+	profile := &api.ParticipantProfile{
+		Entity:      api.Entity{ID: "p1"},
+		TenantID:    "t1",
+		Error:       true,
+		ErrorDetail: "activity A1 of orchestration o1 failed",
+		ErrorCause:  "unexpected status 500 from http://identityhub.internal",
+	}
+	h := newTestHandler(&fakeParticipantService{profile: profile}, nil)
+
+	get := func(claims *cfmauth.Claims) v1alpha1.ParticipantProfile {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/tenants/t1/participant-profiles/p1", nil)
+		newClaimsRouter(h, claims).ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code)
+		var response v1alpha1.ParticipantProfile
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+		return response
+	}
+
+	admin := get(&cfmauth.Claims{Subject: "operator", Scopes: []string{scopeTmRead, scopeTmAdmin}})
+	assert.True(t, admin.Error)
+	assert.Equal(t, profile.ErrorDetail, admin.ErrorDetail)
+	assert.Equal(t, profile.ErrorCause, admin.ErrorCause)
+
+	owner := get(&cfmauth.Claims{Subject: "client-1", Scopes: []string{scopeTmRead}})
+	assert.True(t, owner.Error)
+	assert.Equal(t, profile.ErrorDetail, owner.ErrorDetail, "the detail is written for the owner")
+	assert.Empty(t, owner.ErrorCause)
 }

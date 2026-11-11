@@ -406,7 +406,7 @@ func (e *NatsActivityExecutor) handleOrchestrationCompletion(
 	orchDurationHistogram.Record(activityContext.Context(), float64(time.Since(orchestration.CreatedTimestamp).Milliseconds()),
 		metric.WithAttributes(attribute.String("result", "success")))
 
-	err = e.publishResponse(activityContext, orchestration, "")
+	err = e.publishResponse(activityContext, orchestration, "", "")
 	if err != nil {
 		return err
 	}
@@ -414,16 +414,17 @@ func (e *NatsActivityExecutor) handleOrchestrationCompletion(
 	return natsclient.AckMessage(message)
 }
 
-// publishResponse reports the outcome of an orchestration to its initiator. A non-empty errorDetail reports a failure
-// and says why; it is passed in rather than read from the orchestration, because the orchestration may not carry the
-// error if recording it failed.
-func (e *NatsActivityExecutor) publishResponse(activityContext api.ActivityContext, orchestration api.Orchestration, errorDetail string) error {
+// publishResponse reports the outcome of an orchestration to its initiator. A non-empty errorDetail reports a failure:
+// errorDetail describes it for the caller and errorCause is the underlying error, for operators. Both are passed in
+// rather than read from the orchestration, because the orchestration may not carry the error if recording it failed.
+func (e *NatsActivityExecutor) publishResponse(activityContext api.ActivityContext, orchestration api.Orchestration, errorDetail string, errorCause string) error {
 	response := &model.OrchestrationResponse{
 		ID:                    uuid.New().String(),
 		ManifestID:            orchestration.ID,
 		CorrelationID:         orchestration.CorrelationID,
 		Success:               errorDetail == "" && orchestration.State != api.OrchestrationStateErrored,
 		ErrorDetail:           errorDetail,
+		ErrorCause:            errorCause,
 		OrchestrationType:     orchestration.OrchestrationType,
 		Properties:            orchestration.OutputData,
 		CompensatedManifestID: orchestration.CompensatedOrchestrationID,
@@ -492,7 +493,7 @@ func (e *NatsActivityExecutor) handleFatalError(
 	message jetstream.Msg) error {
 	// Update the orchestration before acking back. If the update fails, just log it to ensure the ack is sent to avoid message re-delivery
 	engineState := orchestration.EngineState
-	errorDetail := truncateError(resultErr.Error())
+	errorCause := truncateError(resultErr.Error())
 	if _, _, err := UpdateOrchestration(activityContext.Context(), orchestration, revision, e.Client, func(o *api.Orchestration) {
 		if o.ProcessingData == nil {
 			o.ProcessingData = make(map[string]any)
@@ -508,7 +509,7 @@ func (e *NatsActivityExecutor) handleFatalError(
 		}
 		o.SetState(api.OrchestrationStateErrored)
 		o.EngineState.Merge(engineState)
-		o.EngineState.Error = errorDetail
+		o.EngineState.Error = errorCause
 		orchestration = *o
 	}); err != nil {
 		e.Monitor.Warnf("Failed to mark orchestration %s as fatal: %v", orchestration.ID, err)
@@ -519,7 +520,10 @@ func (e *NatsActivityExecutor) handleFatalError(
 	orchDurationHistogram.Record(activityContext.Context(), float64(time.Since(orchestration.CreatedTimestamp).Milliseconds()),
 		metric.WithAttributes(attribute.String("result", "fatal")))
 
-	err := e.publishResponse(activityContext, orchestration, errorDetail)
+	// The initiator is told which activity failed; the error itself may quote internal addresses and downstream
+	// responses, so it is sent apart as the cause.
+	errorDetail := fmt.Sprintf("activity %s of orchestration %s failed", activityContext.ID(), orchestration.ID)
+	err := e.publishResponse(activityContext, orchestration, errorDetail, errorCause)
 	if err != nil {
 		return err
 	}
@@ -532,8 +536,9 @@ func (e *NatsActivityExecutor) handleFatalError(
 }
 
 // maxPersistedErrorBytes bounds the error stored in an orchestration's engine state and sent in its response. The error
-// is returned by the Provision Manager API and, as a participant profile's error detail, by the Tenant Manager API. It
-// may contain downstream response bodies, so a long error chain must not grow it without limit.
+// is returned by the Provision Manager API and, to callers with the admin scope, by the Tenant Manager API as a
+// participant profile's error cause. It may contain downstream response bodies, so a long error chain must not grow it
+// without limit.
 const maxPersistedErrorBytes = 2048
 
 // truncateError cuts message to at most maxPersistedErrorBytes, without splitting a multibyte character.
