@@ -27,13 +27,15 @@ import (
 	"github.com/eclipse-cfm/cfm/common/token"
 )
 
+// The tokens for the issuer-admin-api are exchanged under the issuer's participant context
+// (HttpApiClient.IssuerID), so the token's sub owns every context these calls address and the
+// resource scopes below suffice; no issuer-admin-api:admin elevation is needed. The cfm-agents
+// ServiceAccount needs a jwtlet mapping on the issuer context granting these scopes, which the
+// platform seeds.
 const (
-	// ScopeApiAdmin is required for all issuer-admin-api operations here: the token is bound
-	// to the tenant's participant context, which the IssuerService does not know (it only has
-	// the issuer's context), so the caller resolution only passes with admin. Resource-level
-	// scopes (e.g. issuer-admin-api:credentials:read) are rejected with
-	// "No participant for 'sub = ...' found".
-	ScopeApiAdmin = "issuer-admin-api:admin"
+	ScopeHoldersWrite     = "issuer-admin-api:holders:write"
+	ScopeCredentialsRead  = "issuer-admin-api:credentials:read"
+	ScopeCredentialsWrite = "issuer-admin-api:credentials:write"
 )
 
 // IssuerCredentialResourceDto represents a DTO for verifiable credentials that the IssuerService has issued to holders.
@@ -47,14 +49,14 @@ type IssuerCredentialResourceDto struct {
 }
 
 type ApiClient interface {
-	CreateHolder(ctx context.Context, participantContextID string, did string, holderID string, name string, properties map[string]any) error
-	DeleteHolder(ctx context.Context, participantContextID string, holderID string) error
+	CreateHolder(ctx context.Context, did string, holderID string, name string, properties map[string]any) error
+	DeleteHolder(ctx context.Context, holderID string) error
 	// RevokeCredential revokes an issued credential. credentialID is the ID of the IssuerService's credential resource
 	// (IssuerCredentialResourceDto.ID), not the ID of the verifiable credential itself.
-	RevokeCredential(ctx context.Context, participantContextID string, credentialID string) error
+	RevokeCredential(ctx context.Context, credentialID string) error
 	// QueryCredentialsByType returns the credentials of the given type that were issued to the holder. The IssuerService
 	// records the credential subject's ID (the holder's DID) as the holder ID of an issued credential.
-	QueryCredentialsByType(ctx context.Context, participantContextID string, holderID string, credentialType string) ([]IssuerCredentialResourceDto, error)
+	QueryCredentialsByType(ctx context.Context, holderID string, credentialType string) ([]IssuerCredentialResourceDto, error)
 }
 
 type HttpApiClient struct {
@@ -64,8 +66,8 @@ type HttpApiClient struct {
 	HttpClient    *http.Client
 }
 
-func (i HttpApiClient) QueryCredentialsByType(ctx context.Context, participantContextID string, holderID string, credentialType string) ([]IssuerCredentialResourceDto, error) {
-	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
+func (i HttpApiClient) QueryCredentialsByType(ctx context.Context, holderID string, credentialType string) ([]IssuerCredentialResourceDto, error) {
+	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeCredentialsRead, i.IssuerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -113,8 +115,8 @@ func (i HttpApiClient) QueryCredentialsByType(ctx context.Context, participantCo
 	return credentials, nil
 }
 
-func (i HttpApiClient) DeleteHolder(ctx context.Context, participantContextID string, holderID string) error {
-	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
+func (i HttpApiClient) DeleteHolder(ctx context.Context, holderID string) error {
+	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeHoldersWrite, i.IssuerID)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -137,8 +139,8 @@ func (i HttpApiClient) DeleteHolder(ctx context.Context, participantContextID st
 	return nil
 }
 
-func (i HttpApiClient) CreateHolder(ctx context.Context, participantContextID string, did string, holderID string, name string, properties map[string]any) error {
-	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
+func (i HttpApiClient) CreateHolder(ctx context.Context, did string, holderID string, name string, properties map[string]any) error {
+	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeHoldersWrite, i.IssuerID)
 	if err != nil {
 		return fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -178,8 +180,8 @@ func (i HttpApiClient) CreateHolder(ctx context.Context, participantContextID st
 	return nil
 }
 
-func (i HttpApiClient) RevokeCredential(ctx context.Context, participantContextID string, credentialID string) error {
-	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
+func (i HttpApiClient) RevokeCredential(ctx context.Context, credentialID string) error {
+	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeCredentialsWrite, i.IssuerID)
 	if err != nil {
 		return err
 	}
@@ -192,12 +194,12 @@ func (i HttpApiClient) RevokeCredential(ctx context.Context, participantContextI
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	resp, err := i.HttpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to revoke credential with ID '%s' for participant context '%s': %w", credentialID, participantContextID, err)
+		return fmt.Errorf("failed to revoke credential with ID '%s' in issuer context '%s': %w", credentialID, i.IssuerID, err)
 	}
 	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to revoke credential with ID '%s' for participant context '%s': received status code %d with message [%s]", credentialID, participantContextID, resp.StatusCode, httpx.ReadErrorBody(resp))
+		return fmt.Errorf("failed to revoke credential with ID '%s' in issuer context '%s': received status code %d with message [%s]", credentialID, i.IssuerID, resp.StatusCode, httpx.ReadErrorBody(resp))
 	}
 	return nil
 }

@@ -569,7 +569,7 @@ type MockIssuerServiceApiClient struct {
 	queriedHolderIDs    *[]string
 }
 
-func (m MockIssuerServiceApiClient) QueryCredentialsByType(ctx context.Context, participantContextID string, holderID string, credentialType string) ([]issuerservice.IssuerCredentialResourceDto, error) {
+func (m MockIssuerServiceApiClient) QueryCredentialsByType(ctx context.Context, holderID string, credentialType string) ([]issuerservice.IssuerCredentialResourceDto, error) {
 	if m.queriedHolderIDs != nil {
 		*m.queriedHolderIDs = append(*m.queriedHolderIDs, holderID)
 	}
@@ -580,16 +580,16 @@ func (m MockIssuerServiceApiClient) QueryCredentialsByType(ctx context.Context, 
 
 }
 
-func (m MockIssuerServiceApiClient) DeleteHolder(ctx context.Context, participantContextID string, holderID string) error {
+func (m MockIssuerServiceApiClient) DeleteHolder(ctx context.Context, holderID string) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (m MockIssuerServiceApiClient) CreateHolder(ctx context.Context, participantContextID string, did string, holderID string, name string, properties map[string]any) error {
+func (m MockIssuerServiceApiClient) CreateHolder(ctx context.Context, did string, holderID string, name string, properties map[string]any) error {
 	return m.expectedError
 }
 
-func (m MockIssuerServiceApiClient) RevokeCredential(ctx context.Context, participantContextID string, credentialID string) error {
+func (m MockIssuerServiceApiClient) RevokeCredential(ctx context.Context, credentialID string) error {
 	if m.revokedIDs != nil {
 		*m.revokedIDs = append(*m.revokedIDs, credentialID)
 	}

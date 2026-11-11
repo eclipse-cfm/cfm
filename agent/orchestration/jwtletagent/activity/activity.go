@@ -28,7 +28,6 @@ import (
 
 	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
 	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
-	"github.com/eclipse-cfm/cfm/agent/common/issuerservice"
 	"github.com/eclipse-cfm/cfm/agent/common/siglet"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/system"
@@ -85,7 +84,6 @@ var agentScopes = []string{
 	identityhub.ScopeApiAdmin,
 	identityhub.ScopeCredentialsRead,
 	identityhub.ScopeCredentialsWrite,
-	issuerservice.ScopeApiAdmin,
 	siglet.ScopeApiRead,
 	siglet.ScopeApiWrite,
 	"read",
