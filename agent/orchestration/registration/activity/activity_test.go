@@ -386,7 +386,7 @@ type MockIssuerService struct {
 	recorded      regData
 }
 
-func (m *MockIssuerService) QueryCredentialsByType(ctx context.Context, participantContextID string, credentialType string) ([]issuerservice.IssuerCredentialResourceDto, error) {
+func (m *MockIssuerService) QueryCredentialsByType(ctx context.Context, participantContextID string, holderID string, credentialType string) ([]issuerservice.IssuerCredentialResourceDto, error) {
 	return nil, nil
 }
 

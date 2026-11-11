@@ -41,6 +41,12 @@ type credentialRequestData struct {
 	CredentialRequestURL string `json:"credentialRequest"`
 }
 
+// holderData identifies the participant as a holder in the IssuerService, which records the credential subject (the
+// participant's DID) as the holder ID of every credential it issues.
+type holderData struct {
+	HolderID string `json:"cfm.participant.id" validate:"required"`
+}
+
 // ProcessDeploy processes the deploy action for an onboarding activity by requesting the issuance of verifiable credentials.
 // if a credential request is in progress, the deploy action simply checks its status and reschedules itself.
 func (p OnboardingActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
@@ -75,27 +81,32 @@ func (p OnboardingActivityProcessor) ProcessDispose(ctx api.ActivityContext) api
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Onboarding activity for orchestration %s: %w", ctx.OID(), err)}
 	}
 
+	var holder holderData
+	if err := ctx.ReadValues(&holder); err != nil {
+		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error processing Onboarding activity for orchestration %s: %w", ctx.OID(), err)}
+	}
+
 	participantContextID := credentialRequest.ParticipantContextID
-	// query credentials by type, using the IdentityAPI
+	// query the holder's credentials by type, using the IssuerService's Admin API
 	var revocationErrors []error
 
 	for _, spec := range data.CredentialSpecs {
 		credentialType := spec.Type
 
-		credentials, err := p.IssuerServiceApiClient.QueryCredentialsByType(ctx.Context(), participantContextID, credentialType)
+		credentials, err := p.IssuerServiceApiClient.QueryCredentialsByType(ctx.Context(), participantContextID, holder.HolderID, credentialType)
 
 		if err != nil {
 			return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error querying credentials by type %s for participant context %s: %w", credentialType, participantContextID, err)}
 		}
 
 		if len(credentials) == 0 {
-			p.Monitor.Infof("Rollback: could not revoke credentials of type '%s': 0 found for participant context '%s'", credentialType, participantContextID)
+			p.Monitor.Infof("Rollback: could not revoke credentials of type '%s': 0 found for holder '%s'", credentialType, holder.HolderID)
 			continue
 		}
 
 		// for each credential, send a revocation request
 		for _, credentialDto := range credentials {
-			err := p.IssuerServiceApiClient.RevokeCredential(ctx.Context(), participantContextID, credentialDto.VerifiableCredential.ID)
+			err := p.IssuerServiceApiClient.RevokeCredential(ctx.Context(), participantContextID, credentialDto.ID)
 			if err != nil {
 				revocationErrors = append(revocationErrors, err)
 			}

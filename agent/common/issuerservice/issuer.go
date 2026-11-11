@@ -49,8 +49,12 @@ type IssuerCredentialResourceDto struct {
 type ApiClient interface {
 	CreateHolder(ctx context.Context, participantContextID string, did string, holderID string, name string, properties map[string]any) error
 	DeleteHolder(ctx context.Context, participantContextID string, holderID string) error
+	// RevokeCredential revokes an issued credential. credentialID is the ID of the IssuerService's credential resource
+	// (IssuerCredentialResourceDto.ID), not the ID of the verifiable credential itself.
 	RevokeCredential(ctx context.Context, participantContextID string, credentialID string) error
-	QueryCredentialsByType(ctx context.Context, participantContextID string, credentialType string) ([]IssuerCredentialResourceDto, error)
+	// QueryCredentialsByType returns the credentials of the given type that were issued to the holder. The IssuerService
+	// records the credential subject's ID (the holder's DID) as the holder ID of an issued credential.
+	QueryCredentialsByType(ctx context.Context, participantContextID string, holderID string, credentialType string) ([]IssuerCredentialResourceDto, error)
 }
 
 type HttpApiClient struct {
@@ -60,8 +64,8 @@ type HttpApiClient struct {
 	HttpClient    *http.Client
 }
 
-func (i HttpApiClient) QueryCredentialsByType(ctx context.Context, holderID string, credentialType string) ([]IssuerCredentialResourceDto, error) {
-	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiAdmin, holderID)
+func (i HttpApiClient) QueryCredentialsByType(ctx context.Context, participantContextID string, holderID string, credentialType string) ([]IssuerCredentialResourceDto, error) {
+	accessToken, err := i.TokenProvider.GetToken(ctx, ScopeApiAdmin, participantContextID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get API access token: %w", err)
 	}
@@ -179,7 +183,7 @@ func (i HttpApiClient) RevokeCredential(ctx context.Context, participantContextI
 	if err != nil {
 		return err
 	}
-	url := fmt.Sprintf("%s/v1/participants/%s/credentials/%s/revoke", i.BaseURL, url.PathEscape(participantContextID), url.PathEscape(credentialID))
+	url := fmt.Sprintf("%s/v1/participants/%s/credentials/%s/revoke", i.BaseURL, url.PathEscape(i.IssuerID), url.PathEscape(credentialID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
 	if err != nil {
 		return err
