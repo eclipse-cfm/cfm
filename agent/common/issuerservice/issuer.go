@@ -9,6 +9,7 @@
  *
  *  Contributors:
  *       Metaform Systems, Inc. - initial API and implementation
+ *       Matthias Buchhorn - accept 204 on a credential revocation
  *
  */
 
@@ -198,7 +199,8 @@ func (i HttpApiClient) RevokeCredential(ctx context.Context, credentialID string
 	}
 	defer httpx.DrainAndClose(resp)
 
-	if resp.StatusCode != http.StatusOK {
+	// The IssuerService (EDC 1.0) answers a revocation with 204
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("failed to revoke credential with ID '%s' in issuer context '%s': received status code %d with message [%s]", credentialID, i.IssuerID, resp.StatusCode, httpx.ReadErrorBody(resp))
 	}
 	return nil
