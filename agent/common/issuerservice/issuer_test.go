@@ -9,6 +9,7 @@
  *
  *  Contributors:
  *       Metaform Systems, Inc. - initial API and implementation
+ *       Matthias Buchhorn - accept 204 on a credential revocation
  *
  */
 
@@ -127,6 +128,29 @@ func TestHttpApiClient_RevokeCredential(t *testing.T) {
 
 	err := client.RevokeCredential(t.Context(), "test-credential-id")
 	require.NoError(t, err)
+}
+
+func TestHttpApiClient_RevokeCredential_NoContent(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/participants/test-issuer/credentials/test-credential-id/revoke" && r.Method == http.MethodPost {
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, ScopeCredentialsWrite, "test-issuer").Return("test token", nil)
+	client := HttpApiClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		IssuerID:      "test-issuer",
+		HttpClient:    &http.Client{},
+	}
+
+	err := client.RevokeCredential(t.Context(), "test-credential-id")
+	require.NoError(t, err, "the IssuerService answers a revocation with 204")
 }
 
 func TestHttpApiClient_RevokeCredential_ClientError(t *testing.T) {
