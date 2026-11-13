@@ -198,7 +198,7 @@ facilitate the creation of activity agents. The framework is built on the core m
 as the HTTP Client and Router to be used. An agent is instantiated by passing a configuration to the NATS agent
 launcher:
 
-```
+```go
 package launcher
 
 import (
@@ -222,7 +222,7 @@ to instantiate the `ActivityProcessor` implementation.
 
 The following is an example of an activity agent configuration:
 
-```
+```go
 package launcher
 
 import (
@@ -269,7 +269,7 @@ Activities model resource lifecycles. For example, a resource may be deployed an
 desirable to require separate agents for each resource lifecycle operation. Activity processors can use the
 `discriminator` property to distinguish between different resource lifecycle states:
 
-```
+```go
 package example
 
 import "github.com/eclipse-cfm/cfm/pmanager/api"
@@ -313,4 +313,4 @@ API.
 
 The Orchestrator can integrate with infrastructure provisioning technologies such
 as [Eclipse Symphony](https://github.com/eclipse-symphony/symphony), [Fulcrum](https://github.com/fulcrumproject),
-and [Liqo](https://liqo.io/) via `ActivityProcessor` implementations. 
+and [Liqo](https://liqo.io/) via `ActivityProcessor` implementations.
