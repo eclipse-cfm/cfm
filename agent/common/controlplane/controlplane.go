@@ -95,8 +95,10 @@ type ManagementAPIClient interface {
 type DataPlaneRegistration struct {
 	// ID is the unique identifier of the data-plane instance, e.g. "<participant>-siglet".
 	ID string `json:"dataplaneId"`
-	// TransferTypes are the transfer types the data plane supports, e.g. "HttpData-PULL".
-	TransferTypes []string `json:"transferTypes"`
+	// TransferTypes are the transfer types the data plane supports, e.g. "HttpData-PULL". The control
+	// plane calls them "profiles" on the wire and stores them as the instance's allowed transfer types;
+	// an unknown property name is silently ignored, leaving the data plane unselectable.
+	TransferTypes []string `json:"profiles"`
 	// Endpoint is the data plane's DPS signaling endpoint the control plane sends flow events to.
 	Endpoint string `json:"endpoint"`
 	// Authorization is the optional DPS authorization profile the control plane uses to authorize
