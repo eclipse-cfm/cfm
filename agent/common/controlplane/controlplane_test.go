@@ -485,6 +485,8 @@ func TestRegisterDataPlane(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "test-participant-siglet", received["dataplaneId"])
 	require.Equal(t, "http://siglet.edc-v.svc.cluster.local:8081/api/v1/test-participant/dataflows", received["endpoint"])
+	require.Equal(t, []any{"HttpData-PULL"}, received["profiles"])
+	require.NotContains(t, received, "transferTypes", "the control plane ignores transferTypes; transfer types must be sent as profiles")
 	require.NotContains(t, received, "authorization", "an absent authorization profile must not be sent")
 }
 
@@ -519,6 +521,7 @@ func TestRegisterDataPlane_WithAuthorization(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
+	require.Equal(t, []any{"HttpData-PULL"}, received["profiles"])
 	require.Equal(t, map[string]any{
 		"type":                  "oauth2_token_exchange",
 		"tokenExchangeEndpoint": "https://broker.example.com/token",
