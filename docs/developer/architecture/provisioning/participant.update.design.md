@@ -21,30 +21,35 @@ Many things can change during the life of a participant. Three examples are used
 
 This document proposes updates as a third lifecycle operation of a participant profile, next to deploy and dispose:
 
-- A Tenant Manager operation changes the desired state of a deployed participant profile.
-- A third orchestration type, `cfm.orchestration.vpa.update`, brings the downstream systems in line with it. The
-  Provision Manager builds it from the update itself, without an orchestration definition.
-- The existing activity agents handle it in a new `ProcessUpdate` method, next to `ProcessDeploy` and
+- A Tenant Manager operation changes the desired state of a deployed participant profile with a `PATCH`.
+- A third orchestration type, `cfm.orchestration.vpa.update`, brings the downstream systems in line with it. It is a
+  third activity list in the orchestration template, next to deploy and dispose, and is ordered with `dependsOn` like
+  them.
+- The Tenant Manager sends the previous and the requested state of the profile and does not interpret either. Each
+  agent determines its own changes.
+- The existing activity agents handle updates in a new `ProcessUpdate` method, next to `ProcessDeploy` and
   `ProcessDispose`. Each agent updates the part of the participant it already owns.
 
-An update never touches the participant's identity, wallet, or participant context, and a failed update never
-disposes the participant.
+An update never touches the participant's identity, wallet, or participant context. Updates are idempotent and are
+never compensated: a failed update is repeated, and it never disposes the participant.
 
-Two decisions are still open and are described in [Open Questions](#open-questions): whether update handlers belong
-into the existing agents or into standalone update agents, and whether updates need ordering.
+One decision is still open and is described in [Open Questions](#open-questions): whether update handlers belong into
+the existing agents or into standalone update agents.
 
 ## Design Principles
 
-1. **Unknown discriminators are ignored.** An activity processor that does not handle a discriminator completes the
-   activity without doing anything. `BaseActivityProcessor` changes accordingly. Today it fails the activity.
+1. **A missing update handler fails the update.** An activity in the update list whose agent does not handle updates
+   fails the update instead of completing silently, as an unknown discriminator fails an activity today.
 2. **`participantContextId` is mandatory in the processing data** of an update orchestration. It is how every handler
    addresses the participant.
-3. **Each update handler has its own data object.** Like a deploy handler, an update handler expects a data object of
-   its own in the processing data and reads it with `ReadValues`.
-4. **Update activities are independent.** An update orchestration has no definition and no dependencies between its
-   activities. They run in parallel.
-5. **Desired state, reconciled.** A request states what the profile should look like. A handler compares this with
-   the downstream system and applies the difference, so running it twice has the same result as running it once.
+3. **The Tenant Manager does not know the payload.** It applies the request to the stored profile data and sends the
+   previous and the requested state in the format of a deployment. It knows nothing about what an agent reads from
+   it, so a new kind of update needs no change to the Tenant Manager.
+4. **Updates are ordered like deployments.** The update orchestration is an activity list of the orchestration
+   template, and its activities are ordered with `dependsOn`, as for deploy and dispose.
+5. **Updates are idempotent and never compensated.** A handler compares the requested state with the downstream
+   system and applies the difference, so running it twice has the same result as running it once. A failed update is
+   repeated, not rolled back.
 6. **A failed update never disposes the participant.**
 
 ## Goals and Non-Goals
@@ -53,14 +58,16 @@ Goals:
 
 - One mechanism for all changes to a deployed participant profile, with one API operation, one orchestration type, and
   one way to report progress and failure.
-- New kinds of updates are added to the agent that owns the downstream system, without changes to the orchestration
-  engine.
-- An update that only runs the activities concerned by a change.
+- New kinds of updates are added to the agent that owns the downstream system and to the orchestration template,
+  without changes to the Tenant Manager or the orchestration engine.
+- Updates whose activities depend on one another, for example a holder change before a credential request.
 - A failed update that leaves a working participant in place and can be repeated.
 
 Non-goals:
 
 - Changing the identity of a participant: its identifier (DID), participant context ID, cell, or tenant.
+- Adding or removing a VPA of a participant.
+- Changing the credential specs of a dataspace profile. A different set of credentials is a new dataspace profile.
 - Orchestration definitions per dataspace profile, and support for more than one issuer. Updates inherit both
   limitations from deployment.
 - Updates that originate in agent configuration instead of the participant profile, for example changed service
@@ -76,16 +83,18 @@ and the type becomes the `discriminator` of each of its activities. The executor
 discriminators and `Process` for any other. All agents embed `BaseActivityProcessor`, whose `Process` fails with
 `the '...' discriminator is not supported`. Activities are routed to agents by activity type only.
 
-**Every orchestration needs a definition.** `provisionManager.Start` (`pmanager/core/provision.go`) looks up the
-definition of the manifest's orchestration type and fails with `orchestration type '...' not found` if there is none.
-Definitions are unique per orchestration type. `InstantiateOrchestration` turns the activities of a definition into
-steps by their dependencies; activities without dependencies form one parallel step.
+**Every orchestration needs a definition, and definitions are keyed by type.** `provisionManager.Start`
+(`pmanager/core/provision.go`) looks up the definition of the manifest's orchestration type and fails with
+`orchestration type '...' not found` if there is none. The ID of a definition is its orchestration type
+(`OrchestrationDefinition.GetID`), so a platform has one definition per type, whatever the number of templates.
+`InstantiateOrchestration` turns the activities of a definition into steps by their dependencies; activities without
+dependencies form one parallel step.
 
 **A profile has two kinds of mutable input.** `participantRoles` (dataspace profile ID to role names) are interpreted
 only by the Tenant Manager: `generateCredentialSpecs` in `tmanager/core/service_participant.go` selects a
-`CredentialSpec` of a dataspace profile if its `role` is empty or contained in the participant's roles. The roles
-themselves are never sent to the agents. `vpaProperties` are stored per VPA type and read by the agents at
-deployment:
+`CredentialSpec` of a dataspace profile if its `role` is empty or contained in the participant's roles, and the
+result is sent to the agents as `cfm.vpa.credentials`. The roles themselves are never sent. `vpaProperties` are stored
+per VPA type, sent as `cfm.vpa.data`, and read by the agents at deployment:
 
 | VPA type        | Property                                | Read by            |
 |-----------------|-----------------------------------------|--------------------|
@@ -110,6 +119,9 @@ orchestration the Tenant Manager last started and is used to match responses. It
 orchestration is started. The participant profile row is not locked by `DisposeProfile` or by the response handlers,
 and `Update` does not compare versions.
 
+**Tenant properties are patched with a diff.** `PATCH` on a tenant takes a `TenantPropertiesDiff`: the keys to set
+and a list of keys to delete.
+
 ## Design
 
 ### Tenant Manager API
@@ -123,40 +135,57 @@ PATCH /api/v1alpha1/tenants/{tenantID}/participant-profiles/{participantID}
 ```json
 {
   "participantRoles": {
-    "<dataspace profile ID>": [
-      "manufacturer",
-      "supplier"
+    "properties": {
+      "<dataspace profile ID>": [
+        "manufacturer",
+        "supplier"
+      ]
+    },
+    "removed": [
+      "<other dataspace profile ID>"
     ]
   },
   "vpaProperties": {
+    "cfm.issuer": {
+      "properties": {
+        "legalName": "Example Corp"
+      },
+      "removed": [
+        "formerKey"
+      ]
+    },
     "cfm.connector": {
-      "config": {
-        "edc.example.setting": "value"
+      "properties": {
+        "config": {
+          "edc.example.setting": "value"
+        }
       }
     }
   }
 }
 ```
 
-Both members are optional, and at least one must be present. A member that is absent leaves that part of the profile
-unchanged.
+Every map is changed with the diff of the tenant `PATCH` (`TenantPropertiesDiff`): `properties` holds the keys to
+set, and `removed` lists the keys to delete. The Tenant Manager sets first and removes second. A key that is not mentioned is unchanged, so a client cannot remove data
+by leaving it out, and it does not have to read the profile before it changes it.
 
-- `participantRoles` is the complete desired role map and replaces the current one. A dataspace profile that is not
-  listed has no roles afterwards.
-- `vpaProperties` contains the complete desired properties of each VPA type listed and replaces the entire map of
-  properties of that VPA. Properties that are not listed (e.g. `edc.example.setting2`) are assumed to be `nil` or
-  default, as applicable. VPA types that are not listed are unchanged.
+- `participantRoles` is one diff. Its keys are dataspace profile IDs, and each value is the complete role list of that
+  dataspace profile.
+- `vpaProperties` holds one diff per VPA type. The VPA type selects the VPA and is not itself set or removed.
+- A diff changes one level. A value is replaced as a whole, for example the `config` map of the `cfm.connector` VPA
+  above.
+- Both members are optional, and at least one must be present.
 
 The operation requires the scope `tenant-manager-api:write` and applies the same tenant ownership rules as the other
 participant profile operations.
 
 Validation, rejected with `400`:
 
-- The struct validation is the same as for a deployment.
+- The struct validation is the same as for a deployment, plus the limits of the tenant diff on the number and length
+  of keys.
 - Every key of `participantRoles` must be one of the profile's dataspace profile IDs. A deployment does not check
   this today and silently ignores such keys.
-- Every change the request causes must map to an update data object the Tenant Manager knows, see
-  [Update Data Objects](#update-data-objects).
+- Every VPA type in `vpaProperties` must be a VPA of the profile.
 
 Preconditions, rejected with `409 Conflict`:
 
@@ -167,9 +196,10 @@ Preconditions, rejected with `409 Conflict`:
 Result:
 
 `202 Accepted` with the participant profile. Clients read the `update` field to learn whether an orchestration was
-started. If the request causes no change, or `participantRoles` differ without changing the credential entitlement,
-the profile is stored directly, no orchestration is started and `update` is not set. Otherwise, the requested state is
-applied to the profile when the update orchestration has completed.
+started. If the requested state sent to the agents equals the previous state, for example because `participantRoles`
+differ without changing the credential entitlement, the profile is stored directly, no orchestration is started and
+`update` is not set. Otherwise, the requested state is applied to the profile when the update orchestration has
+completed.
 
 The service implementation follows `DisposeProfile`: the profile is changed in a transaction, the manifest is sent
 after the commit, and the change is reverted if the manifest cannot be sent. Unlike `DisposeProfile`, the profile is
@@ -188,10 +218,6 @@ The update is tracked in a new optional field of the participant profile instead
   "update": {
     "manifestId": "5f0c...",
     "state": "pending",
-    "changes": [
-      "cfm.update.roles",
-      "cfm.update.participantconfig"
-    ],
     "participantRoles": {
       "<dataspace profile ID>": [
         "manufacturer",
@@ -199,6 +225,9 @@ The update is tracked in a new optional field of the participant profile instead
       ]
     },
     "vpaProperties": {
+      "cfm.issuer": {
+        "legalName": "Example Corp"
+      },
       "cfm.connector": {
         "config": {
           "edc.example.setting": "value"
@@ -212,10 +241,9 @@ The update is tracked in a new optional field of the participant profile instead
 ```
 
 - `state` is `pending` while the orchestration runs and `failed` after it has failed.
-- `changes` lists the update data objects the update carries. The example is the update of the request above: the
-  added role changes the credential entitlement and the connector config changes, so both data objects are sent.
-- `participantRoles` and `vpaProperties` inside `update` are the requested values. The members of the same name on
-  the profile and its VPAs always show what has been applied.
+- `participantRoles` and `vpaProperties` inside `update` are the requested state: the stored values with the diff of
+  the request applied, for the parts the request changes. The example is the update of the request above. The members
+  of the same name on the profile and its VPAs always show what has been applied.
 - `errorDetail` and `errorCause` have the same meaning and visibility as the fields of the same name on the profile.
 - The field is removed when an update succeeds. A failed update stays visible until the next update is requested.
 
@@ -226,33 +254,43 @@ still set when the update is started, so that the existing response matching app
 ### Update Manifest
 
 The Tenant Manager sends an `OrchestrationManifest` with the type `cfm.orchestration.vpa.update` and the profile ID as
-correlation ID. The payload contains:
+correlation ID. The payload contains the requested state in the keys of a deployment, and the previous state in the
+same format:
 
-| Key                    | Content                                                                   |
-|------------------------|---------------------------------------------------------------------------|
-| `participantContextId` | Mandatory. Copied from the stored deployment state.                       |
-| `cfm.participant.id`   | The participant identifier, as in deploy and dispose.                     |
-| `cfm.update.*`         | One update data object per change, see below. Absent for unchanged parts. |
+| Key                    | Content                                                                          |
+|------------------------|----------------------------------------------------------------------------------|
+| `participantContextId` | Mandatory. Copied from the stored deployment state.                              |
+| `cfm.participant.id`   | The participant identifier, as in deploy and dispose.                            |
+| `cfm.vpa.data`         | The VPAs with their requested properties, as in a deployment.                    |
+| `cfm.vpa.credentials`  | The credential specs selected by the requested roles, as in a deployment.        |
+| `cfm.vpa.state`        | The stored deployment state, as in dispose.                                      |
+| `cfm.update.previous`  | A list of previous states, each with `cfm.vpa.data` and `cfm.vpa.credentials`.   |
 
-The payload deliberately contains neither the complete `cfm.vpa.data` nor the other entries of `cfm.vpa.state`. A
-handler finds everything it needs in its own data object. In particular, the onboarding agent cannot confuse the
-`holderPid` of the original credential request in the deployment state with a request of the update.
+```json
+{
+  "participantContextId": "...",
+  "cfm.participant.id": "did:web:...",
+  "cfm.vpa.data": [ "... requested ..." ],
+  "cfm.vpa.credentials": [ "... requested ..." ],
+  "cfm.vpa.state": { "...": "..." },
+  "cfm.update.previous": [
+    {
+      "cfm.vpa.data": [ "... stored ..." ],
+      "cfm.vpa.credentials": [ "... stored ..." ]
+    }
+  ]
+}
+```
 
-### Update Data Objects
+The Tenant Manager computes both states the same way: it applies the diff to the stored roles and VPA properties,
+and it builds `cfm.vpa.data` and `cfm.vpa.credentials` with the code of a deployment. It computes nothing else and
+does not know which agent reads which part.
 
-Each kind of update has a data object under a key of its own, built by the Tenant Manager from the request and the
-profile, and read by exactly one handler:
+`cfm.update.previous` normally holds one state, the stored one. After a failed update it also holds the requested
+state of the failed update, see [Failure Handling](#failure-handling).
 
-| Key                            | Built from                                       | Handled by         |
-|--------------------------------|--------------------------------------------------|--------------------|
-| `cfm.update.roles`             | `participantRoles` and the dataspace profiles    | onboarding agent   |
-| `cfm.update.holder`            | the properties of the `cfm.issuer` VPA           | registration agent |
-| `cfm.update.participantconfig` | the `config` property of the `cfm.connector` VPA | edcv agent         |
-
-A data object is only present if its part of the profile changes. Each data object carries the complete desired state
-of its part, so that the handler can reconcile, plus whatever the handler cannot derive from the desired state. The
-Tenant Manager has one builder per data object. Adding a kind of update means adding a builder in the Tenant Manager,
-a handler in an agent, and the declaration of the data object in the agent's activity definition.
+An agent reads the requested state with the same structs and helpers as at deployment, for example `VpaProperties`,
+and the previous states with a struct of its own.
 
 ### Activity Processing
 
@@ -281,40 +319,43 @@ package api
 const UpdateDiscriminator = Discriminator(model.VPAUpdateType)
 ```
 
-The executor dispatches `UpdateDiscriminator` to `ProcessUpdate`. `BaseActivityProcessor` implements both `Process`
-and `ProcessUpdate` by completing the activity:
+The executor dispatches `UpdateDiscriminator` to `ProcessUpdate`. `BaseActivityProcessor` implements `ProcessUpdate`
+by failing the activity, as its `Process` does for an unknown discriminator today. `Process` does not change:
 
 ```go
 package api
 
-func (p BaseActivityProcessor) Process(ctx ActivityContext) ActivityResult {
-	return ActivityResult{Result: ActivityResultComplete}
-}
-
 func (p BaseActivityProcessor) ProcessUpdate(ctx ActivityContext) ActivityResult {
-	return ActivityResult{Result: ActivityResultComplete}
+	return ActivityResult{
+		Result: ActivityResultFatalError,
+		Error:  fmt.Errorf("the '%s' discriminator is not supported", ctx.Discriminator()),
+	}
 }
 ```
 
-An agent without an update handler is therefore a no-op for updates, and every agent in this repository compiles
+An agent without an update handler that is listed in the update list therefore fails the update, which points at the
+misconfigured template instead of reporting an update that did nothing. Every agent in this repository compiles
 unchanged. Processors that do not embed `BaseActivityProcessor` need the additional method. These are the test
-processors in `pmanager/natsorchestration`, `pmanager/natsagent`, and `e2e/testagent`. Tests that assert the
-`not supported` error of `BaseActivityProcessor` change.
+processors in `pmanager/natsorchestration`, `pmanager/natsagent`, and `e2e/testagent`.
 
-An agent that handles updates implements `ProcessUpdate`. The data object is read with `ReadValues` into a struct of
-the handler's own, as deploy handlers do:
+An agent that handles updates implements `ProcessUpdate`:
 
 ```go
 package onboarding
 
-type roleUpdateData struct {
-	ParticipantContextID string     `json:"participantContextId" validate:"required,participantcontextid"`
-	ParticipantID        string     `json:"cfm.participant.id" validate:"required"`
-	Update               roleUpdate `json:"cfm.update.roles" validate:"required"`
+type credentialUpdateData struct {
+	ParticipantContextID string                   `json:"participantContextId" validate:"required,participantcontextid"`
+	ParticipantID        string                   `json:"cfm.participant.id" validate:"required"`
+	Credentials          []model.CredentialSpec   `json:"cfm.vpa.credentials"`
+	Previous             []previousCredentialData `json:"cfm.update.previous" validate:"required,min=1"`
+}
+
+type previousCredentialData struct {
+	Credentials []model.CredentialSpec `json:"cfm.vpa.credentials"`
 }
 
 func (p OnboardingActivityProcessor) ProcessUpdate(ctx api.ActivityContext) api.ActivityResult {
-	var data roleUpdateData
+	var data credentialUpdateData
 	if err := ctx.ReadValues(&data); err != nil {
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}
 	}
@@ -324,61 +365,73 @@ func (p OnboardingActivityProcessor) ProcessUpdate(ctx api.ActivityContext) api.
 
 A handler:
 
-- fails with a fatal error if its data object is missing or invalid. It is only started for an update that carries
-  its data object, see [Building the Update Orchestration](#building-the-update-orchestration);
-- reconciles: it must be safe to run again after a partial failure, and in a later update orchestration;
+- reads only the parts of the requested and previous states it uses, and may complete without action when these
+  parts are equal in the requested state and in every previous state;
+- otherwise reads the current state of its downstream system, writes what the requested state needs and the
+  downstream system lacks, and removes what a previous state contains, the requested state does not, and the
+  downstream system has;
+- is idempotent: it must be safe to run again after a partial failure, and in a later update orchestration;
+- fails with a fatal error if a value it needs is missing or invalid;
 - keeps values it needs across redeliveries under keys of its own;
 - reports a failure that may be transient as `ActivityResultRetryError`, while the existing handlers report every
   downstream error as fatal;
 - never calls the agent's dispose logic and never deletes the participant's resources.
 
-### Building the Update Orchestration
+Removing only what a previous state contains leaves alone what the profile never contained, for example holder
+properties written by a registration desk.
 
-The update orchestration has no orchestration definition. `provisionManager.Start` builds it from the manifest
-instead of looking up a definition.
+### Update Orchestration in the Template
 
-An activity definition declares the update data objects its agent handles, in a new optional field:
+An orchestration template maps orchestration types to activity lists. The update type is a third key, next to deploy
+and dispose. The format of the entries does not change, and neither do `provisionManager.Start` and
+`ActivityDefinition`:
 
 ```json
 {
-  "type": "registration-activity",
-  "description": "Registers the participant as a holder in the IssuerService",
-  "updates": [
-    "cfm.update.holder"
-  ]
+  "id": "example-template",
+  "description": "Participant deployment, disposal, and update",
+  "activities": {
+    "cfm.orchestration.vpa.deploy": [
+      { "id": "register",  "type": "registration-activity", "dependsOn": [] },
+      { "id": "connector", "type": "edcv-activity",         "dependsOn": [] },
+      { "id": "onboard",   "type": "onboarding-activity",   "dependsOn": ["register"] }
+    ],
+    "cfm.orchestration.vpa.dispose": [
+      { "id": "offboard",          "type": "onboarding-activity",   "dependsOn": [] },
+      { "id": "connector-cleanup", "type": "edcv-activity",         "dependsOn": [] },
+      { "id": "deregister",        "type": "registration-activity", "dependsOn": ["offboard"] }
+    ],
+    "cfm.orchestration.vpa.update": [
+      { "id": "holder-update",      "type": "registration-activity", "dependsOn": [] },
+      { "id": "connector-update",   "type": "edcv-activity",         "dependsOn": [] },
+      { "id": "credentials-update", "type": "onboarding-activity",   "dependsOn": ["holder-update"] }
+    ]
+  }
 }
 ```
 
-For a manifest of type `cfm.orchestration.vpa.update`, `Start`:
+- The deploy and dispose lists are shortened for this example.
+- The update list contains the agents that handle updates. Every activity of the list runs on every update, in the
+  defined order, and completes immediately if its part of the profile does not change.
+- Each activity of the list receives the discriminator `cfm.orchestration.vpa.update`, and the executor calls
+  `ProcessUpdate` on its agent.
+- A platform without an update definition does not support updates. `Start` fails with `orchestration type '...' not
+  found`, which reaches the Tenant Manager as a failed update.
 
-1. collects the `cfm.update.*` keys of the payload;
-2. finds, for each key, the activity definition that declares it. A key that no activity definition declares, or that
-   more than one declares, fails the start with a client error, which reaches the Tenant Manager as a failed update;
-3. creates one activity per key, with the activity type of that definition, the discriminator
-   `cfm.orchestration.vpa.update`, and no dependencies;
-4. instantiates the orchestration with these activities and a fixed definition ID, `cfm.orchestration.vpa.update`, and
-   executes it as usual.
-
-All activities form one parallel step. De-duplication by manifest ID, redelivery, retries, and the response to the
-Tenant Manager work as for every other orchestration.
-
-Only activities concerned by the update are started. An agent that is not involved receives no message, and an
-activity type whose agent is not deployed cannot keep an update pending, as long as no activity definition declares
-a data object for it.
-
-`ActivityDefinition` (`pmanager/api/types.go`), its API representation, and its SQL table get the `updates` field. The
-field is not interpreted for deploy and dispose.
+Definitions are keyed by orchestration type, so a platform has one update definition, like it has one deploy
+definition. Update support is a property of the platform, not of a template.
 
 ### Ordering
 
-Update activities do not depend on one another and run in parallel. The runtime does not know what an update does
-and does not order data objects. A request that carries changes depending on each other may therefore run into race
-conditions. For example, an issuer may evaluate holder properties when it issues a credential, so a credential
-requested in the same update as a holder properties change may be issued from the old properties, or fail its
-attestation. A
-client that needs a particular order sends one update per step and waits for each to complete.
+Activities of the update list are ordered with `dependsOn`. The dependency is declared by whoever configures the
+platform, because only the platform knows it. The runtime does not derive it from the kinds of change.
 
-Whether this is sufficient is an open question, see [Do Updates Need Ordering?](#do-updates-need-ordering).
+The example above orders the credential update after the holder update. The issuer's attestation pipeline reads the
+holder properties, so a new entitlement usually requires changed holder properties before the new credential can be
+issued. With the dependency, one update can change both, and the credential request sees the new holder properties.
+
+Activities without dependencies run in parallel. Changes that depend on each other but are handled by activities
+without a declared dependency may run into race conditions.
 
 ### Tenant Manager Response Handling
 
@@ -393,15 +446,14 @@ orchestration type without a handler is dropped, so the handler is also what mak
 
 ### No Disposal on Failure
 
-A failed update, or a failed activity of an update, never leads to a dispose of the participant. A dispose is the
-end of a participant and is only ever started by an explicit dispose request or as the compensation of a failed
-deploy, where there is no working participant to lose.
+A failed update, or a failed activity of an update, never leads to a dispose of the participant, and it is never
+compensated in any other way. A dispose is the end of a participant and is only ever started by an explicit dispose
+request or as the compensation of a failed deploy, where there is no working participant to lose.
 
-Today the orchestration index watcher compensates every errored orchestration that is not a dispose. For an update
-orchestration this has two effects: with a dispose definition found, it disposes a working participant whose profile
-then keeps reporting `active` VPAs, because the Tenant Manager ignores the response. Without a stored definition for
-the update, which is the case in this design, the watcher's definition lookup fails, and the watcher retries the
-failed orchestration without end.
+Today the orchestration index watcher compensates every errored orchestration that is not a dispose, provided the
+template of the failed orchestration has a dispose definition. The update definition is part of the same template as
+the dispose definition, so a failed update would dispose a working participant, whose profile then keeps reporting
+`active` VPAs, because the Tenant Manager ignores the response.
 
 The condition in the watcher therefore changes from "not a dispose" to "a deploy":
 
@@ -432,19 +484,20 @@ prevent it.
 ## Failure Handling
 
 A failed update leaves the profile with its previous roles and VPA properties, `active` VPAs, and an `update` field in
-state `failed`. The downstream systems may be in an intermediate state: activities run in parallel, and the others
-finish when one fails, so some changes may be applied and others not.
+state `failed`. The downstream systems may be in an intermediate state: activities of one step run in parallel and the
+others finish when one fails, later steps do not run, so some changes may be applied and others not.
 
-The client resolves this by requesting an update again, either with the same values or with the previous ones. Both
-converge, because handlers reconcile against the downstream system. Three rules guarantee that:
+A failed update is not compensated. The client resolves it by requesting an update again, either with the same values
+or with the previous ones. Both converge, because handlers are idempotent and reconcile against the downstream system.
+Two rules guarantee that:
 
-- While an `update` field in state `failed` exists, its data objects are included in the next update, built from the
-  values of the new request. A request for the previous values would otherwise cause no change, although a handler
-  has already applied the failed one.
-- For the same reason, the entitlement used to compute the credentials to revoke is then the union of the specs
-  selected by the applied roles and by the roles of the failed update.
-- `DisposeProfile` builds `cfm.vpa.credentials` from the same union. Dispose recomputes the credentials to revoke from
-  the roles of the profile, and would otherwise miss a credential that a failed update has issued.
+- While an `update` field in state `failed` exists, the next update carries two previous states: the stored state and
+  the requested state of the failed update. A handler then acts if its part differs from either, and removes what
+  either contains and the new requested state does not. A request for the stored values would otherwise cause no
+  change, although a handler has already applied part of the failed update.
+- `DisposeProfile` builds `cfm.vpa.credentials` from the specs selected by the stored roles and by the roles of the
+  failed update. Dispose recomputes the credentials to revoke from the roles of the profile, and would otherwise miss a
+  credential that a failed update has issued.
 
 An update whose response never arrives stays `pending`. This is not specific to updates: the Tenant Manager has no
 timeout for any orchestration, and a manifest that cannot be started after ten deliveries is discarded without a
@@ -454,49 +507,26 @@ response.
 
 The three examples from the overview are sketched here to show that the model carries them and what each needs from
 its downstream system. Each needs its own detailed design before it is built. They are independent of each other and
-can be delivered in any order.
+can be delivered in any order. None of them needs a change to the Tenant Manager.
 
 ### Roles
 
-|                 |                                                   |
-|-----------------|---------------------------------------------------|
-| **Agent**       | onboarding (`onboarding-activity`)                |
-| **Data object** | `cfm.update.roles`                                |
-| **Downstream**  | IssuerService admin API, IdentityHub identity API |
+|                |                                                   |
+|----------------|---------------------------------------------------|
+| **Agent**      | onboarding (`onboarding-activity`)                |
+| **Reads**      | `cfm.vpa.credentials`                             |
+| **Depends on** | the holder update                                 |
+| **Downstream** | IssuerService admin API, IdentityHub identity API |
 
-```json
-{
-  "cfm.update.roles": {
-    "credentials": [
-      {
-        "id": "...",
-        "type": "ManufacturerCredential",
-        "issuer": "did:web:...",
-        "format": "VC1_0_JWT",
-        "role": "manufacturer"
-      }
-    ],
-    "revoked": [
-      {
-        "id": "...",
-        "type": "SupplierCredential",
-        "issuer": "did:web:...",
-        "format": "VC1_0_JWT",
-        "role": "supplier"
-      }
-    ]
-  }
-}
-```
+A change of roles reaches the agent as a change of `cfm.vpa.credentials`, the complete entitlement selected by the
+roles.
 
-`credentials` is the complete entitlement with the requested roles. `revoked` holds the specs that the participant
-was entitled to and no longer is, compared by credential type, because revocation in the IssuerService is by type and
-would otherwise revoke a credential that another spec still grants.
-
-1. For each spec in `revoked`, query the holder's credentials of that type in the IssuerService and revoke each of
-   them. This is the revocation logic of `ProcessDispose`.
-2. For each spec in `credentials`, query the IssuerService for a credential of that type that the holder has and that
-   is not revoked. The specs without such a credential are missing.
+1. For each credential type of a previous state that no spec of the requested state grants, query the holder's
+   credentials of that type in the IssuerService and revoke each of them. This is the revocation logic of
+   `ProcessDispose`. Types are compared, because revocation in the IssuerService is by type and would otherwise revoke
+   a credential that another spec still grants.
+2. For each spec of the requested state, query the IssuerService for a credential of that type that the holder has
+   and that is not revoked. The specs without such a credential are missing.
 3. Send one credential request for the missing specs through the IdentityHub of the participant, keep the request ID
    under a key of its own, and poll the request until it is issued, as `ProcessDeploy` does.
 
@@ -511,27 +541,14 @@ Notes:
 
 ### Holder Properties
 
-|                 |                                        |
-|-----------------|----------------------------------------|
-| **Agent**       | registration (`registration-activity`) |
-| **Data object** | `cfm.update.holder`                    |
-| **Downstream**  | IssuerService admin API                |
-
-```json
-{
-  "cfm.update.holder": {
-    "properties": {
-      "legalName": "Example Corp"
-    },
-    "removed": [
-      "formerKey"
-    ]
-  }
-}
-```
+|                |                                         |
+|----------------|-----------------------------------------|
+| **Agent**      | registration (`registration-activity`)  |
+| **Reads**      | the properties of the `cfm.issuer` VPA  |
+| **Downstream** | IssuerService admin API                 |
 
 1. Read the holder of the participant from the IssuerService.
-2. Set the desired properties and remove the removed keys.
+2. Set the requested properties, and remove the keys that a previous state contains and the requested state does not.
 3. Write the holder back.
 
 Notes:
@@ -539,41 +556,32 @@ Notes:
 - The IssuerService has no partial update for holders. The holder is replaced with its DID, name, and properties, so
   the handler reads, merges, and writes without atomicity. The issuer client in `agent/common` needs read and replace
   calls, which the tolerant holder registration needs as well.
-- `removed` is computed by the Tenant Manager from the previously applied properties. Properties the profile never
-  contained, for example ones written by a registration desk, are left alone.
+- Properties the profile never contained, for example ones written by a registration desk, are left alone.
 - Changed properties affect credentials issued afterwards, not existing ones.
 - The registration agent can serve updates on a platform that does not register holders during deployment: its
-  activity definition only has to exist, and its activity does not have to be part of the deploy definition.
+  activity only has to be part of the update list, not of the deploy list.
 
 ### Participant Config
 
-|                 |                                |
-|-----------------|--------------------------------|
-| **Agent**       | edcv (`edcv-activity`)         |
-| **Data object** | `cfm.update.participantconfig` |
-| **Downstream**  | Control plane management API   |
+|                |                                                  |
+|----------------|--------------------------------------------------|
+| **Agent**      | edcv (`edcv-activity`)                           |
+| **Reads**      | the `config` property of the `cfm.connector` VPA |
+| **Downstream** | Control plane management API                     |
 
-```json
-{
-  "cfm.update.participantconfig": {
-    "entries": {
-      "edc.example.setting": "value"
-    }
-  }
-}
-```
-
-1. Patch the participant context config in the control plane with the entries.
+1. Patch the participant context config in the control plane with the entries of the requested state.
 
 Notes:
 
 - Config entries are not a profile input today. The `config` property of the `cfm.connector` VPA is new.
+- The `config` map is replaced as a whole by a diff. A client that changes one entry sends the complete map.
 - The client call exists (`PatchConfig`) and already distinguishes recoverable from permanent errors.
 - The edcv agent at deployment and the key management agent write entries of the same config, without coordination.
-  The Tenant Manager rejects requests that set the keys they own (`edc.participant.id`, `edc.iam.issuer.id`,
+  The agent must not overwrite the keys they own (`edc.participant.id`, `edc.iam.issuer.id`,
   `edc.vault.hashicorp.config`, and the `edc.iam.sts.*` entries). This is safe only if the control plane merges
   patched entries, which is not verified.
-- A patch cannot remove an entry. Whether removal is needed, and how it is expressed, is open.
+- A patch cannot remove an entry. Entries that a previous state contains and the requested state does not cannot be
+  removed until the control plane offers a way.
 
 ### Further Candidates
 
@@ -586,25 +594,25 @@ Notes:
 
 ## Phases
 
-1. **Framework.** API, update status, manifest, `ProcessUpdate`, the change to `BaseActivityProcessor`, the
-   `updates` field of activity definitions, building the update orchestration, response handling, and the
-   compensation change. An end-to-end test proves the flow with the test agent.
-2. **Handlers.** One at a time, each with its detailed design, its data object builder in the Tenant Manager, its
-   handler, and the declaration in its activity definition.
+1. **Framework.** API, update status, manifest, `ProcessUpdate` and its default in `BaseActivityProcessor`, response
+   handling, and the compensation change. An end-to-end test proves the flow with the test agent and a template with
+   an update list.
+2. **Handlers.** One at a time, each with its detailed design, its handler, and its entry in the update list of the
+   template.
 
 ## Compatibility and Rollout
 
 - The API change is additive. Profiles without an `update` field are unaffected.
-- The change to `BaseActivityProcessor` affects every agent built on it, also outside this repository: an activity
-  with a discriminator the agent does not handle now completes instead of failing. Today this only happens with a
-  misconfigured template.
+- Agents built on `BaseActivityProcessor` outside this repository get a `ProcessUpdate` that fails. Listing such an
+  agent in the update list fails every update until it implements a handler.
 - The `ActivityProcessor` interface change breaks processors outside this repository that do not embed
   `BaseActivityProcessor` at compile time.
-- Activity definitions without `updates` behave as before. An agent receives update activities only once its activity
-  definition declares a data object, so a platform enables an update by deploying the agent version with the handler
-  and then extending its activity definition.
-- The Provision Manager change to compensation and the new Tenant Manager handler have to be deployed before any
-  activity definition declares a data object.
+- A platform enables updates by deploying agent versions with update handlers and then adding the update list to its
+  template. The definition store has no operation to change a stored definition, and its two implementations treat a
+  repeated post differently (the SQL store overwrites, the memory store returns `409`), which has to be resolved for
+  adding the list on a running platform.
+- The Provision Manager change to compensation and the new Tenant Manager handler have to be deployed before a
+  template has an update list.
 - Tenant Manager replicas share one consumer for orchestration responses. During a rolling upgrade, a replica without
   the update handler drops an update response. Updates should not be requested before all replicas are upgraded.
 - An orchestration can also be started through the Provision Manager API by a caller with the scope
@@ -626,52 +634,37 @@ track an update result.
 **One orchestration type per kind of update.** It multiplies response handlers, and a request that changes two things
 would need two orchestrations and a rule for their partial failure.
 
-**Compensate a failed update with an inverse update.** The inverse can fail as well, and it hides the failure from the
-client, which then sees neither the requested nor a reliably restored state. Reporting the failure and letting the
-client repeat or revert the update is simpler and converges for the same reason.
+**Update data objects built by the Tenant Manager.** The Tenant Manager could compute one data object per kind of
+update, for example the credentials to request and to revoke, and send only the data objects of the parts that
+change. Every new kind of update would then need a builder in the Tenant Manager, so an agent outside this repository
+could not handle updates without a change to the Tenant Manager.
 
-**Enqueue every registered activity type for every update.** It needs no declaration in activity definitions, but an
-activity type whose agent is not deployed would leave every update pending, because nothing consumes its message.
+**An update orchestration built by the Provision Manager.** Activity definitions could declare the data objects they
+handle, and `Start` could build an orchestration of the activities concerned by an update, without a definition.
+This needs a new field on activity definitions and a second way to build orchestrations, and it cannot order
+activities without a second ordering mechanism next to `dependsOn`.
+
+**Compensate a failed update with an inverse update.** The Tenant Manager could start a second update with the
+previous and the requested state exchanged. The inverse can fail as well, and it hides the failure from the client,
+which then sees neither the requested nor a reliably restored state. It only sees the output values that the failed
+orchestration reported with its first failure, and an activity of the same step that finishes later is not among
+them. It also removes what the requested state contains and the downstream system has, which may include state that
+existed before the update, for example a credential, which cannot be restored once revoked. Reporting the failure and
+letting the client repeat or revert the update is simpler and converges for the same reason.
+
+**`PUT` instead of `PATCH`.** A `PUT` replaces the complete roles and properties, so the client reads the profile,
+modifies it, and sends all values back. The read-modify-write happens in the client, so two clients that update the
+same profile can overwrite each other's changes unless the profile carries a version or ETag that the Tenant Manager
+checks, and a client that leaves a value out removes it.
 
 ## Open Questions
-
-### `PATCH` vs `PUT`?
-
-`PATCH` performs a partial update, e.g. modifying a single property value, whereas `PUT` modifies the _entire object_.
-In practice, this would have the following implications:
-
-- `PATCH`: no _read_ beforehand, simply send the modified value. Deleting a value requires a dedicated contract, such
-  as listing the fields under dedicated `added` or `removed` objects, as the tenant properties do today, or naively
-  setting the value to `null` in JSON:
-  ```json
-  {
-    "key1": "newValue",
-    "key2": null
-  }
-  ```
-  `key1` is updated to `newValue`, and `key2` is deleted, regardless of its type.
-
-- `PUT`: requires a _read_ beforehand, to have the latest data, then modifying a value, then sending _all_ values back.
-  ```json
-  {
-    "key1": "newValue",
-    "key2": "oldValue",
-    "key3": "anotherOldValue",
-    "...": "..."
-  }
-  ```
-  The read-modify-write happens in the client, so two clients that update the same profile can overwrite each other's
-  changes. The row lock of `UpdateProfile` only protects the Tenant Manager's side. Preventing lost updates requires
-  a version or ETag on the profile that the client sends back and the Tenant Manager checks.
 
 ### Integrated `ProcessUpdate` or Standalone Update Activities
 
 This document integrates update handlers into the existing activity agents through a new handler `ProcessUpdate`. The
 alternative is standalone update activities: a third agent category under `agent/update`, next to `agent/orchestration`
-and
-`agent/lifecycle`, with one agent and one activity type per kind of update, for example `holder-update-activity`. The
-rest of this design applies to both, since the Provision Manager finds the activity through the `updates` declaration
-of its activity definition either way.
+and `agent/lifecycle`, with one agent and one activity type per kind of update, for example `holder-update-activity`.
+The rest of this design applies to both, since the update list of the template names the activity type either way.
 
 Integrated `ProcessUpdate`:
 
@@ -705,47 +698,8 @@ Standalone update activities:
 - **Con:** two agents write to the same downstream resource, for example the registration agent creates the holder and
   a holder update agent changes it, which spreads the knowledge about that resource.
 
-### Do Updates Need Ordering?
+### Further Questions
 
-This document assumes that they do not: update activities are independent, the update orchestration has no
-definition, and a client that needs an order sends separate updates, see [Ordering](#ordering).
-
-The case that challenges this assumption is a change of roles. The issuer's attestation pipeline reads the holder
-properties, so a new entitlement usually requires changed holder properties before the new credential can be issued.
-The holder change is not an exception but the precondition of the role change. Under this design, the client has to
-split one logical change into two updates, holder first and roles second, wait for the first to complete in between,
-and handle a failure of the second while the first has already been applied. Sent as one update, both handlers start
-at the same time, and whether the credential request sees the new holder properties depends on timing. The holder
-write is a single synchronous call and the credential request is processed asynchronously, so the request will often
-see the new properties, which makes the failure rare and hard to reproduce.
-
-This makes a case for expressing dependencies between updates:
-
-- The dependency is a fact of the platform, not of a single request. Every client that changes roles has to know about
-  it and implement the same two-step sequence, and a client that does not know about it works most of the time.
-- A single update with an order is applied or failed as a whole and reported in one `update` status. Two updates
-  produce two statuses and an intermediate state the client has to recover from.
-- The runtime must not learn what an update does. A dependency therefore has to be declared by whoever configures the
-  platform, not derived by the Tenant Manager or the Provision Manager from the kinds of change.
-- The engine already orders activities with `dependsOn` in an orchestration definition. Expressing update dependencies
-  there reuses that mechanism, while ordering declared on data objects would add a second one to maintain.
-
-- **If updates do not need ordering**, the design stays as described. Each kind of update is started for its data
-  object alone, the Provision Manager builds the orchestration, and a platform enables an update by declaring the data
-  object in an activity definition.
-- **If updates need ordering**, the update orchestration gets a dedicated orchestration definition, like deploy and
-  dispose. It lists the update activities with `dependsOn`, for example the holder update before the credential
-  update. The `updates` declaration then selects which activities of the definition are relevant to a manifest, and
-  the others complete immediately, or the declaration is dropped and every activity of the definition runs and
-  completes immediately when its data object is absent. The definition has to be seeded and extended like the deploy
-  definition. The definition store has no operation to change a stored definition, and its two implementations treat
-  a repeated post differently, which makes extending it on a running platform awkward. The watcher's compensation
-  lookup works again, but the compensation change stays necessary, because a dispose definition in the same template
-  would otherwise dispose the participant.
-
-Further questions:
-
-- How does the executor tell an ignored activity from a handled one, for logging and possibly for metrics?
 - Should a `pending` update block a dispose without limit, or should an administrator be able to reset or supersede
   it?
 - Should the update status be a field of its own, as proposed, or should a failed update set the `error` flag of the
