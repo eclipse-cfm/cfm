@@ -21,7 +21,7 @@ Many things can change during the life of a participant. Two examples are used t
 Update orchestrations are intended for the type of lifecycle changes that require a concerted effort and span across
 multiple downstream components. The two listed above are typical of what updates are for: a change of roles usually
 needs changed holder properties before the new credentials can be offered, so one change spans several components,
-namely the IssuerService (to change the holder), and the IdentityHub (to request and receive the new credential)
+namely the IssuerService (to change the holder), and the IdentityHub (to request and receive the new credential),
 see [Scope](#scope).
 
 This document proposes updates as a third lifecycle operation of a participant profile, next to deploy and dispose:
@@ -549,9 +549,9 @@ The Tenant Manager must not run two orchestrations for one profile at a time, an
 prevent it.
 
 - `UpdateProfile` reads the profile with an exclusive row lock and rejects the request unless the preconditions hold.
-- `DisposeProfile` takes the same lock and rejects a profile with a `pending` update. Otherwise a dispose and an
-  update could run concurrently, and the update could, for example, request a credential after the dispose has
-  revoked the participant's credentials.
+- `DisposeProfile` takes the same lock and rejects a profile with a `pending` update, without exception. Otherwise a
+  dispose and an update could run concurrently, and the update could, for example, request a credential after the
+  dispose has revoked the participant's credentials.
 - The update response handler takes the same lock.
 
 ## Failure Handling
@@ -630,7 +630,7 @@ Notes:
   the handler reads, merges, and writes without atomicity. The issuer client in `agent/common` needs read and replace
   calls, which the tolerant holder registration needs as well.
 - Properties the profile never contained, for example ones written by a registration desk, are left alone.
-- Changed properties affect credentials issued afterwards, not existing ones.
+- Changed properties affect credentials issued afterwards, not existing ones. Existing credentials are not reissued.
 - The registration agent can serve updates on a platform that does not register holders during deployment: its
   activity only has to be part of the update list, not of the deploy list.
 
@@ -750,15 +750,6 @@ Standalone update activities:
 - **Con:** two agents write to the same downstream resource, for example the registration agent creates the holder and
   a holder update agent changes it, which spreads the knowledge about that resource.
 
-### Further Questions
-
-- Should a `pending` update block a dispose without limit, or should an administrator be able to reset or supersede
-  it?
-- Should the update status be a field of its own, as proposed, or should a failed update set the `error` flag of the
-  profile while the VPAs stay `active`?
-- Should a changed holder property lead to the reissuance of existing credentials?
-- Should the dataspace profiles of a participant become updatable? Joining another dataspace changes the credential
-  entitlement and the connector's profile associations together, and today the two are separate inputs.
 
 ## Related Issues
 
