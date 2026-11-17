@@ -13,11 +13,16 @@ is fixed for the lifetime of the profile. A participant for which something chan
 the profile and deploying a new one, which means a new participant context, a new wallet, and the loss of everything
 bound to the old ones.
 
-Many things can change during the life of a participant. Three examples are used throughout this document:
+Many things can change during the life of a participant. Two examples are used throughout this document:
 
 - its **roles** in a dataspace, which determine the credentials it is entitled to,
-- its **holder properties** in the IssuerService, from which the claims of its credentials are taken,
-- its **participant config** in the control plane.
+- its **holder properties** in the IssuerService, from which the claims of its credentials are taken.
+
+Update orchestrations are intended for the type of lifecycle changes that require a concerted effort and span across
+multiple downstream components. The two listed above are typical of what updates are for: a change of roles usually
+needs changed holder properties before the new credentials can be offered, so one change spans several components,
+namely the IssuerService (to change the holder), and the IdentityHub (to request and receive the new credential)
+see [Scope](#scope).
 
 This document proposes updates as a third lifecycle operation of a participant profile, next to deploy and dispose:
 
@@ -67,11 +72,30 @@ Non-goals:
 
 - Changing the identity of a participant: its identifier (DID), participant context ID, cell, or tenant.
 - Adding or removing a VPA of a participant.
+- Changes that concern one component only, for example the participant config of the control plane, see
+  [Scope](#scope).
 - Changing the credential specs of a dataspace profile. A different set of credentials is a new dataspace profile.
 - Orchestration definitions per dataspace profile, and support for more than one issuer. Updates inherit both
   limitations from deployment.
 - Updates that originate in agent configuration instead of the participant profile, for example changed service
   endpoint templates of the IdentityHub agent.
+
+## Scope
+
+Update orchestrations are intended for changes that span several components and have to be applied together and in
+order. Updating the roles of a participant is the prime example: the holder properties in the IssuerService may have
+to change first, because the issuer's attestation pipeline reads them, and then the credentials the participant is
+offered and holds change in the IssuerService and the IdentityHub. No single component can apply such a change, and
+the parts depend on each other.
+
+Updates are not intended for changes that concern one component only, such as the participant config of the
+connector's control plane. Users make such changes with the administrative API of that component, for example the
+control plane management API. Routing them through an orchestration would add a Tenant Manager operation, an
+orchestration, and an agent handler to what is one call to one API, and the profile would have to mirror
+configuration that the component already owns.
+
+A kind of change belongs into an update orchestration if it needs more than one component, or if it changes an input
+that only the participant profile holds, such as the roles.
 
 ## Current Behavior
 
@@ -153,27 +177,20 @@ PATCH /api/v1alpha1/tenants/{tenantID}/participant-profiles/{participantID}
       "removed": [
         "formerKey"
       ]
-    },
-    "cfm.connector": {
-      "properties": {
-        "config": {
-          "edc.example.setting": "value"
-        }
-      }
     }
   }
 }
 ```
 
 Every map is changed with the diff of the tenant `PATCH` (`TenantPropertiesDiff`): `properties` holds the keys to
-set, and `removed` lists the keys to delete. The Tenant Manager sets first and removes second. A key that is not mentioned is unchanged, so a client cannot remove data
+set, and `removed` lists the keys to delete. The Tenant Manager sets first and removes second. A key that is not
+mentioned is unchanged, so a client cannot remove data
 by leaving it out, and it does not have to read the profile before it changes it.
 
 - `participantRoles` is one diff. Its keys are dataspace profile IDs, and each value is the complete role list of that
   dataspace profile.
 - `vpaProperties` holds one diff per VPA type. The VPA type selects the VPA and is not itself set or removed.
-- A diff changes one level. A value is replaced as a whole, for example the `config` map of the `cfm.connector` VPA
-  above.
+- A diff changes one level. A value is replaced as a whole, for example the role list of a dataspace profile above.
 - Both members are optional, and at least one must be present.
 
 The operation requires the scope `tenant-manager-api:write` and applies the same tenant ownership rules as the other
@@ -227,11 +244,6 @@ The update is tracked in a new optional field of the participant profile instead
     "vpaProperties": {
       "cfm.issuer": {
         "legalName": "Example Corp"
-      },
-      "cfm.connector": {
-        "config": {
-          "edc.example.setting": "value"
-        }
       }
     },
     "errorDetail": "",
@@ -257,26 +269,36 @@ The Tenant Manager sends an `OrchestrationManifest` with the type `cfm.orchestra
 correlation ID. The payload contains the requested state in the keys of a deployment, and the previous state in the
 same format:
 
-| Key                    | Content                                                                          |
-|------------------------|----------------------------------------------------------------------------------|
-| `participantContextId` | Mandatory. Copied from the stored deployment state.                              |
-| `cfm.participant.id`   | The participant identifier, as in deploy and dispose.                            |
-| `cfm.vpa.data`         | The VPAs with their requested properties, as in a deployment.                    |
-| `cfm.vpa.credentials`  | The credential specs selected by the requested roles, as in a deployment.        |
-| `cfm.vpa.state`        | The stored deployment state, as in dispose.                                      |
-| `cfm.update.previous`  | A list of previous states, each with `cfm.vpa.data` and `cfm.vpa.credentials`.   |
+| Key                    | Content                                                                        |
+|------------------------|--------------------------------------------------------------------------------|
+| `participantContextId` | Mandatory. Copied from the stored deployment state.                            |
+| `cfm.participant.id`   | The participant identifier, as in deploy and dispose.                          |
+| `cfm.vpa.data`         | The VPAs with their requested properties, as in a deployment.                  |
+| `cfm.vpa.credentials`  | The credential specs selected by the requested roles, as in a deployment.      |
+| `cfm.vpa.state`        | The stored deployment state, as in dispose.                                    |
+| `cfm.update.previous`  | A list of previous states, each with `cfm.vpa.data` and `cfm.vpa.credentials`. |
 
 ```json
 {
   "participantContextId": "...",
   "cfm.participant.id": "did:web:...",
-  "cfm.vpa.data": [ "... requested ..." ],
-  "cfm.vpa.credentials": [ "... requested ..." ],
-  "cfm.vpa.state": { "...": "..." },
+  "cfm.vpa.data": [
+    "... requested ..."
+  ],
+  "cfm.vpa.credentials": [
+    "... requested ..."
+  ],
+  "cfm.vpa.state": {
+    "...": "..."
+  },
   "cfm.update.previous": [
     {
-      "cfm.vpa.data": [ "... stored ..." ],
-      "cfm.vpa.credentials": [ "... stored ..." ]
+      "cfm.vpa.data": [
+        "... stored ..."
+      ],
+      "cfm.vpa.credentials": [
+        "... stored ..."
+      ]
     }
   ]
 }
@@ -372,7 +394,8 @@ A handler:
   downstream system has;
 - is idempotent: it must be safe to run again after a partial failure, and in a later update orchestration;
 - fails with a fatal error if a value it needs is missing or invalid;
-- keeps values it needs across redeliveries under keys of its own;
+- keeps values it needs across redeliveries under keys of its own, and sets output values only under keys prefixed
+  with its activity type;
 - reports a failure that may be transient as `ActivityResultRetryError`, while the existing handlers report every
   downstream error as fatal;
 - never calls the agent's dispose logic and never deletes the participant's resources.
@@ -392,19 +415,56 @@ and dispose. The format of the entries does not change, and neither do `provisio
   "description": "Participant deployment, disposal, and update",
   "activities": {
     "cfm.orchestration.vpa.deploy": [
-      { "id": "register",  "type": "registration-activity", "dependsOn": [] },
-      { "id": "connector", "type": "edcv-activity",         "dependsOn": [] },
-      { "id": "onboard",   "type": "onboarding-activity",   "dependsOn": ["register"] }
+      {
+        "id": "register",
+        "type": "registration-activity",
+        "dependsOn": []
+      },
+      {
+        "id": "connector",
+        "type": "edcv-activity",
+        "dependsOn": []
+      },
+      {
+        "id": "onboard",
+        "type": "onboarding-activity",
+        "dependsOn": [
+          "register"
+        ]
+      }
     ],
     "cfm.orchestration.vpa.dispose": [
-      { "id": "offboard",          "type": "onboarding-activity",   "dependsOn": [] },
-      { "id": "connector-cleanup", "type": "edcv-activity",         "dependsOn": [] },
-      { "id": "deregister",        "type": "registration-activity", "dependsOn": ["offboard"] }
+      {
+        "id": "offboard",
+        "type": "onboarding-activity",
+        "dependsOn": []
+      },
+      {
+        "id": "connector-cleanup",
+        "type": "edcv-activity",
+        "dependsOn": []
+      },
+      {
+        "id": "deregister",
+        "type": "registration-activity",
+        "dependsOn": [
+          "offboard"
+        ]
+      }
     ],
     "cfm.orchestration.vpa.update": [
-      { "id": "holder-update",      "type": "registration-activity", "dependsOn": [] },
-      { "id": "connector-update",   "type": "edcv-activity",         "dependsOn": [] },
-      { "id": "credentials-update", "type": "onboarding-activity",   "dependsOn": ["holder-update"] }
+      {
+        "id": "holder-update",
+        "type": "registration-activity",
+        "dependsOn": []
+      },
+      {
+        "id": "credentials-update",
+        "type": "onboarding-activity",
+        "dependsOn": [
+          "holder-update"
+        ]
+      }
     ]
   }
 }
@@ -441,8 +501,21 @@ orchestration type without a handler is dropped, so the handler is also what mak
 - On success, the requested roles and VPA properties are applied to the profile and the `update` field is removed.
 - On failure, the `update` field is set to `failed` with the error detail and cause of the response. The profile is
   not changed otherwise.
-- In both cases `cfm.orchestration.pending` is removed, VPA states and the `error` flag are left alone, and
-  `cfm.vpa.state` is kept. Output values of the update orchestration are not merged into it.
+- In both cases `cfm.orchestration.pending` is removed, VPA states and the `error` flag are left alone, and the
+  output values of the update orchestration are merged into `cfm.vpa.state`, see below.
+
+The output values of an orchestration form one flat map, in which a later write to the same key wins, and
+`cfm.vpa.state` holds the output values of the deployment, for example `participantContextId` and `holderPid`. Update
+output values are therefore namespaced twice:
+
+- The Tenant Manager merges them into a map of their own, `cfm.vpa.state["cfm.update"]`, so that an update cannot
+  overwrite a value of the deployment, such as `participantContextId`.
+- An update handler sets output values only under keys prefixed with its activity type, for example
+  `onboarding-activity.credentialRequest`, so that two agents cannot overwrite each other's values.
+
+A later update replaces the values of the same key, and other keys are kept. The values are also merged after a failed
+update, so that a repeated update finds what the failed one recorded, as far as the response of the failed update
+reports it. Because the payload carries `cfm.vpa.state`, a handler reads its earlier values there.
 
 ### No Disposal on Failure
 
@@ -505,7 +578,7 @@ response.
 
 ## Examples
 
-The three examples from the overview are sketched here to show that the model carries them and what each needs from
+The two examples from the overview are sketched here to show that the model carries them and what each needs from
 its downstream system. Each needs its own detailed design before it is built. They are independent of each other and
 can be delivered in any order. None of them needs a change to the Tenant Manager.
 
@@ -541,11 +614,11 @@ Notes:
 
 ### Holder Properties
 
-|                |                                         |
-|----------------|-----------------------------------------|
-| **Agent**      | registration (`registration-activity`)  |
-| **Reads**      | the properties of the `cfm.issuer` VPA  |
-| **Downstream** | IssuerService admin API                 |
+|                |                                        |
+|----------------|----------------------------------------|
+| **Agent**      | registration (`registration-activity`) |
+| **Reads**      | the properties of the `cfm.issuer` VPA |
+| **Downstream** | IssuerService admin API                |
 
 1. Read the holder of the participant from the IssuerService.
 2. Set the requested properties, and remove the keys that a previous state contains and the requested state does not.
@@ -561,36 +634,15 @@ Notes:
 - The registration agent can serve updates on a platform that does not register holders during deployment: its
   activity only has to be part of the update list, not of the deploy list.
 
-### Participant Config
-
-|                |                                                  |
-|----------------|--------------------------------------------------|
-| **Agent**      | edcv (`edcv-activity`)                           |
-| **Reads**      | the `config` property of the `cfm.connector` VPA |
-| **Downstream** | Control plane management API                     |
-
-1. Patch the participant context config in the control plane with the entries of the requested state.
-
-Notes:
-
-- Config entries are not a profile input today. The `config` property of the `cfm.connector` VPA is new.
-- The `config` map is replaced as a whole by a diff. A client that changes one entry sends the complete map.
-- The client call exists (`PatchConfig`) and already distinguishes recoverable from permanent errors.
-- The edcv agent at deployment and the key management agent write entries of the same config, without coordination.
-  The agent must not overwrite the keys they own (`edc.participant.id`, `edc.iam.issuer.id`,
-  `edc.vault.hashicorp.config`, and the `edc.iam.sts.*` entries). This is safe only if the control plane merges
-  patched entries, which is not verified.
-- A patch cannot remove an entry. Entries that a previous state contains and the requested state does not cannot be
-  removed until the control plane offers a way.
-
 ### Further Candidates
 
-- **Dataspace profile associations** of the connector, in the edcv agent. The control plane call exists, but has no
-  path for removing the last association.
-- **Transfer type mappings and authorization** of the data plane, in the siglet agent. The deploy logic is an upsert
-  and reusable. Removal is missing, and a stored mapping replaces the participant's whole set, which conflicts with
-  other writers.
-- **Dataspace identifier** in Certo, in the certo agent. Certo is only called to create and delete today.
+- **Dataspace profile associations** of the connector, in the edcv agent, together with the credential entitlement of
+  the dataspace profile. Joining a dataspace changes both. The control plane call exists, but has no path for removing
+  the last association.
+
+Changes that concern one component, for example the participant config of the control plane, the transfer type
+mappings and authorization of the data plane, or the dataspace identifier in Certo, are made through the
+administrative API of that component, see [Scope](#scope).
 
 ## Phases
 
