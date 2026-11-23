@@ -17,7 +17,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"iter"
 	"reflect"
 
@@ -71,22 +70,12 @@ type Orchestrator interface {
 	GetOrchestration(ctx context.Context, id string) (*Orchestration, error)
 }
 
-// ActivityProcessor defines an interface for processing various activities within an orchestrated workflow.
-// Process handles a generic activity, taking an ActivityContext and returning an ActivityResult.
-// ProcessDeploy handles deployment-specific activities, taking an ActivityContext and returning an ActivityResult.
-// ProcessDispose handles disposal-specific activities, taking an ActivityContext and returning an ActivityResult.
+// ActivityProcessor processes the activities of an orchestration that an agent is responsible for.
+// Process handles an activity, taking an ActivityContext and returning an ActivityResult. The engine calls Process for
+// every activity, whatever its discriminator; an implementation that handles several kinds of work can select by
+// ActivityContext.Discriminator.
 type ActivityProcessor interface {
 	Process(activityContext ActivityContext) ActivityResult
-	ProcessDeploy(activityContext ActivityContext) ActivityResult
-	ProcessDispose(activityContext ActivityContext) ActivityResult
-}
-
-// BaseActivityProcessor provides default implementations for processing activity lifecycle methods in an orchestration system.
-type BaseActivityProcessor struct {
-}
-
-func (p BaseActivityProcessor) Process(ctx ActivityContext) ActivityResult {
-	return ActivityResult{Result: ActivityResultFatalError, Error: fmt.Errorf("the '%s' discriminator is not supported", ctx.Discriminator())}
 }
 
 type ActivityResultType int
@@ -114,9 +103,6 @@ const (
 	ActivityResultSchedule   = 2
 	ActivityResultRetryError = -1
 	ActivityResultFatalError = -2
-
-	DeployDiscriminator  = Discriminator(model.VPADeployType)
-	DisposeDiscriminator = Discriminator(model.VPADisposeType)
 )
 
 type ActivityResult struct {
@@ -165,9 +151,6 @@ type ActivityContext interface {
 
 	// Context returns the underlying context
 	Context() context.Context
-
-	// VpaProperties returns the properties for the given VPA type from the activity context.
-	VpaProperties(vpaType model.VPAType) (map[string]any, error)
 }
 
 type DefinitionManager interface {
@@ -266,34 +249,4 @@ func (d defaultActivityContext) SetOutputValue(key string, value any) {
 
 func (d defaultActivityContext) OutputValues() map[string]any {
 	return d.outputData
-}
-
-// VpaProperties retrieves the properties for a specific VPA type from the activity context. If the `cfm.vpa.data` object is not present,
-// if it does not contain an entry for the specified VPA type, nil is returned. The contents of the `cfm.vpa.data`.`<vpatype>` entry are
-// returned
-// if the `cfm.vpa.data` object is not a slice, an error is returned
-func (d defaultActivityContext) VpaProperties(vpaType model.VPAType) (map[string]any, error) {
-	vpaData, ok := d.processingData[model.VPAData]
-	if !ok || vpaData == nil {
-		return nil, nil
-	}
-	vpaList, ok := vpaData.([]any)
-	if !ok {
-		return nil, fmt.Errorf("vpa data is not a slice")
-	}
-
-	for _, item := range vpaList {
-		vpaEntry, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-		if entryType, exists := vpaEntry["vpaType"]; exists && entryType == vpaType.String() {
-			if properties, ok := vpaEntry["properties"].(map[string]any); ok {
-				return properties, nil
-			}
-			return make(map[string]any), nil
-		}
-	}
-
-	return nil, nil
 }

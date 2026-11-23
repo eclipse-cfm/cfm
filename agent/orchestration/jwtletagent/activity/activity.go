@@ -91,7 +91,6 @@ var agentScopes = []string{
 }
 
 type TokenExchangeActivityProcessor struct {
-	api.BaseActivityProcessor
 	Monitor            system.LogMonitor
 	TokenProvider      token.TokenProvider
 	tracer             trace.Tracer

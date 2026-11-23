@@ -17,6 +17,7 @@ import (
 
 	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
 	"github.com/eclipse-cfm/cfm/agent/common/issuerservice"
+	"github.com/eclipse-cfm/cfm/agent/common/vpa"
 	"github.com/eclipse-cfm/cfm/agent/orchestration/onboarding/activity"
 	"github.com/eclipse-cfm/cfm/assembly/httpclient"
 	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
@@ -63,7 +64,7 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 				tokenexchange.WithTokenExchangeAudience(ctx.Config.GetString(audienceKey)),
 				tokenexchange.WithHttpClient(&httpClient))
 
-			return activity.OnboardingActivityProcessor{
+			return vpa.AsActivityProcessor(activity.OnboardingActivityProcessor{
 				Monitor: ctx.Monitor,
 				IdentityApiClient: identityhub.HttpIdentityAPIClient{
 					BaseURL:       ihURL,
@@ -76,7 +77,7 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 					IssuerID:      issuerID,
 					HttpClient:    &httpClient,
 				},
-			}
+			})
 		},
 	}
 	natsagent.LaunchAgent(shutdown, config)

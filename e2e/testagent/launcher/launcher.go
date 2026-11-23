@@ -13,6 +13,7 @@
 package launcher
 
 import (
+	"github.com/eclipse-cfm/cfm/agent/common/vpa"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/runtime"
 	"github.com/eclipse-cfm/cfm/common/system"
@@ -59,14 +60,6 @@ type TestActivityProcessor struct {
 	callback func(ctx api.ActivityContext) api.ActivityResult
 }
 
-func (t TestActivityProcessor) ProcessDeploy(activityContext api.ActivityContext) api.ActivityResult {
-	return t.Process(activityContext)
-}
-
-func (t TestActivityProcessor) ProcessDispose(activityContext api.ActivityContext) api.ActivityResult {
-	return t.Process(activityContext)
-}
-
 func (t TestActivityProcessor) Process(ctx api.ActivityContext) api.ActivityResult {
 	if t.callback != nil {
 		return t.callback(ctx)
@@ -75,7 +68,7 @@ func (t TestActivityProcessor) Process(ctx api.ActivityContext) api.ActivityResu
 }
 
 func processDefault(ctx api.ActivityContext, t TestActivityProcessor) api.ActivityResult {
-	if ctx.Discriminator() == api.DisposeDiscriminator {
+	if ctx.Discriminator() == vpa.DisposeDiscriminator {
 		// a disposal request
 		t.monitor.Infof("Processed dispose")
 		return api.ActivityResult{Result: api.ActivityResultComplete}

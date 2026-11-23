@@ -286,15 +286,7 @@ func (e *NatsActivityExecutor) runActivity(ctx context.Context, orchestration ap
 	// The context shares the orchestration's data maps, so values set by the processor are seen by the executor
 	activityContext := api.NewActivityContext(activityCtx, orchestration.ID, activity, orchestration.ProcessingData, orchestration.OutputData)
 
-	var result api.ActivityResult
-	switch activityContext.Discriminator() {
-	case api.DeployDiscriminator:
-		result = e.ActivityProcessor.ProcessDeploy(activityContext)
-	case api.DisposeDiscriminator:
-		result = e.ActivityProcessor.ProcessDispose(activityContext)
-	default:
-		result = e.ActivityProcessor.Process(activityContext)
-	}
+	result := e.ActivityProcessor.Process(activityContext)
 
 	if result.Result == api.ActivityResultFatalError && errors.Is(activityCtx.Err(), context.DeadlineExceeded) && ctx.Err() == nil {
 		e.Monitor.Warnf("Activity %s of orchestration %s did not finish within %s, retrying it", activity.ID, orchestration.ID, timeout)

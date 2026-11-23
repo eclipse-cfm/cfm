@@ -145,12 +145,6 @@ func (p failingProcessor) Process(api.ActivityContext) api.ActivityResult {
 	p.t.Error("a completed activity must not run again")
 	return api.ActivityResult{Result: api.ActivityResultComplete}
 }
-func (p failingProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
-	return p.Process(ctx)
-}
-func (p failingProcessor) ProcessDispose(ctx api.ActivityContext) api.ActivityResult {
-	return p.Process(ctx)
-}
 
 func TestProcessMessage_CompletedActivityIsNotRunAgain(t *testing.T) {
 	tests := []struct {

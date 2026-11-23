@@ -17,6 +17,7 @@ import (
 
 	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
 	"github.com/eclipse-cfm/cfm/agent/common/siglet"
+	"github.com/eclipse-cfm/cfm/agent/common/vpa"
 	"github.com/eclipse-cfm/cfm/agent/orchestration/siglet/activity"
 	"github.com/eclipse-cfm/cfm/assembly/httpclient"
 	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
@@ -82,7 +83,7 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 				tokenexchange.WithTokenExchangeAudience(audience),
 				tokenexchange.WithHttpClient(&httpClient))
 
-			return activity.NewProcessor(&activity.Config{
+			return vpa.AsActivityProcessor(activity.NewProcessor(&activity.Config{
 				LogMonitor:                ctx.Monitor,
 				SigletSignalingURL:        sigletSignalingURL,
 				TransferTypeMappingClient: siglet.NewTransferTypeMappingClient(&httpClient, provider, sigletManagementURL),
@@ -97,7 +98,7 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 					JwksUri:               jwksURI,
 					Scope:                 scope,
 				},
-			})
+			}))
 		},
 	}
 	natsagent.LaunchAgent(shutdown, config)

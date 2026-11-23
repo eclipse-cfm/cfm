@@ -16,6 +16,7 @@ import (
 	"net/http"
 
 	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
+	"github.com/eclipse-cfm/cfm/agent/common/vpa"
 	"github.com/eclipse-cfm/cfm/agent/orchestration/ih/activity"
 	"github.com/eclipse-cfm/cfm/assembly/httpclient"
 	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
@@ -66,9 +67,9 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 				tokenexchange.WithTokenExchangeAudience(ctx.Config.GetString(audienceKey)),
 				tokenexchange.WithHttpClient(&httpClient))
 
-			return activity.NewProcessor(&activity.Config{
-				Client:      &httpClient,
-				LogMonitor:  ctx.Monitor,
+			return vpa.AsActivityProcessor(activity.NewProcessor(&activity.Config{
+				Client:     &httpClient,
+				LogMonitor: ctx.Monitor,
 				IdentityAPIClient: identityhub.HttpIdentityAPIClient{
 					BaseURL:       ihURL,
 					TokenProvider: provider,
@@ -78,7 +79,7 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 				CredentialServiceURL: ihCsURL,
 				ProtocolServiceURL:   cpProtocolURL,
 				DataServiceURL:       cpDataServiceURL,
-			})
+			}))
 		},
 	}
 	natsagent.LaunchAgent(shutdown, config)

@@ -29,7 +29,6 @@ import (
 )
 
 type IdentityHubActivityProcessor struct {
-	api.BaseActivityProcessor
 	HTTPClient        *http.Client
 	Monitor           system.LogMonitor
 	IdentityAPIClient identityhub.IdentityAPIClient

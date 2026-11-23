@@ -20,6 +20,7 @@ import (
 
 	"github.com/eclipse-cfm/cfm/agent/common"
 	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
+	"github.com/eclipse-cfm/cfm/agent/common/vpa"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
@@ -63,7 +64,7 @@ func TestIHActivityProcessor_ProcessDeploy_WithValidData(t *testing.T) {
 	activityContext := api.NewActivityContext(context.Background(), "orch-1", api.Activity{
 		ID:            "test-activity",
 		Type:          "ih",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}, copyOf(processingData), make(map[string]any))
 
 	result := processor.ProcessDeploy(activityContext)
@@ -96,7 +97,7 @@ func TestIHActivityProcessor_ProcessDeploy_MissingCredentialServiceURL(t *testin
 	activityContext := api.NewActivityContext(context.Background(), "orch-3", api.Activity{
 		ID:            "activity-2",
 		Type:          "ih",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}, pd, make(map[string]any))
 
 	result := processor.ProcessDeploy(activityContext)
@@ -113,7 +114,7 @@ func TestIHActivityProcessor_ProcessDeploy_MissingProtocolServiceURL(t *testing.
 	activityContext := api.NewActivityContext(context.Background(), "orch-4", api.Activity{
 		ID:            "activity-3",
 		Type:          "ih",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}, pd, make(map[string]any))
 
 	result := processor.ProcessDeploy(activityContext)
@@ -130,7 +131,7 @@ func TestIHActivityProcessor_ProcessDeploy_MissingDataServiceURL(t *testing.T) {
 	activityContext := api.NewActivityContext(context.Background(), "orch-4b", api.Activity{
 		ID:            "activity-3b",
 		Type:          "ih",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}, pd, make(map[string]any))
 
 	result := processor.ProcessDeploy(activityContext)
@@ -145,7 +146,7 @@ func TestIHActivityProcessor_ProcessDeploy_IdentityHubFailure(t *testing.T) {
 	activityContext := api.NewActivityContext(context.Background(), "orch-6", api.Activity{
 		ID:            "activity-5",
 		Type:          "ih",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}, copyOf(processingData), make(map[string]any))
 
 	result := processor.ProcessDeploy(activityContext)
@@ -160,7 +161,7 @@ func TestIHActivityProcessor_ProcessDispose_Success(t *testing.T) {
 	activityContext := api.NewActivityContext(context.Background(), "orch-7", api.Activity{
 		ID:            "activity-6",
 		Type:          "ih",
-		Discriminator: api.DisposeDiscriminator,
+		Discriminator: vpa.DisposeDiscriminator,
 	}, copyOf(processingData), make(map[string]any))
 
 	result := processor.ProcessDispose(activityContext)
@@ -175,7 +176,7 @@ func TestIHActivityProcessor_ProcessDispose_IdentityHubError(t *testing.T) {
 	activityContext := api.NewActivityContext(context.Background(), "orch-8", api.Activity{
 		ID:            "activity-7",
 		Type:          "ih",
-		Discriminator: api.DisposeDiscriminator,
+		Discriminator: vpa.DisposeDiscriminator,
 	}, copyOf(processingData), make(map[string]any))
 
 	result := processor.ProcessDispose(activityContext)

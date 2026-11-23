@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
+	"github.com/eclipse-cfm/cfm/agent/common/vpa"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
@@ -75,7 +76,7 @@ func TestEDCVActivityProcessor_Process_WithProfiles(t *testing.T) {
 	pd := copyOf(processingData)
 	pd[model.VPAData] = connectorVpaData([]string{"cx-neptune", "cx-pluto"})
 
-	activity := api.Activity{ID: "test-activity", Type: "edcv", Discriminator: api.DeployDiscriminator}
+	activity := api.Activity{ID: "test-activity", Type: "edcv", Discriminator: vpa.DeployDiscriminator}
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, pd, make(map[string]any))
 
 	result := processor.ProcessDeploy(activityContext)
@@ -93,7 +94,7 @@ func TestEDCVActivityProcessor_Process_EmptyProfiles_NoAssociation(t *testing.T)
 	pd := copyOf(processingData)
 	pd[model.VPAData] = connectorVpaData([]string{})
 
-	activity := api.Activity{ID: "test-activity", Type: "edcv", Discriminator: api.DeployDiscriminator}
+	activity := api.Activity{ID: "test-activity", Type: "edcv", Discriminator: vpa.DeployDiscriminator}
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, pd, make(map[string]any))
 
 	result := processor.ProcessDeploy(activityContext)
@@ -110,7 +111,7 @@ func TestEDCVActivityProcessor_Process_ProfileAssociationFailure(t *testing.T) {
 	pd := copyOf(processingData)
 	pd[model.VPAData] = connectorVpaData([]string{"cx-neptune"})
 
-	activity := api.Activity{ID: "test-activity", Type: "edcv", Discriminator: api.DeployDiscriminator}
+	activity := api.Activity{ID: "test-activity", Type: "edcv", Discriminator: vpa.DeployDiscriminator}
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, pd, make(map[string]any))
 
 	result := processor.ProcessDeploy(activityContext)
@@ -128,7 +129,7 @@ func TestEDCVActivityProcessor_Process_WithValidData(t *testing.T) {
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, copyOf(processingData), outputData)
@@ -150,7 +151,7 @@ func TestEDCVActivityProcessor_Process_MissingParticipantID(t *testing.T) {
 	activity := api.Activity{
 		ID:            "activity-1",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orchestration-1", activity, pd, outputData)
@@ -247,7 +248,7 @@ func TestEDCVActivityProcessor_Process_MultipleUnknownFields(t *testing.T) {
 	activity := api.Activity{
 		ID:            "activity-multi",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-multi", activity, pd, outputData)
@@ -268,7 +269,7 @@ func TestEDCVActivityProcessor_Process_ManagementAPIFailure(t *testing.T) {
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, copyOf(processingData), outputData)
@@ -288,7 +289,7 @@ func TestEDCVActivityProcessor_Process_ManagementAPIFailureConfig(t *testing.T) 
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, copyOf(processingData), outputData)
@@ -308,7 +309,7 @@ func TestEDCVActivityProcessor_ProcessDispose(t *testing.T) {
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DisposeDiscriminator,
+		Discriminator: vpa.DisposeDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, copyOf(processingData), outputData)
@@ -330,7 +331,7 @@ func TestEDCVActivityProcessor_ProcessDispose_CtrlPlaneParticipantError(t *testi
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DisposeDiscriminator,
+		Discriminator: vpa.DisposeDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, copyOf(processingData), outputData)
@@ -352,7 +353,7 @@ func TestEDCVActivityProcessor_ProcessDispose_CtrlPlaneConfigError(t *testing.T)
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DisposeDiscriminator,
+		Discriminator: vpa.DisposeDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, copyOf(processingData), outputData)

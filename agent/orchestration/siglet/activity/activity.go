@@ -25,6 +25,7 @@ import (
 
 	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
 	"github.com/eclipse-cfm/cfm/agent/common/siglet"
+	"github.com/eclipse-cfm/cfm/agent/common/vpa"
 	. "github.com/eclipse-cfm/cfm/common/collection"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/system"
@@ -84,7 +85,6 @@ type Config struct {
 }
 
 type SigletActivityProcessor struct {
-	api.BaseActivityProcessor
 	monitor                   system.LogMonitor
 	sigletSignalingURL        string
 	transferTypeMappingClient siglet.TransferTypeMappingClient
@@ -112,7 +112,7 @@ func (p SigletActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.Acti
 	spanCtx, span := p.tracer.Start(ctx.Context(), "cfm.agent.siglet.deploy")
 	defer span.End()
 
-	props, err := ctx.VpaProperties(model.DataPlaneType)
+	props, err := vpa.Properties(ctx, model.DataPlaneType)
 	if err != nil {
 		span.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error reading data plane VPA properties for orchestration %s: %w", ctx.OID(), err)}

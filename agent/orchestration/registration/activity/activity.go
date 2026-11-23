@@ -16,6 +16,7 @@ import (
 	"fmt"
 
 	"github.com/eclipse-cfm/cfm/agent/common/issuerservice"
+	"github.com/eclipse-cfm/cfm/agent/common/vpa"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
@@ -24,7 +25,6 @@ import (
 )
 
 type RegistrationActivityProcessor struct {
-	api.BaseActivityProcessor
 	Monitor       system.LogMonitor
 	IssuerService issuerservice.ApiClient
 }
@@ -61,7 +61,7 @@ func (p RegistrationActivityProcessor) ProcessDeploy(ctx api.ActivityContext) ap
 	}
 
 	holderID := regData.DID
-	properties, err := ctx.VpaProperties(model.IssuerServiceType)
+	properties, err := vpa.Properties(ctx, model.IssuerServiceType)
 	if err != nil {
 		span.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error reading vpa data: %w", err)}
