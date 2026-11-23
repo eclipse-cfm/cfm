@@ -44,10 +44,12 @@ func newPostgresDefinitionStore() api.DefinitionStore {
 }
 
 func newOrchestrationStore() store.EntityStore[*api.OrchestrationDefinition] {
-	columnNames := []string{"id", "type", "version", "description", "active", "schema", "activities", "templateref"}
+	columnNames := []string{"id", "type", "version", "description", "active", "schema", "activities", "templateref", "compensation_type"}
 	builder := sqlstore.NewPostgresJSONBBuilder().WithJSONBFieldTypes(map[string]sqlstore.JSONBFieldType{
 		"schema":     sqlstore.JSONBFieldTypeArrayOfObjects,
 		"activities": sqlstore.JSONBFieldTypeArrayOfObjects,
+	}).WithFieldMappings(map[string]string{
+		"compensationType": "compensation_type",
 	})
 
 	estore := sqlstore.NewPostgresEntityStore[*api.OrchestrationDefinition](
@@ -274,6 +276,11 @@ func orchestrationEntityToRecord(definition *api.OrchestrationDefinition) (*sqls
 	record.Values["description"] = definition.Description
 	record.Values["active"] = definition.Active
 	record.Values["templateref"] = definition.TemplateRef
+	if definition.CompensationType != "" {
+		record.Values["compensation_type"] = definition.CompensationType.String()
+	} else {
+		record.Values["compensation_type"] = nil
+	}
 
 	if definition.Schema != nil {
 		bytes, err := json.Marshal(definition.Schema)
@@ -336,6 +343,11 @@ func recordToOrchestrationEntity(tx *sql.Tx, record *sqlstore.DatabaseRecord) (*
 		definition.TemplateRef = templateref
 	} else {
 		return nil, fmt.Errorf("invalid orchestration definition templateref reading record")
+	}
+
+	// the column is NULL for a definition without compensation
+	if compensationType, ok := record.Values["compensation_type"].(string); ok {
+		definition.CompensationType = model.OrchestrationType(compensationType)
 	}
 	return definition, nil
 }

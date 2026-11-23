@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/types"
 )
 
 const (
@@ -40,6 +41,8 @@ type OrchestrationDefinitionDto struct {
 	Schema      map[string]any           `json:"schema,omitempty"`
 	Activities  map[string][]ActivityDto `json:"activities" validate:"required,min=1,dive,dive"`
 	TemplateRef string                   `json:"templateRef" validate:"required"`
+	// CompensationType is the orchestration type that compensates this definition when one of its orchestrations fails
+	CompensationType string `json:"compensationType,omitempty"`
 }
 
 type IDResponse struct {
@@ -52,6 +55,34 @@ type OrchestrationTemplate struct {
 	Schema      map[string]any           `json:"schema,omitempty"`
 	ID          string                   `json:"id"`
 	Activities  map[string][]ActivityDto `json:"activities" validate:"required,min=1,dive,dive"`
+	// Compensation maps an orchestration type in Activities to the orchestration type in Activities that is started when
+	// an orchestration of the first type fails. An orchestration type without an entry is not compensated.
+	Compensation map[string]string `json:"compensation,omitempty"`
+}
+
+// ValidateCompensation checks the Compensation map of the template. Every key and every value must be an orchestration
+// type in Activities, an orchestration type must not compensate itself, and following the map from any orchestration
+// type must not lead back to it, because a failed compensation would otherwise start the orchestration it compensates.
+func (t *OrchestrationTemplate) ValidateCompensation() error {
+	for orchType, compensationType := range t.Compensation {
+		if _, ok := t.Activities[orchType]; !ok {
+			return types.NewValidationError("compensation."+orchType, "orchestration type is not defined in activities")
+		}
+		if _, ok := t.Activities[compensationType]; !ok {
+			return types.NewValidationError("compensation."+orchType, "compensation type ["+compensationType+"] is not defined in activities")
+		}
+		if compensationType == orchType {
+			return types.NewValidationError("compensation."+orchType, "an orchestration type cannot compensate itself")
+		}
+		visited := map[string]bool{orchType: true}
+		for next, ok := compensationType, true; ok; next, ok = t.Compensation[next] {
+			if visited[next] {
+				return types.NewValidationError("compensation."+orchType, "compensation types form a cycle")
+			}
+			visited[next] = true
+		}
+	}
+	return nil
 }
 
 type OrchestrationEntry struct {

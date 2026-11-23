@@ -305,6 +305,9 @@
           "payload": {
             "type": "object",
             "additionalProperties": {}
+          },
+          "replyTo": {
+            "type": "string"
           }
         }
       },
@@ -449,6 +452,9 @@
               }
             }
           },
+          "compensationType": {
+            "type": "string"
+          },
           "description": {
             "type": "string"
           },
@@ -514,6 +520,12 @@
               "items": {
                 "$ref": "#/components/schemas/V1alpha1ActivityDto"
               }
+            }
+          },
+          "compensation": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
             }
           },
           "description": {

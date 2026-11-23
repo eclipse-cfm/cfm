@@ -106,6 +106,31 @@ Compensation may be initiated by several triggers:
 
 - manually, by an operator via the CFM API.
 
+### Automatic compensation
+
+An orchestration template declares which orchestration type compensates which other type in its `compensation` map. A
+key and its value must both be orchestration types in `activities`. When an orchestration fails, the Provision Manager
+reads the definition of the failed orchestration and starts an orchestration of the declared compensation type, which
+must come from the same template. The compensation orchestration has the ID `<failed orchestration ID>-compensation`, so
+it is started only once, and it reports its result to the `replyTo` subject of the orchestration it compensates.
+
+An orchestration type without an entry in `compensation` is not compensated. This also applies to a failed compensation
+orchestration: it is only compensated if its own type has an entry. The template is rejected if an orchestration type
+compensates itself, or if following the entries leads back to a type that was already visited.
+
+```json
+{
+  "id": "participant-template",
+  "activities": {
+    "cfm.orchestration.vpa.deploy": [{ "id": "connector-create", "type": "edcv-activity" }],
+    "cfm.orchestration.vpa.dispose": [{ "id": "connector-cleanup", "type": "edcv-activity" }]
+  },
+  "compensation": {
+    "cfm.orchestration.vpa.deploy": "cfm.orchestration.vpa.dispose"
+  }
+}
+```
+
 ## Reconciliation processing
 
 Reconciliation should be implemented in `ActivityProcessors`. Each activity processor must report `ActivityResultWait`

@@ -50,6 +50,10 @@ func CreateTestOrchestrationDefinitions(apiClient *ApiClient) error {
 				Type: "test-activity",
 			}},
 		},
+		// a failed deployment is rolled back by the dispose orchestration
+		Compensation: map[string]string{
+			model.VPADeployType.String(): model.VPADisposeType.String(),
+		},
 	}
 
 	return apiClient.PostToPManager("orchestration-definitions", requestBody)

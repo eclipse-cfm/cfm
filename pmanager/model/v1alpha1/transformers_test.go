@@ -708,3 +708,30 @@ func TestToActivityDefinition_WithComplexSchemas(t *testing.T) {
 //	assert.Len(t, result.Activities[0].DependsOn, 0)
 //	assert.Len(t, result.Activities[1].DependsOn, 0)
 //}
+
+func TestToOrchestrationDefinition_CompensationType(t *testing.T) {
+	template := &OrchestrationTemplate{
+		ID: "template-1",
+		Activities: map[string][]ActivityDto{
+			"test.deploy":   {{ID: "a1", Type: "test-activity"}},
+			"test.rollback": {{ID: "a2", Type: "test-activity"}},
+		},
+		Compensation: map[string]string{"test.deploy": "test.rollback"},
+	}
+
+	_, definitions := ToOrchestrationDefinition(template)
+
+	require.Len(t, definitions, 2)
+	for _, definition := range definitions {
+		switch definition.Type {
+		case "test.deploy":
+			assert.Equal(t, model.OrchestrationType("test.rollback"), definition.CompensationType)
+			assert.Equal(t, "test.rollback", ToOrchestrationDefinitionDto(definition).CompensationType)
+		case "test.rollback":
+			assert.Empty(t, definition.CompensationType)
+			assert.Empty(t, ToOrchestrationDefinitionDto(definition).CompensationType)
+		default:
+			t.Fatalf("unexpected orchestration type %s", definition.Type)
+		}
+	}
+}

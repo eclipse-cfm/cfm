@@ -80,15 +80,14 @@ func (h *PMHandler) createOrchestrationDefinition(w http.ResponseWriter, req *ht
 
 	span.SetAttributes(attribute.String("orchestration.template_id", orchestrationTemplate.ID))
 	span.AddEvent("Payload read successfully")
-	hasCompensation := false
-	for key, activities := range orchestrationTemplate.Activities {
-		if key == model.VPADisposeType.String() && len(activities) > 0 {
-			hasCompensation = true
-		}
+	if err := orchestrationTemplate.ValidateCompensation(); err != nil {
+		span.RecordError(err)
+		h.HandleError(w, err)
+		return
 	}
-	if !hasCompensation {
-		span.RecordError(fmt.Errorf("no compensation activity found"))
-		h.Monitor.Warnf("Orchestration template does not contain a compensation activity. Compensation orchestration definitions will not be created for orchestration template [%s] and auto-rollback will not be available", orchestrationTemplate.ID)
+	if len(orchestrationTemplate.Compensation) == 0 {
+		span.RecordError(fmt.Errorf("no compensation entry found"))
+		h.Monitor.Warnf("Orchestration template [%s] does not contain a compensation entry. Failed orchestrations of this template will not be compensated automatically", orchestrationTemplate.ID)
 	}
 
 	templateRef, definitions := v1alpha1.ToOrchestrationDefinition(&orchestrationTemplate)
