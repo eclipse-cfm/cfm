@@ -38,8 +38,22 @@ func CreateTestActivityDefinition(apiClient *ApiClient) error {
 	return apiClient.PostToPManager("activity-definitions", requestBody)
 }
 
+// DataspaceTemplateSchema returns the template schema of a dataspace orchestration template. It declares the fields that
+// tmanager writes into the manifest payload, so that pmanager can validate the activity inputs against them.
+func DataspaceTemplateSchema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			model.ParticipantIdentifier: map[string]any{"type": "string"},
+			model.VPAData:               map[string]any{"type": "array"},
+			model.CredentialData:        map[string]any{"type": "array"},
+		},
+	}
+}
+
 func CreateTestOrchestrationDefinitions(apiClient *ApiClient) error {
 	requestBody := pv1alpha1.OrchestrationTemplate{
+		Schema: DataspaceTemplateSchema(),
 		Activities: map[string][]pv1alpha1.ActivityDto{
 			model.VPADeployType.String(): {{
 				ID:   "activity1",

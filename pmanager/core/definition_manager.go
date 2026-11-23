@@ -19,7 +19,6 @@ import (
 	"strings"
 
 	"github.com/eclipse-cfm/cfm/common/collection"
-	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/query"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/types"
@@ -54,11 +53,9 @@ func (d definitionManager) CreateOrchestrationDefinition(ctx context.Context, de
 		if len(missingErrors) > 0 {
 			return nil, errors.Join(missingErrors...)
 		}
-		// Verify schema compatibility between dependent activities for deploy orchestrations
-		if definition.Type == model.VPADeployType {
-			if err := validateActivitySchema(definition.Activities, activityDefinitions); err != nil {
-				return nil, err
-			}
+		// Verify that every activity input is provided by the orchestration schema or by a dependent activity
+		if err := validateActivitySchema(definition.Schema, definition.Activities, activityDefinitions); err != nil {
+			return nil, err
 		}
 
 		persisted, err := d.store.StoreOrchestrationDefinition(ctx, definition)
@@ -191,7 +188,14 @@ func (d definitionManager) GetActivityDefinitions(ctx context.Context) ([]api.Ac
 	return result, err
 }
 
-func validateActivitySchema(activities []api.Activity, activityDefinitions map[api.ActivityType]*api.ActivityDefinition) error {
+// validateActivitySchema verifies that the input of every activity is provided either by the orchestration schema or by
+// the output of the activities it depends on, and that the types of matching fields agree.
+//
+// The properties of the orchestration schema describe the fields of the manifest payload, which is injected into every
+// activity of the orchestration. The validation does not depend on the orchestration type.
+func validateActivitySchema(schema map[string]any, activities []api.Activity, activityDefinitions map[api.ActivityType]*api.ActivityDefinition) error {
+	schemaProperties, _ := schema["properties"].(map[string]any)
+
 	activityMapById := make(map[string]api.Activity)
 
 	for _, activity := range activities {
@@ -202,12 +206,11 @@ func validateActivitySchema(activities []api.Activity, activityDefinitions map[a
 
 	for _, activity := range activities {
 
-		mergedDependantOutputProperties := make(map[string]any)
-
-		//The following 3 fields are always injected as part of the orchestration manifest. In a future this could be modified and maybe derived from the orchestration schema
-		mergedDependantOutputProperties[model.ParticipantIdentifier] = map[string]any{"type": "string"}
-		mergedDependantOutputProperties[model.VPAData] = map[string]any{"type": "array"}
-		mergedDependantOutputProperties[model.CredentialData] = map[string]any{"type": "array"}
+		// the fields of the manifest payload, as declared by the orchestration schema, are available to every activity
+		mergedDependantOutputProperties := make(map[string]any, len(schemaProperties))
+		for field, fieldSchema := range schemaProperties {
+			mergedDependantOutputProperties[field] = fieldSchema
+		}
 
 		hasDuplicateFieldError := false
 
@@ -219,7 +222,10 @@ func validateActivitySchema(activities []api.Activity, activityDefinitions map[a
 				continue
 			}
 			for field := range dependantOutputProperties {
-				if _, exists := mergedDependantOutputProperties[field]; exists {
+				if _, inSchema := schemaProperties[field]; inSchema {
+					validationErrors = append(validationErrors, types.NewValidationError(activity.ID, fmt.Sprintf("field %s is provided by both the orchestration schema and dependent activity %s", field, dependencyID)))
+					hasDuplicateFieldError = true
+				} else if _, exists := mergedDependantOutputProperties[field]; exists {
 					validationErrors = append(validationErrors, types.NewValidationError(activity.ID, fmt.Sprintf("field %s is duplicated in multiple dependent activities", field)))
 					hasDuplicateFieldError = true
 				} else {
@@ -241,11 +247,7 @@ func validateActivitySchema(activities []api.Activity, activityDefinitions map[a
 			}
 
 			if _, exists := mergedDependantOutputProperties[field]; !exists {
-				if len(activity.DependsOn) == 0 {
-					validationErrors = append(validationErrors, types.NewValidationError(activity.ID, "activity has required input fields in InputSchema but not declared dependencies"))
-					break
-				}
-				validationErrors = append(validationErrors, types.NewValidationError(activity.ID, fmt.Sprintf("required input field %s is not provided by dependent activities as output", field)))
+				validationErrors = append(validationErrors, types.NewValidationError(activity.ID, fmt.Sprintf("required input field %s is not provided by the orchestration schema or by dependent activities", field)))
 			}
 		}
 
@@ -260,7 +262,7 @@ func validateActivitySchema(activities []api.Activity, activityDefinitions map[a
 			dependantFieldType, _ := dependantFieldMap["type"].(string)
 
 			if inputFieldType != "" && dependantFieldType != "" && inputFieldType != dependantFieldType {
-				validationErrors = append(validationErrors, types.NewValidationError(activity.ID, fmt.Sprintf("type of input field %s differs from dependent activities output", field)))
+				validationErrors = append(validationErrors, types.NewValidationError(activity.ID, fmt.Sprintf("type of input field %s differs from the orchestration schema or dependent activities output", field)))
 			}
 
 		}

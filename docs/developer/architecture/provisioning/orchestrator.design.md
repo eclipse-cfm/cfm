@@ -100,6 +100,12 @@ types:
 - `output`: The output data from the orchestration.
 - `schema`: The schema for input data.
 
+The `properties` of the `schema` declare the fields of the orchestration manifest payload, which is available to every
+activity. When a definition is created, every required input of an activity (`inputSchema`) must be declared in the
+`schema` or in the `outputSchema` of an activity it depends on, and the types of matching fields must agree. This
+applies to every orchestration type. A field must not be declared both in the `schema` and in the `outputSchema` of a
+dependency, or in the `outputSchema` of more than one dependency.
+
 Activities form a Directed Acyclic Graph (DAG) by declaring dependencies using the `dependsOn` property. At execution
 time, the activities will be ordered using a topological sort and grouping activities into tiers of parallel execution
 steps based on their dependencies.
