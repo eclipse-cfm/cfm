@@ -902,7 +902,7 @@ func TestValidateActivitySchema_Success(t *testing.T) {
 			},
 		},
 	}
-	err := validateActivitySchema(activities, activityDefinitions)
+	err := validateActivitySchema(nil, activities, activityDefinitions)
 	require.NoError(t, err)
 }
 
@@ -926,7 +926,7 @@ func TestValidateActivitySchema_MissingRequiredField(t *testing.T) {
 			},
 		},
 	}
-	err := validateActivitySchema(activities, activityDefinitions)
+	err := validateActivitySchema(nil, activities, activityDefinitions)
 	require.Error(t, err, "Missing required field-a")
 	assert.Contains(t, err.Error(), "required input field field-a")
 }
@@ -959,7 +959,7 @@ func TestValidateActivitySchema_DuplicatedFields(t *testing.T) {
 			},
 		},
 	}
-	err := validateActivitySchema(activities, activityDefinitions)
+	err := validateActivitySchema(nil, activities, activityDefinitions)
 	require.Error(t, err, "Field defined by multiple output schemas")
 	assert.Contains(t, err.Error(), "field field-1 is duplicated in multiple dependent activities")
 }
@@ -986,9 +986,9 @@ func TestValidateActivitySchema_IncompatibleRequiredFieldTypes(t *testing.T) {
 			},
 		},
 	}
-	err := validateActivitySchema(activities, activityDefinitions)
+	err := validateActivitySchema(nil, activities, activityDefinitions)
 	require.Error(t, err, "Type missmatch in Required Output and Input Field")
-	assert.Contains(t, err.Error(), "type of input field field-a differs from dependent activities output")
+	assert.Contains(t, err.Error(), "type of input field field-a differs from the orchestration schema or dependent activities output")
 }
 
 func TestValidateActivitySchema_IncompatibleOptionalFieldTypes(t *testing.T) {
@@ -1012,9 +1012,9 @@ func TestValidateActivitySchema_IncompatibleOptionalFieldTypes(t *testing.T) {
 			},
 		},
 	}
-	err := validateActivitySchema(activities, activityDefinitions)
+	err := validateActivitySchema(nil, activities, activityDefinitions)
 	require.Error(t, err, "Type missmatch in Optional Output and Input Field")
-	assert.Contains(t, err.Error(), "type of input field field-a differs from dependent activities output")
+	assert.Contains(t, err.Error(), "type of input field field-a differs from the orchestration schema or dependent activities output")
 }
 
 func TestValidateActivitySchema_NonObjectFieldSchema(t *testing.T) {
@@ -1039,7 +1039,7 @@ func TestValidateActivitySchema_NonObjectFieldSchema(t *testing.T) {
 		},
 	}
 	require.NotPanics(t, func() {
-		err := validateActivitySchema(activities, activityDefinitions)
+		err := validateActivitySchema(nil, activities, activityDefinitions)
 		require.NoError(t, err, "field schemas that are not objects carry no type to compare")
 	})
 }
@@ -1061,7 +1061,7 @@ func TestValidateActivitySchema_OptionalFieldMissing(t *testing.T) {
 			},
 		},
 	}
-	err := validateActivitySchema(activities, activityDefinitions)
+	err := validateActivitySchema(nil, activities, activityDefinitions)
 	require.NoError(t, err, "Validation should succeed")
 }
 
@@ -1096,7 +1096,7 @@ func TestValidateActivitySchema_TransitiveDependency(t *testing.T) {
 			},
 		},
 	}
-	err := validateActivitySchema(activities, activityDefinitions)
+	err := validateActivitySchema(nil, activities, activityDefinitions)
 	require.NoError(t, err, "Validation should succeed")
 }
 
@@ -1131,9 +1131,9 @@ func TestValidateActivitySchema_TransitiveDependencyNotDeclared(t *testing.T) {
 			},
 		},
 	}
-	err := validateActivitySchema(activities, activityDefinitions)
+	err := validateActivitySchema(nil, activities, activityDefinitions)
 	require.Error(t, err, "Transitive dependency not declared")
-	assert.Contains(t, err.Error(), "required input field field-1 is not provided by dependent activities as output")
+	assert.Contains(t, err.Error(), "required input field field-1 is not provided by the orchestration schema or by dependent activities")
 }
 
 func TestValidateActivitySchema_RequiredFieldsButNoDependencies(t *testing.T) {
@@ -1150,9 +1150,228 @@ func TestValidateActivitySchema_RequiredFieldsButNoDependencies(t *testing.T) {
 			},
 		},
 	}
-	err := validateActivitySchema(activities, activityDefinitions)
+	err := validateActivitySchema(nil, activities, activityDefinitions)
 	require.Error(t, err, "No dependency declared but additional fields in InputSchema required")
-	assert.Contains(t, err.Error(), "activity has required input fields in InputSchema but not declared dependencies")
+	assert.Contains(t, err.Error(), "required input field field-1 is not provided by the orchestration schema or by dependent activities")
+}
+
+func TestCreateOrchestrationDefinition_ArbitraryTypeMissingInputRejected(t *testing.T) {
+	store := memorystore.NewDefinitionStore()
+	manager := definitionManager{
+		trxContext: cstore.NoOpTransactionContext{},
+		store:      store,
+	}
+	ctx := context.Background()
+
+	_, err := store.StoreActivityDefinition(ctx, &api.ActivityDefinition{
+		Type: "needs-input",
+		InputSchema: map[string]any{
+			"properties": map[string]any{"cluster.id": map[string]any{"type": "string"}},
+			"required":   []any{"cluster.id"},
+		},
+	})
+	require.NoError(t, err)
+
+	definition := &api.OrchestrationDefinition{
+		Type:       model.OrchestrationType("example.cluster.provision"),
+		Active:     true,
+		Schema:     map[string]any{"type": "object"},
+		Activities: []api.Activity{{ID: "activity-1", Type: "needs-input"}},
+	}
+
+	_, err = manager.CreateOrchestrationDefinition(ctx, definition)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "required input field cluster.id is not provided by the orchestration schema or by dependent activities")
+	exists, err := store.ExistsOrchestrationDefinition(ctx, definition.Type)
+	require.NoError(t, err)
+	assert.False(t, exists, "a definition that fails validation must not be stored")
+}
+
+func TestCreateOrchestrationDefinition_ArbitraryTypeInputFromSchemaAccepted(t *testing.T) {
+	store := memorystore.NewDefinitionStore()
+	manager := definitionManager{
+		trxContext: cstore.NoOpTransactionContext{},
+		store:      store,
+	}
+	ctx := context.Background()
+
+	_, err := store.StoreActivityDefinition(ctx, &api.ActivityDefinition{
+		Type: "needs-input",
+		InputSchema: map[string]any{
+			"properties": map[string]any{"cluster.id": map[string]any{"type": "string"}},
+			"required":   []any{"cluster.id"},
+		},
+	})
+	require.NoError(t, err)
+
+	definition := &api.OrchestrationDefinition{
+		Type:   model.OrchestrationType("example.cluster.provision"),
+		Active: true,
+		Schema: map[string]any{
+			"type":       "object",
+			"properties": map[string]any{"cluster.id": map[string]any{"type": "string"}},
+		},
+		Activities: []api.Activity{{ID: "activity-1", Type: "needs-input"}},
+	}
+
+	result, err := manager.CreateOrchestrationDefinition(ctx, definition)
+
+	require.NoError(t, err)
+	assert.Equal(t, definition.Type, result.Type)
+}
+
+func TestValidateActivitySchema_InputFromSchema(t *testing.T) {
+	schema := map[string]any{
+		"properties": map[string]any{"field-1": map[string]any{"type": "string"}},
+	}
+	activities := []api.Activity{{ID: "activity-a", Type: "type-a"}}
+	activityDefinitions := map[api.ActivityType]*api.ActivityDefinition{
+		"type-a": {
+			InputSchema: map[string]any{
+				"properties": map[string]any{"field-1": map[string]any{"type": "string"}},
+				"required":   []any{"field-1"},
+			},
+		},
+	}
+	require.NoError(t, validateActivitySchema(schema, activities, activityDefinitions))
+}
+
+func TestValidateActivitySchema_InputFromSchemaAndDependency(t *testing.T) {
+	schema := map[string]any{
+		"properties": map[string]any{"field-1": map[string]any{"type": "string"}},
+	}
+	activities := []api.Activity{
+		{ID: "activity-a", Type: "type-a"},
+		{ID: "activity-b", Type: "type-b", DependsOn: []string{"activity-a"}},
+	}
+	activityDefinitions := map[api.ActivityType]*api.ActivityDefinition{
+		"type-a": {
+			OutputSchema: map[string]any{
+				"properties": map[string]any{"field-2": map[string]any{"type": "string"}},
+			},
+		},
+		"type-b": {
+			InputSchema: map[string]any{
+				"properties": map[string]any{
+					"field-1": map[string]any{"type": "string"},
+					"field-2": map[string]any{"type": "string"},
+				},
+				"required": []any{"field-1", "field-2"},
+			},
+		},
+	}
+	require.NoError(t, validateActivitySchema(schema, activities, activityDefinitions))
+}
+
+func TestValidateActivitySchema_SchemaTypeMismatch(t *testing.T) {
+	schema := map[string]any{
+		"properties": map[string]any{"field-1": map[string]any{"type": "array"}},
+	}
+	activities := []api.Activity{{ID: "activity-a", Type: "type-a"}}
+	activityDefinitions := map[api.ActivityType]*api.ActivityDefinition{
+		"type-a": {
+			InputSchema: map[string]any{
+				"properties": map[string]any{"field-1": map[string]any{"type": "string"}},
+			},
+		},
+	}
+	err := validateActivitySchema(schema, activities, activityDefinitions)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "type of input field field-1 differs from the orchestration schema or dependent activities output")
+}
+
+func TestValidateActivitySchema_SchemaFieldAlsoOutputByDependency(t *testing.T) {
+	schema := map[string]any{
+		"properties": map[string]any{"field-1": map[string]any{"type": "string"}},
+	}
+	activities := []api.Activity{
+		{ID: "activity-a", Type: "type-a"},
+		{ID: "activity-b", Type: "type-b", DependsOn: []string{"activity-a"}},
+	}
+	activityDefinitions := map[api.ActivityType]*api.ActivityDefinition{
+		"type-a": {
+			OutputSchema: map[string]any{
+				"properties": map[string]any{"field-1": map[string]any{"type": "string"}},
+			},
+		},
+		"type-b": {},
+	}
+	err := validateActivitySchema(schema, activities, activityDefinitions)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "field field-1 is provided by both the orchestration schema and dependent activity activity-a")
+}
+
+func TestValidateActivitySchema_SchemaWithoutProperties(t *testing.T) {
+	activities := []api.Activity{{ID: "activity-a", Type: "type-a"}}
+	activityDefinitions := map[api.ActivityType]*api.ActivityDefinition{
+		"type-a": {
+			InputSchema: map[string]any{
+				"properties": map[string]any{"field-1": map[string]any{"type": "string"}},
+				"required":   []any{"field-1"},
+			},
+		},
+	}
+	for name, schema := range map[string]map[string]any{
+		"nil schema":           nil,
+		"no properties":        {"type": "object"},
+		"malformed properties": {"properties": "not-an-object"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.NotPanics(t, func() {
+				err := validateActivitySchema(schema, activities, activityDefinitions)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "required input field field-1")
+			})
+		})
+	}
+}
+
+// TestValidateActivitySchema_DataspaceFieldsDeclaredInSchema covers the dataspace deploy templates: the participant
+// identifier, VPA data, and credential data are provided because the template schema declares them, not because the
+// engine knows about them.
+func TestValidateActivitySchema_DataspaceFieldsDeclaredInSchema(t *testing.T) {
+	dataspaceSchema := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			model.ParticipantIdentifier: map[string]any{"type": "string"},
+			model.VPAData:               map[string]any{"type": "array"},
+			model.CredentialData:        map[string]any{"type": "array"},
+		},
+	}
+	activities := []api.Activity{
+		{ID: "activity-a", Type: "type-a"},
+		{ID: "activity-b", Type: "type-b", DependsOn: []string{"activity-a"}},
+	}
+	activityDefinitions := map[api.ActivityType]*api.ActivityDefinition{
+		"type-a": {
+			InputSchema: map[string]any{
+				"properties": map[string]any{
+					model.ParticipantIdentifier: map[string]any{"type": "string"},
+					model.VPAData:               map[string]any{"type": "array"},
+				},
+				"required": []any{model.ParticipantIdentifier, model.VPAData},
+			},
+			OutputSchema: map[string]any{
+				"properties": map[string]any{"field-a": map[string]any{"type": "string"}},
+			},
+		},
+		"type-b": {
+			InputSchema: map[string]any{
+				"properties": map[string]any{
+					model.CredentialData: map[string]any{"type": "array"},
+					"field-a":            map[string]any{"type": "string"},
+				},
+				"required": []any{model.CredentialData, "field-a"},
+			},
+		},
+	}
+
+	require.NoError(t, validateActivitySchema(dataspaceSchema, activities, activityDefinitions))
+
+	err := validateActivitySchema(map[string]any{"type": "object"}, activities, activityDefinitions)
+	require.Error(t, err, "without the schema declaration the dataspace fields are not provided")
+	assert.Contains(t, err.Error(), "required input field "+model.ParticipantIdentifier)
 }
 
 // Helper mock store for testing error scenarios

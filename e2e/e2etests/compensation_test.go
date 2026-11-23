@@ -184,6 +184,7 @@ func Test_VerifyAutoCompensation_NoCompensationOrchestration(t *testing.T) {
 	require.NoError(t, err)
 
 	requestBody := pv1alpha1.OrchestrationTemplate{
+		Schema: e2efixtures.DataspaceTemplateSchema(),
 		Activities: map[string][]pv1alpha1.ActivityDto{
 			model.VPADeployType.String(): {{
 				ID:   "activity1",
