@@ -234,3 +234,42 @@ func (m *MockProvisionManager) QueryOrchestrations(ctx context.Context, predicat
 func (m *MockProvisionManager) CountOrchestrations(ctx context.Context, predicate query.Predicate) (int64, error) {
 	panic("not implemented")
 }
+
+func TestNatsProvisionHandler_Dispatcher_StartErrorIsPublishedToReplyTo(t *testing.T) {
+	testCases := []struct {
+		name     string
+		replyTo  string
+		expected string
+	}{
+		{"reply-to set", "second-manager-response", "event.second-manager-response"},
+		{"no reply-to", "", natsclient.CFMOrchestrationResponseSubject},
+		// An invalid token is rejected by Start; the rejection must still reach a subject in the stream
+		{"invalid reply-to", "a.b", natsclient.CFMOrchestrationResponseSubject},
+		{"reserved reply-to", natsclient.CFMOrchestration, natsclient.CFMOrchestrationResponseSubject},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockClient := mocks.NewMockMsgClient(t)
+			mockProvisionManager := &MockProvisionManager{}
+			handler := newNatsProvisionHandler(mockClient, mockProvisionManager, system.NoopMonitor{})
+
+			ctx := context.Background()
+			manifest := model.OrchestrationManifest{ID: "test-manifest-id", OrchestrationType: model.VPADeployType, ReplyTo: tc.replyTo}
+			mockProvisionManager.On("Start", ctx, &manifest).Return(nil, types.NewClientError("orchestration type 'x' not found"))
+
+			var capturedPayload []byte
+			mockClient.EXPECT().Publish(ctx, tc.expected, mock.Anything).
+				Run(func(ctx context.Context, subject string, payload []byte, opts ...jetstream.PublishOpt) {
+					capturedPayload = payload
+				}).Return(&jetstream.PubAck{}, nil)
+
+			require.NoError(t, handler.RetriableMessageProcessor.Dispatcher(ctx, manifest))
+
+			var response model.OrchestrationResponse
+			require.NoError(t, json.Unmarshal(capturedPayload, &response))
+			assert.False(t, response.Success)
+			assert.Equal(t, "test-manifest-id", response.ManifestID)
+		})
+	}
+}

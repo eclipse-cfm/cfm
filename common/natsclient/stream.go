@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/nats-io/nats.go/jetstream"
 )
 
@@ -26,6 +27,22 @@ const CFMOrchestration = "cfm-orchestration"
 const CFMOrchestrationSubject = CFMSubjectPrefix + "." + CFMOrchestration
 const CFMOrchestrationResponse = "cfm-orchestration-response"
 const CFMOrchestrationResponseSubject = CFMSubjectPrefix + "." + CFMOrchestrationResponse
+
+// IsReservedReplyTo reports whether the given reply-to token names the subject the Provision Manager receives
+// orchestration manifests on. Responses published there would be consumed as manifests.
+func IsReservedReplyTo(replyTo string) bool {
+	return replyTo == CFMOrchestration
+}
+
+// ResponseSubject returns the subject an orchestration response is published to. A manifest that sets a reply-to token
+// receives its response on CFMSubjectPrefix + "." + replyTo. An empty, invalid or reserved token selects
+// CFMOrchestrationResponseSubject, so that a response is never published to a subject outside the stream.
+func ResponseSubject(replyTo string) string {
+	if replyTo == "" || model.ValidateReplyTo(replyTo) != nil || IsReservedReplyTo(replyTo) {
+		return CFMOrchestrationResponseSubject
+	}
+	return CFMSubjectPrefix + "." + replyTo
+}
 
 // SetupStream configures a JetStream stream used for component messaging. If the stream does not exist, it is created
 // with the client's resource configuration. An existing stream is never updated, so a stream provisioned out of band

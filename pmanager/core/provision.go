@@ -19,6 +19,7 @@ import (
 	"iter"
 
 	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/query"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
@@ -44,6 +45,15 @@ func (p provisionManager) Start(ctx context.Context, manifest *model.Orchestrati
 
 	if manifest.OrchestrationType == "" {
 		return nil, types.NewClientError("Missing required field: orchestrationType")
+	}
+
+	if manifest.ReplyTo != "" {
+		if err := model.ValidateReplyTo(manifest.ReplyTo); err != nil {
+			return nil, types.NewClientError("%s", err.Error())
+		}
+		if natsclient.IsReservedReplyTo(manifest.ReplyTo) {
+			return nil, types.NewClientError("invalid replyTo %q: the subject is reserved", manifest.ReplyTo)
+		}
 	}
 
 	var orchestration *api.Orchestration
@@ -88,6 +98,7 @@ func (p provisionManager) Start(ctx context.Context, manifest *model.Orchestrati
 			return types.NewFatalWrappedError(err, "error instantiating orchestration for %s", manifestID)
 		}
 		orch.CompensatedOrchestrationID = manifest.CompensatedManifestID
+		orch.ReplyTo = manifest.ReplyTo
 		err = p.orchestrator.Execute(ctx, orch)
 		if err != nil {
 			return executionError(err, orch.ID, manifestID)
