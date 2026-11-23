@@ -231,3 +231,30 @@ func TestValidator_ParticipantContextIDTag(t *testing.T) {
 	require.Error(t, Validator.Struct(data{ParticipantContextID: "../other"}))
 	require.Error(t, Validator.Struct(data{}))
 }
+
+func TestManifestReplyToValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		replyTo string
+		wantErr bool
+	}{
+		{"empty", "", false},
+		{"single token", "second-manager_response1", false},
+		{"dot", "second.manager", true},
+		{"wildcard", "*", true},
+		{"full wildcard", ">", true},
+		{"space", "second manager", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := Validator.Struct(OrchestrationManifest{ID: "id", CorrelationID: "corr", OrchestrationType: "type", ReplyTo: tt.replyTo})
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, ValidationMessage(err), "replyTo")
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}

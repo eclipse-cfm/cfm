@@ -211,6 +211,35 @@ func TestOnMessage_CompensationReferencesFailedOrchestration(t *testing.T) {
 	pManager.AssertExpectations(t)
 }
 
+// The compensation reports to the initiator of the failed orchestration
+func TestOnMessage_CompensationUsesReplyToOfFailedOrchestration(t *testing.T) {
+	index := createTestStore(t)
+	trxContext := &store.NoOpTransactionContext{}
+	pManager := &mocks.MockProvisionManager{}
+	pManager.On("Start", mock.Anything, mock.MatchedBy(func(manifest *model.OrchestrationManifest) bool {
+		return manifest.CompensatedManifestID == "orch-1" && manifest.ReplyTo == "second-manager-response"
+	})).Return(&api.Orchestration{}, nil)
+	manager := mocks.MockDefinitionManager{}
+	manager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{{}}, nil)
+	watcher := createTestWatcher(index, trxContext, pManager, &manager)
+
+	ctx := context.Background()
+
+	orch1 := createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateRunning)
+	orch1.ReplyTo = "second-manager-response"
+	_, err := index.Create(ctx, convertToEntry(orch1))
+	require.NoError(t, err)
+
+	orch2 := createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateErrored)
+	orch2.ReplyTo = "second-manager-response"
+	orch2.StateTimestamp = time.Now().Add(time.Second)
+	msg := createNatsMsg(t, orch2)
+
+	watcher.onMessage(msg.Data, msg)
+
+	pManager.AssertExpectations(t)
+}
+
 // Compensation should fail if there are too many compensation orchestration defs
 func TestOnMessage_ErrorWhenTooManyCompensationOrchs(t *testing.T) {
 	index := createTestStore(t)

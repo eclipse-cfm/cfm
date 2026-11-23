@@ -414,7 +414,8 @@ func (e *NatsActivityExecutor) handleOrchestrationCompletion(
 	return natsclient.AckMessage(message)
 }
 
-// publishResponse reports the outcome of an orchestration to its initiator. A non-empty errorDetail reports a failure:
+// publishResponse reports the outcome of an orchestration to its initiator, on the subject selected by the manifest's
+// reply-to token. A non-empty errorDetail reports a failure:
 // errorDetail describes it for the caller and errorCause is the underlying error, for operators. Both are passed in
 // rather than read from the orchestration, because the orchestration may not carry the error if recording it failed.
 func (e *NatsActivityExecutor) publishResponse(activityContext api.ActivityContext, orchestration api.Orchestration, errorDetail string, errorCause string) error {
@@ -433,7 +434,7 @@ func (e *NatsActivityExecutor) publishResponse(activityContext api.ActivityConte
 	if err != nil {
 		return fmt.Errorf("failed to marshal orchestration response: %w", err)
 	}
-	_, err = e.Client.Publish(activityContext.Context(), natsclient.CFMOrchestrationResponseSubject, ser)
+	_, err = e.Client.Publish(activityContext.Context(), natsclient.ResponseSubject(orchestration.ReplyTo), ser)
 	return err
 }
 

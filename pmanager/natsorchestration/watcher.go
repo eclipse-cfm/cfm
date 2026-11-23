@@ -153,6 +153,8 @@ func (w *OrchestrationIndexWatcher) startCompensationOrchestration(ctx context.C
 		OrchestrationType:     model.VPADisposeType,
 		Payload:               pData,
 		CompensatedManifestID: orchestration.ID,
+		// The compensation reports to the initiator of the failed orchestration
+		ReplyTo: orchestration.ReplyTo,
 	}
 	compensation, err := w.provisionManager.Start(ctx, &manifest)
 	if err != nil {

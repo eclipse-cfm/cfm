@@ -361,6 +361,57 @@ func TestProvisionManager_Start_RecordsCompensatedOrchestration(t *testing.T) {
 	assert.Equal(t, "failed-deployment", result.CompensatedOrchestrationID)
 }
 
+func TestProvisionManager_Start_RecordsReplyTo(t *testing.T) {
+	definitionStore := memorystore.NewDefinitionStore()
+	ctx := context.Background()
+	_, _ = definitionStore.StoreOrchestrationDefinition(ctx, createTestOrchestrationDefinition("test-type"))
+
+	mockOrch := mocks.NewMockOrchestrator(t)
+	mockOrch.EXPECT().GetOrchestration(mock.Anything, "deployment").Return(nil, nil)
+	mockOrch.EXPECT().Execute(mock.Anything, mock.MatchedBy(func(orch *api.Orchestration) bool {
+		return orch.ReplyTo == "second-manager-response"
+	})).Return(nil)
+
+	pm := &provisionManager{
+		orchestrator: mockOrch,
+		store:        definitionStore,
+		monitor:      &system.NoopMonitor{},
+		trxContext:   store.NoOpTransactionContext{},
+	}
+
+	result, err := pm.Start(ctx, &model.OrchestrationManifest{
+		ID:                "deployment",
+		OrchestrationType: "test-type",
+		ReplyTo:           "second-manager-response",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "second-manager-response", result.ReplyTo)
+}
+
+func TestProvisionManager_Start_RejectsInvalidReplyTo(t *testing.T) {
+	for _, replyTo := range []string{"a.b", "*", ">", "with space", "cfm-orchestration"} {
+		t.Run(replyTo, func(t *testing.T) {
+			pm := &provisionManager{
+				orchestrator: mocks.NewMockOrchestrator(t),
+				store:        memorystore.NewDefinitionStore(),
+				monitor:      &system.NoopMonitor{},
+				trxContext:   store.NoOpTransactionContext{},
+			}
+
+			_, err := pm.Start(context.Background(), &model.OrchestrationManifest{
+				ID:                "deployment",
+				OrchestrationType: "test-type",
+				ReplyTo:           replyTo,
+			})
+
+			var clientErr types.ClientError
+			require.ErrorAs(t, err, &clientErr)
+			assert.True(t, clientErr.IsClientError())
+		})
+	}
+}
+
 // TestCountOrchestrations_WithEmptyResult tests counting with no matching orchestrations
 func TestCountOrchestrations_WithEmptyResult(t *testing.T) {
 	ctx := context.Background()

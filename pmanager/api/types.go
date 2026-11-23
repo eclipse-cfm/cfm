@@ -75,6 +75,9 @@ type Orchestration struct {
 	OriginTraceContext map[string]string `json:"originTraceContext,omitempty"`
 	// CompensatedOrchestrationID is the ID of the failed orchestration this orchestration was started to compensate.
 	CompensatedOrchestrationID string `json:"compensatedOrchestrationId,omitempty"`
+	// ReplyTo is the subject token of the manifest that started this orchestration. The orchestration response is
+	// published to it, see natsclient.ResponseSubject.
+	ReplyTo string `json:"replyTo,omitempty"`
 }
 
 // EngineState is the orchestration engine's internal bookkeeping for an orchestration.

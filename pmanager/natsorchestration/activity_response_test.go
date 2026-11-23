@@ -34,7 +34,15 @@ import (
 // the executor published. updateErr, if set, makes every update of the orchestration fail.
 func runResponseTest(t *testing.T, processor api.ActivityProcessor, engineState api.EngineState, updateErr error) []model.OrchestrationResponse {
 	t.Helper()
+	return runReplyToResponseTest(t, processor, engineState, updateErr, "", natsclient.CFMOrchestrationResponseSubject)
+}
+
+// runReplyToResponseTest is runResponseTest for an orchestration started with the given reply-to token. It returns only
+// the responses published to expectedSubject; a publish to any other subject fails the test.
+func runReplyToResponseTest(t *testing.T, processor api.ActivityProcessor, engineState api.EngineState, updateErr error, replyTo string, expectedSubject string) []model.OrchestrationResponse {
+	t.Helper()
 	orchestration := api.Orchestration{
+		ReplyTo:           replyTo,
 		ID:                "test-response",
 		CorrelationID:     "profile-1",
 		OrchestrationType: model.VPADeployType,
@@ -60,7 +68,7 @@ func runResponseTest(t *testing.T, processor api.ActivityProcessor, engineState 
 			}
 			return revision + 1, nil
 		})
-	mockClient.EXPECT().Publish(mock.Anything, natsclient.CFMOrchestrationResponseSubject, mock.Anything).
+	mockClient.EXPECT().Publish(mock.Anything, expectedSubject, mock.Anything).
 		RunAndReturn(func(_ context.Context, _ string, payload []byte, _ ...jetstream.PublishOpt) (*jetstream.PubAck, error) {
 			var response model.OrchestrationResponse
 			require.NoError(t, json.Unmarshal(payload, &response))
@@ -140,4 +148,24 @@ func TestProcessMessage_SuccessResponseHasNoErrorDetail(t *testing.T) {
 	assert.True(t, responses[0].Success)
 	assert.Empty(t, responses[0].ErrorDetail)
 	assert.Empty(t, responses[0].ErrorCause)
+}
+
+func TestProcessMessage_SuccessResponseIsPublishedToReplyTo(t *testing.T) {
+	processor := &resultTestProcessor{result: api.ActivityResult{Result: api.ActivityResultComplete}}
+
+	responses := runReplyToResponseTest(t, processor, api.EngineState{}, nil, "second-manager-response", "event.second-manager-response")
+
+	require.Len(t, responses, 1)
+	assert.True(t, responses[0].Success)
+	assert.Equal(t, "test-response", responses[0].ManifestID)
+}
+
+func TestProcessMessage_ErrorResponseIsPublishedToReplyTo(t *testing.T) {
+	processor := &resultTestProcessor{result: api.ActivityResult{Result: api.ActivityResultFatalError, Error: errors.New("activity failed")}}
+
+	responses := runReplyToResponseTest(t, processor, api.EngineState{}, nil, "second-manager-response", "event.second-manager-response")
+
+	require.Len(t, responses, 1)
+	assert.False(t, responses[0].Success)
+	assert.Equal(t, "activity failed", responses[0].ErrorCause)
 }

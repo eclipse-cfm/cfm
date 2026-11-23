@@ -53,6 +53,20 @@ func ValidateParticipantContextID(id string) error {
 	return nil
 }
 
+// replyToPattern restricts a reply-to subject token to the characters allowed by the modeltype check, without dots, so
+// that it is exactly one subject token.
+var replyToPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+// ValidateReplyTo returns an error if the given reply-to value is not a single subject token, that is, if it is empty or
+// contains anything other than letters, digits, underscores and hyphens. Dots, which separate subject tokens, and the
+// wildcards '*' and '>' are rejected.
+func ValidateReplyTo(replyTo string) error {
+	if !replyToPattern.MatchString(replyTo) {
+		return fmt.Errorf("invalid replyTo %q: must be a single subject token of letters, digits, '_' and '-'", replyTo)
+	}
+	return nil
+}
+
 // OrchestrationManifest represents the configuration details for the execution of an orchestration.
 //
 // The manifest includes a unique identifier, the orchestration type, and a payload of orchestration-specific data, which
@@ -62,6 +76,10 @@ type OrchestrationManifest struct {
 	CorrelationID     string            `json:"correlationId" validate:"required"`
 	OrchestrationType OrchestrationType `json:"orchestrationType" validate:"required"`
 	Payload           map[string]any    `json:"payload,omitempty"`
+	// ReplyTo is the subject token the Provision Manager publishes the orchestration response to, so that each
+	// initiator receives its own responses. It is a single token without dots, see ValidateReplyTo. When it is empty,
+	// the response is published to the default response subject.
+	ReplyTo string `json:"replyTo,omitempty" validate:"omitempty,replyto"`
 	// CompensatedManifestID is set by the Provision Manager when it starts this orchestration to compensate a failed
 	// one. It is never read from serialized manifests, so external callers cannot claim to compensate an orchestration.
 	CompensatedManifestID string `json:"-"`
@@ -146,6 +164,11 @@ func initValidator() *validator.Validate {
 		// Only allow alphanumeric, dots, underscores, and hyphens
 		match, _ := regexp.MatchString(`^[a-zA-Z0-9._-]+$`, value)
 		return match
+	})
+
+	// replyto validates reply-to subject tokens, see ValidateReplyTo
+	_ = v.RegisterValidation("replyto", func(fl validator.FieldLevel) bool {
+		return ValidateReplyTo(fl.Field().String()) == nil
 	})
 
 	// participantcontextid validates participant context IDs, see ValidateParticipantContextID

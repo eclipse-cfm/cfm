@@ -83,3 +83,11 @@ func TestMergeStreamSubjects(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+func TestResponseSubject(t *testing.T) {
+	assert.Equal(t, CFMOrchestrationResponseSubject, ResponseSubject(""))
+	assert.Equal(t, "event.second-manager-response", ResponseSubject("second-manager-response"))
+	assert.Equal(t, CFMOrchestrationResponseSubject, ResponseSubject("a.b"), "a token with a dot is not used")
+	assert.Equal(t, CFMOrchestrationResponseSubject, ResponseSubject(">"), "a wildcard is not used")
+	assert.Equal(t, CFMOrchestrationResponseSubject, ResponseSubject(CFMOrchestration), "the manifest subject is not used")
+}

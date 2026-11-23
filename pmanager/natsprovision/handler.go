@@ -71,7 +71,7 @@ func newNatsProvisionHandler(
 						if err != nil {
 							return types.NewRecoverableError("failed to marshal response: %s", err.Error())
 						}
-						_, err = client.Publish(ctx, natsclient.CFMOrchestrationResponseSubject, ser)
+						_, err = client.Publish(ctx, natsclient.ResponseSubject(manifest.ReplyTo), ser)
 						if err != nil {
 							return types.NewRecoverableError("failed to publish response: %s", err.Error())
 						}
