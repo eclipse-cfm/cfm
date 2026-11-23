@@ -20,6 +20,7 @@ import (
 	"github.com/eclipse-cfm/cfm/agent/common"
 	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
 	"github.com/eclipse-cfm/cfm/agent/common/issuerservice"
+	"github.com/eclipse-cfm/cfm/agent/common/vpa"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/stretchr/testify/assert"
@@ -52,7 +53,7 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenNewRequest(t *testing.T) 
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -94,7 +95,7 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenNewRequestError(t *testin
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -127,7 +128,7 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenPendingRequestApiError(t 
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -160,7 +161,7 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenPendingRequestIssued(t *t
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -196,7 +197,7 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenPendingRequestCreated(t *
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -230,7 +231,7 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenPendingRequestError(t *te
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -258,7 +259,7 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenInvalidData(t *testing.T)
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -290,7 +291,7 @@ func TestOnboardingActivityProcessor_ProcessDeploy_WhenInvalidStateReceived(t *t
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -342,7 +343,7 @@ func TestOnboardingActivityProcessor_ProcessDispose(t *testing.T) {
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DisposeDiscriminator,
+		Discriminator: vpa.DisposeDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -376,7 +377,7 @@ func TestOnboardingActivityProcessor_ProcessDispose_MissingParticipantID(t *test
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DisposeDiscriminator,
+		Discriminator: vpa.DisposeDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(context.Background(), "orch-123", activity, processingData, make(map[string]any))
@@ -424,7 +425,7 @@ func TestOnboardingActivityProcessor_ProcessDispose_RevocationFails(t *testing.T
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DisposeDiscriminator,
+		Discriminator: vpa.DisposeDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -466,7 +467,7 @@ func TestOnboardingActivityProcessor_ProcessDispose_NoCredentials(t *testing.T) 
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DisposeDiscriminator,
+		Discriminator: vpa.DisposeDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -521,7 +522,7 @@ func TestOnboardingActivityProcessor_ProcessDispose_FirstTypeWithoutCredentials(
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DisposeDiscriminator,
+		Discriminator: vpa.DisposeDiscriminator,
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)

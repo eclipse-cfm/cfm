@@ -27,7 +27,6 @@ import (
 )
 
 type OnboardingActivityProcessor struct {
-	api.BaseActivityProcessor
 	Monitor                system.LogMonitor
 	IdentityApiClient      identityhub.IdentityAPIClient
 	IssuerServiceApiClient issuerservice.ApiClient

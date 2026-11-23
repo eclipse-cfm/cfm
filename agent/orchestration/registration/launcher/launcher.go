@@ -16,6 +16,7 @@ import (
 	"net/http"
 
 	"github.com/eclipse-cfm/cfm/agent/common/issuerservice"
+	"github.com/eclipse-cfm/cfm/agent/common/vpa"
 	"github.com/eclipse-cfm/cfm/agent/orchestration/registration/activity"
 	"github.com/eclipse-cfm/cfm/assembly/httpclient"
 	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
@@ -59,7 +60,7 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 				tokenexchange.WithTokenExchangeUrl(ctx.Config.GetString(tokenExchangeURLKey)),
 				tokenexchange.WithTokenExchangeAudience(ctx.Config.GetString(audienceKey)),
 				tokenexchange.WithHttpClient(&httpClient))
-			return activity.NewProcessor(&activity.Config{
+			return vpa.AsActivityProcessor(activity.NewProcessor(&activity.Config{
 				LogMonitor: ctx.Monitor,
 				IssuerService: issuerservice.HttpApiClient{
 					BaseURL:       issuerServiceBaseUrl,
@@ -67,7 +68,7 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 					IssuerID:      issuerID,
 					HttpClient:    &httpClient,
 				},
-			})
+			}))
 		},
 	}
 	natsagent.LaunchAgent(shutdown, config)

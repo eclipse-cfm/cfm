@@ -19,6 +19,7 @@ import (
 
 	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
 	"github.com/eclipse-cfm/cfm/agent/common/siglet"
+	"github.com/eclipse-cfm/cfm/agent/common/vpa"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
@@ -124,7 +125,7 @@ func TestSiglet_Deploy_HappyPath(t *testing.T) {
 	dpClient := &MockDataPlaneClient{}
 	processor := NewProcessor(validConfig(WithSiglet(sigletClient), WithDataPlane(dpClient)))
 
-	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(mappingsProps())), api.DeployDiscriminator))
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(mappingsProps())), vpa.DeployDiscriminator))
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	assert.NoError(t, result.Error)
@@ -153,7 +154,7 @@ func TestSiglet_Deploy_DefaultsTokenSourceAndRenewal(t *testing.T) {
 		},
 	}
 
-	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), api.DeployDiscriminator))
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), vpa.DeployDiscriminator))
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	require.NotNil(t, sigletClient.lastMapping)
@@ -182,7 +183,7 @@ func TestSiglet_Deploy_FiltersIncompleteMappings(t *testing.T) {
 		},
 	}
 
-	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), api.DeployDiscriminator))
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), vpa.DeployDiscriminator))
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	require.NotNil(t, sigletClient.lastMapping)
@@ -206,7 +207,7 @@ func TestSiglet_Deploy_AllIncomplete_RegistersDataPlaneOnly(t *testing.T) {
 		},
 	}
 
-	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), api.DeployDiscriminator))
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), vpa.DeployDiscriminator))
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	assert.False(t, sigletClient.created, "expected no mapping to be created in Siglet")
@@ -219,7 +220,7 @@ func TestSiglet_Deploy_UpsertReplacesExisting(t *testing.T) {
 	sigletClient := &MockSigletClient{existing: &siglet.TransferTypeMapping{ParticipantContextID: "participant-1"}}
 	processor := NewProcessor(validConfig(WithSiglet(sigletClient)))
 
-	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(mappingsProps())), api.DeployDiscriminator))
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(mappingsProps())), vpa.DeployDiscriminator))
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	assert.True(t, sigletClient.replaced, "expected an existing mapping to be replaced")
@@ -231,7 +232,7 @@ func TestSiglet_Deploy_NoDataPlaneVpa_CompletesDoingNothing(t *testing.T) {
 	dpClient := &MockDataPlaneClient{}
 	processor := NewProcessor(validConfig(WithSiglet(sigletClient), WithDataPlane(dpClient)))
 
-	result := processor.ProcessDeploy(newContext(processingDataWith(nil), api.DeployDiscriminator))
+	result := processor.ProcessDeploy(newContext(processingDataWith(nil), vpa.DeployDiscriminator))
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	assert.NoError(t, result.Error)
@@ -246,7 +247,7 @@ func TestSiglet_Deploy_NoMappings_CompletesDoingNothing(t *testing.T) {
 	processor := NewProcessor(validConfig(WithSiglet(sigletClient), WithDataPlane(dpClient)))
 
 	// dataplane VPA present but no transfer-type mappings property
-	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(map[string]any{})), api.DeployDiscriminator))
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(map[string]any{})), vpa.DeployDiscriminator))
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	assert.False(t, sigletClient.created)
@@ -259,7 +260,7 @@ func TestSiglet_Deploy_MissingParticipantContextId(t *testing.T) {
 	pd := processingDataWith(validVpaData(mappingsProps()))
 	delete(pd, "participantContextId")
 
-	result := processor.ProcessDeploy(newContext(pd, api.DeployDiscriminator))
+	result := processor.ProcessDeploy(newContext(pd, vpa.DeployDiscriminator))
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	require.Error(t, result.Error)
@@ -269,7 +270,7 @@ func TestSiglet_Deploy_MissingParticipantContextId(t *testing.T) {
 func TestSiglet_Deploy_SigletError(t *testing.T) {
 	processor := NewProcessor(validConfig(WithSiglet(&MockSigletClient{createErr: fmt.Errorf("siglet boom")})))
 
-	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(mappingsProps())), api.DeployDiscriminator))
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(mappingsProps())), vpa.DeployDiscriminator))
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	assert.ErrorContains(t, result.Error, "siglet boom")
@@ -278,7 +279,7 @@ func TestSiglet_Deploy_SigletError(t *testing.T) {
 func TestSiglet_Deploy_ControlPlaneError(t *testing.T) {
 	processor := NewProcessor(validConfig(WithDataPlane(&MockDataPlaneClient{registerErr: fmt.Errorf("cp boom")})))
 
-	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(mappingsProps())), api.DeployDiscriminator))
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(mappingsProps())), vpa.DeployDiscriminator))
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	assert.ErrorContains(t, result.Error, "cp boom")
@@ -288,7 +289,7 @@ func TestSiglet_Deploy_NoAuthorizationInVpa_RegistersWithoutProfile(t *testing.T
 	dpClient := &MockDataPlaneClient{}
 	processor := NewProcessor(validConfig(WithDataPlane(dpClient), WithAuthorization(configuredAuthorization())))
 
-	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(mappingsProps())), api.DeployDiscriminator))
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(mappingsProps())), vpa.DeployDiscriminator))
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	assert.NoError(t, result.Error)
@@ -301,7 +302,7 @@ func TestSiglet_Deploy_TypeOnlyAuthorization_UsesConfiguredFallbacks(t *testing.
 	processor := NewProcessor(validConfig(WithDataPlane(dpClient), WithAuthorization(configuredAuthorization())))
 
 	props := propsWithAuthorization(tokenExchangeAuthorization(nil))
-	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), api.DeployDiscriminator))
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), vpa.DeployDiscriminator))
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	assert.NoError(t, result.Error)
@@ -323,7 +324,7 @@ func TestSiglet_Deploy_Authorization_UsesConfiguredScope(t *testing.T) {
 	processor := NewProcessor(validConfig(WithDataPlane(dpClient), WithAuthorization(authorization)))
 
 	props := propsWithAuthorization(tokenExchangeAuthorization(nil))
-	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), api.DeployDiscriminator))
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), vpa.DeployDiscriminator))
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	assert.Equal(t, "signaling:dataflow", dpClient.lastRegistration.Authorization["scope"])
@@ -342,7 +343,7 @@ func TestSiglet_Deploy_Authorization_VpaOverridesConfiguration(t *testing.T) {
 		"resource":              "urn:dps:principal:participant-1",
 		"scope":                 "vpa:scope",
 	}))
-	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), api.DeployDiscriminator))
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), vpa.DeployDiscriminator))
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	assert.NoError(t, result.Error)
@@ -364,7 +365,7 @@ func TestSiglet_Deploy_Authorization_MissingRequiredProperty(t *testing.T) {
 	processor := NewProcessor(validConfig(WithSiglet(sigletClient), WithDataPlane(dpClient), WithAuthorization(authorization)))
 
 	props := propsWithAuthorization(tokenExchangeAuthorization(nil))
-	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), api.DeployDiscriminator))
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), vpa.DeployDiscriminator))
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	require.Error(t, result.Error)
@@ -381,7 +382,7 @@ func TestSiglet_Deploy_Authorization_UnsupportedType(t *testing.T) {
 	processor := NewProcessor(validConfig(WithSiglet(sigletClient), WithDataPlane(dpClient), WithAuthorization(configuredAuthorization())))
 
 	props := propsWithAuthorization(map[string]any{"type": "oauth2_client_credentials"})
-	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), api.DeployDiscriminator))
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), vpa.DeployDiscriminator))
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	require.Error(t, result.Error)
@@ -395,7 +396,7 @@ func TestSiglet_Deploy_Authorization_MissingType(t *testing.T) {
 	processor := NewProcessor(validConfig(WithDataPlane(dpClient), WithAuthorization(configuredAuthorization())))
 
 	props := propsWithAuthorization(map[string]any{"issuer": "https://vpa.example.com"})
-	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), api.DeployDiscriminator))
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), vpa.DeployDiscriminator))
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	require.Error(t, result.Error)
@@ -409,7 +410,7 @@ func TestSiglet_Deploy_Authorization_NotAnObject(t *testing.T) {
 
 	props := mappingsProps()
 	props[AuthorizationKey] = "not-an-object"
-	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), api.DeployDiscriminator))
+	result := processor.ProcessDeploy(newContext(processingDataWith(validVpaData(props)), vpa.DeployDiscriminator))
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	require.Error(t, result.Error)
@@ -421,7 +422,7 @@ func TestSiglet_Dispose_HappyPath(t *testing.T) {
 	dpClient := &MockDataPlaneClient{}
 	processor := NewProcessor(validConfig(WithSiglet(sigletClient), WithDataPlane(dpClient)))
 
-	result := processor.ProcessDispose(newContext(processingDataWith(nil), api.DisposeDiscriminator))
+	result := processor.ProcessDispose(newContext(processingDataWith(nil), vpa.DisposeDiscriminator))
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
 	assert.True(t, sigletClient.deleted)
@@ -435,7 +436,7 @@ func TestSiglet_Dispose_ErrorsStillComplete(t *testing.T) {
 		WithDataPlane(&MockDataPlaneClient{unregisterErr: fmt.Errorf("cp boom")}),
 	))
 
-	result := processor.ProcessDispose(newContext(processingDataWith(nil), api.DisposeDiscriminator))
+	result := processor.ProcessDispose(newContext(processingDataWith(nil), vpa.DisposeDiscriminator))
 
 	// dispose must complete even when downstream clients error, so sibling rollback isn't blocked
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
@@ -444,7 +445,7 @@ func TestSiglet_Dispose_ErrorsStillComplete(t *testing.T) {
 func TestSiglet_Dispose_MissingParticipantContextId(t *testing.T) {
 	processor := NewProcessor(validConfig())
 
-	result := processor.ProcessDispose(newContext(map[string]any{}, api.DisposeDiscriminator))
+	result := processor.ProcessDispose(newContext(map[string]any{}, vpa.DisposeDiscriminator))
 
 	assert.Equal(t, api.ActivityResultType(api.ActivityResultFatalError), result.Result)
 	require.Error(t, result.Error)

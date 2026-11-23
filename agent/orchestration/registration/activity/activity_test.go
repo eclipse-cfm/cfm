@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/eclipse-cfm/cfm/agent/common/issuerservice"
+	"github.com/eclipse-cfm/cfm/agent/common/vpa"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
@@ -37,7 +38,7 @@ func TestRegistrationActivityProcessor_MinimalValidData(t *testing.T) {
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}
 
 	processingData := map[string]any{
@@ -69,7 +70,7 @@ func TestRegistrationActivityProcessor_FullValidData(t *testing.T) {
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}
 
 	processingData := map[string]any{
@@ -102,7 +103,7 @@ func TestRegistrationActivityProcessor_InvalidData(t *testing.T) {
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}
 
 	processingData := map[string]any{}
@@ -128,7 +129,7 @@ func TestRegistrationActivityProcessor_IssuerServiceFails(t *testing.T) {
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}
 
 	processingData := map[string]any{
@@ -160,7 +161,7 @@ func TestRegistrationActivityProcessor_VpaDataMissing(t *testing.T) {
 	activityContext := api.NewActivityContext(context.Background(), "orch-123", api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}, processingData, make(map[string]any))
 
 	result := processor.ProcessDeploy(activityContext)
@@ -183,7 +184,7 @@ func TestRegistrationActivityProcessor_ParticipantContextIDMissing(t *testing.T)
 	activityContext := api.NewActivityContext(context.Background(), "orch-123", api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}, processingData, make(map[string]any))
 
 	result := processor.ProcessDeploy(activityContext)
@@ -208,7 +209,7 @@ func TestRegistrationActivityProcessor_VpaDataEmptySlice(t *testing.T) {
 	activityContext := api.NewActivityContext(context.Background(), "orch-123", api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}, processingData, make(map[string]any))
 
 	result := processor.ProcessDeploy(activityContext)
@@ -237,7 +238,7 @@ func TestRegistrationActivityProcessor_VpaDataTypeMismatch(t *testing.T) {
 	activityContext := api.NewActivityContext(context.Background(), "orch-123", api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}, processingData, make(map[string]any))
 
 	result := processor.ProcessDeploy(activityContext)
@@ -263,7 +264,7 @@ func TestRegistrationActivityProcessor_VpaDataPropertiesPassedToIssuerService(t 
 	activityContext := api.NewActivityContext(context.Background(), "orch-123", api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}, processingData, make(map[string]any))
 
 	result := processor.ProcessDeploy(activityContext)
@@ -294,7 +295,7 @@ func TestRegistrationActivityProcessor_VpaDataNoProperties(t *testing.T) {
 	activityContext := api.NewActivityContext(context.Background(), "orch-123", api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DeployDiscriminator,
+		Discriminator: vpa.DeployDiscriminator,
 	}, processingData, make(map[string]any))
 
 	result := processor.ProcessDeploy(activityContext)
@@ -317,7 +318,7 @@ func TestRegistrationActivityProcessor_ProcessDispose(t *testing.T) {
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DisposeDiscriminator,
+		Discriminator: vpa.DisposeDiscriminator,
 	}
 
 	processingData := map[string]any{
@@ -346,7 +347,7 @@ func TestRegistrationActivityProcessor_ProcessDispose_IssuerServiceFails(t *test
 	activity := api.Activity{
 		ID:            "test-activity",
 		Type:          "edcv",
-		Discriminator: api.DisposeDiscriminator,
+		Discriminator: vpa.DisposeDiscriminator,
 	}
 
 	processingData := map[string]any{

@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/agent/common/vpa"
 	"github.com/eclipse-cfm/cfm/common/collection"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/natsfixtures"
@@ -55,7 +56,7 @@ func Test_VerifyAutoCompensation(t *testing.T) {
 	go func() {
 		testLauncher.LaunchWithCallback(ctx.Done(), func(ctx papi.ActivityContext) papi.ActivityResult {
 			disc := ctx.Discriminator()
-			if disc == papi.DisposeDiscriminator {
+			if disc == vpa.DisposeDiscriminator {
 				disposed = true
 				return papi.ActivityResult{Result: papi.ActivityResultComplete}
 			}
@@ -166,7 +167,7 @@ func Test_VerifyAutoCompensation_NoCompensationOrchestration(t *testing.T) {
 	go func() {
 		testLauncher.LaunchWithCallback(ctx.Done(), func(ctx papi.ActivityContext) papi.ActivityResult {
 			disc := ctx.Discriminator()
-			if disc == papi.DisposeDiscriminator {
+			if disc == vpa.DisposeDiscriminator {
 				require.Fail(t, "Expected no compensation orchestration to be run")
 			}
 			return papi.ActivityResult{

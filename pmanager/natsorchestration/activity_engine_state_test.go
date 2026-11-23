@@ -45,12 +45,32 @@ func (p *resultTestProcessor) Process(ctx api.ActivityContext) api.ActivityResul
 	return p.result
 }
 
-func (p *resultTestProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
-	return p.Process(ctx)
+// discriminatorRecordingProcessor completes immediately and records the discriminators it was called with.
+type discriminatorRecordingProcessor struct {
+	seen []api.Discriminator
 }
 
-func (p *resultTestProcessor) ProcessDispose(ctx api.ActivityContext) api.ActivityResult {
-	return p.Process(ctx)
+func (p *discriminatorRecordingProcessor) Process(ctx api.ActivityContext) api.ActivityResult {
+	p.seen = append(p.seen, ctx.Discriminator())
+	return api.ActivityResult{Result: api.ActivityResultComplete}
+}
+
+// The executor calls Process for every activity, whatever its discriminator.
+func TestRunActivity_CallsProcessForAnyDiscriminator(t *testing.T) {
+	discriminators := []api.Discriminator{"", "cfm.orchestration.vpa.deploy", "cfm.orchestration.vpa.dispose", "example.orchestration.other"}
+	for _, discriminator := range discriminators {
+		t.Run(string(discriminator), func(t *testing.T) {
+			processor := &discriminatorRecordingProcessor{}
+			executor := &NatsActivityExecutor{ActivityProcessor: processor, Monitor: system.NoopMonitor{}}
+			orchestration := api.Orchestration{ID: "o1", ProcessingData: map[string]any{}, OutputData: map[string]any{}}
+			activity := api.Activity{ID: "A1", Type: panicTestActivityType, Discriminator: discriminator}
+
+			result := executor.runActivity(context.Background(), orchestration, activity)
+
+			assert.Equal(t, api.ActivityResultType(api.ActivityResultComplete), result.Result)
+			assert.Equal(t, []api.Discriminator{discriminator}, processor.seen)
+		})
+	}
 }
 
 // spoofedPayload uses the keys under which the engine used to keep its own state in ProcessingData, with values of
@@ -238,13 +258,6 @@ func (p *hangingProcessor) Process(ctx api.ActivityContext) api.ActivityResult {
 	return api.ActivityResult{Result: api.ActivityResultFatalError, Error: ctx.Context().Err()}
 }
 
-func (p *hangingProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
-	return p.Process(ctx)
-}
-func (p *hangingProcessor) ProcessDispose(ctx api.ActivityContext) api.ActivityResult {
-	return p.Process(ctx)
-}
-
 // An activity that runs out of time is retried instead of failing the orchestration, and the executor can still record
 // the outcome afterwards.
 func TestProcessMessage_ActivityTimeoutIsRetried(t *testing.T) {
@@ -299,14 +312,6 @@ type deadlineRecordingProcessor struct {
 func (p *deadlineRecordingProcessor) Process(ctx api.ActivityContext) api.ActivityResult {
 	p.deadline, p.hasDeadline = ctx.Context().Deadline()
 	return api.ActivityResult{Result: api.ActivityResultComplete}
-}
-
-func (p *deadlineRecordingProcessor) ProcessDeploy(ctx api.ActivityContext) api.ActivityResult {
-	return p.Process(ctx)
-}
-
-func (p *deadlineRecordingProcessor) ProcessDispose(ctx api.ActivityContext) api.ActivityResult {
-	return p.Process(ctx)
 }
 
 // Once an activity has used up its retries, the orchestration is marked errored instead of being retried forever.

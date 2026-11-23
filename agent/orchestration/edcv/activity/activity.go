@@ -20,6 +20,7 @@ import (
 
 	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
 	"github.com/eclipse-cfm/cfm/agent/common/vault"
+	"github.com/eclipse-cfm/cfm/agent/common/vpa"
 	"github.com/eclipse-cfm/cfm/agent/orchestration/edcv"
 	. "github.com/eclipse-cfm/cfm/common/collection"
 	"github.com/eclipse-cfm/cfm/common/model"
@@ -35,7 +36,6 @@ import (
 const DataspaceProfilesKey = "dataspaceProfiles"
 
 type EDCVActivityProcessor struct {
-	api.BaseActivityProcessor
 	Monitor             system.LogMonitor
 	ManagementAPIClient controlplane.ManagementAPIClient
 	VaultURL            string
@@ -79,7 +79,7 @@ func (p EDCVActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.Activi
 	}
 
 	// dataspace profiles are optional; they are carried in the cfm.connector VPA properties
-	props, err := ctx.VpaProperties(model.ConnectorType)
+	props, err := vpa.Properties(ctx, model.ConnectorType)
 	if err != nil {
 		span.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error reading connector VPA properties for orchestration %s: %w", ctx.OID(), err)}

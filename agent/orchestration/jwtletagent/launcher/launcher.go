@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/eclipse-cfm/cfm/agent/common/vpa"
 	"github.com/eclipse-cfm/cfm/agent/orchestration/jwtletagent/activity"
 	"github.com/eclipse-cfm/cfm/assembly/httpclient"
 	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
@@ -80,7 +81,7 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 				tokenexchange.WithHttpClient(&httpClient),
 			)
 
-			return activity.NewProcessor(&activity.Config{
+			return vpa.AsActivityProcessor(activity.NewProcessor(&activity.Config{
 				LogMonitor:              ctx.Monitor,
 				TokenProvider:           provider,
 				HttpClient:              &httpClient,
@@ -89,7 +90,7 @@ func LaunchAndWaitSignal(shutdown <-chan struct{}) {
 				ManagementBasePath:      managementBasePath,
 				ServiceAccountNamespace: namespace,
 				ClientMappings:          clientMappings,
-			})
+			}))
 		},
 	}
 	natsagent.LaunchAgent(shutdown, config)

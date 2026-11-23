@@ -272,8 +272,9 @@ The above example relies on the HTTP Client, Vault, and Monitor services, passin
 ## Resource Lifecycles
 
 Activities model resource lifecycles. For example, a resource may be deployed and undeployed. In many cases, it is not
-desirable to require separate agents for each resource lifecycle operation. Activity processors can use the
-`discriminator` property to distinguish between different resource lifecycle states:
+desirable to require separate agents for each resource lifecycle operation. The engine calls `Process` for every
+activity, and activity processors can use the `discriminator` property, which is the type of the orchestration the
+activity runs in, to distinguish between different resource lifecycle operations:
 
 ```
 package example
@@ -281,13 +282,20 @@ package example
 import "github.com/eclipse-cfm/cfm/pmanager/api"
 
 func (p ExampleProcessor) Process(ctx api.ActivityContext) api.ActivityResult {
-	if ctx.Discriminator() == api.DeployDiscriminator {
+	switch ctx.Discriminator() {
+	case "example.deploy":
 		// deploy the resource
-	} else {
+	case "example.dispose":
 		// dispose the resource
 	}
 }
 ```
+
+Agents that deploy and dispose VPAs implement `vpa.DeployDisposeProcessor` from `agent/common/vpa`, which has a
+`ProcessDeploy` and a `ProcessDispose` method, and register `vpa.AsActivityProcessor(processor)` as their
+`ActivityProcessor`. It calls `ProcessDeploy` for the VPA deploy orchestration type, `ProcessDispose` for the VPA dispose
+orchestration type, and fails the activity with a fatal error for any other type. `vpa.Properties(ctx, vpaType)` returns
+the properties of a VPA from the `cfm.vpa.data` value.
 
 The activity can be configured with `deploy` and `dispose` orchestrations:
 

@@ -19,14 +19,6 @@ import "github.com/eclipse-cfm/cfm/pmanager/api"
 type DefaultTestProcessor struct {
 }
 
-func (d DefaultTestProcessor) ProcessDeploy(activityContext api.ActivityContext) api.ActivityResult {
-	return api.ActivityResult{Result: api.ActivityResultComplete}
-}
-
-func (d DefaultTestProcessor) ProcessDispose(activityContext api.ActivityContext) api.ActivityResult {
-	return api.ActivityResult{Result: api.ActivityResultComplete}
-}
-
 func (d DefaultTestProcessor) Process(activityContext api.ActivityContext) api.ActivityResult {
 	return api.ActivityResult{Result: api.ActivityResultComplete}
 }

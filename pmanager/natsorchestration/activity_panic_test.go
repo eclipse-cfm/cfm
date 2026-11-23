@@ -67,11 +67,7 @@ func (e panicTestEntry) Revision() uint64 { return 1 }
 // panicTestProcessor is an api.ActivityProcessor that panics on every call.
 type panicTestProcessor struct{}
 
-func (panicTestProcessor) Process(api.ActivityContext) api.ActivityResult       { panic("boom") }
-func (panicTestProcessor) ProcessDeploy(api.ActivityContext) api.ActivityResult { panic("boom") }
-func (panicTestProcessor) ProcessDispose(api.ActivityContext) api.ActivityResult {
-	panic("boom")
-}
+func (panicTestProcessor) Process(api.ActivityContext) api.ActivityResult { panic("boom") }
 
 func TestProcessMessage_PanicTerminatesMessage(t *testing.T) {
 	orchestration := api.Orchestration{
