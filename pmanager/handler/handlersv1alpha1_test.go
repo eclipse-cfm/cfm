@@ -120,3 +120,68 @@ func TestCreateOrchestration_IDConflict(t *testing.T) {
 
 	assert.Equal(t, http.StatusConflict, w.Code)
 }
+
+// fakeDefinitionManager records the orchestration definitions it is asked to create
+type fakeDefinitionManager struct {
+	api.DefinitionManager
+	created []*api.OrchestrationDefinition
+}
+
+func (f *fakeDefinitionManager) CreateOrchestrationDefinition(_ context.Context, definition *api.OrchestrationDefinition) (*api.OrchestrationDefinition, error) {
+	f.created = append(f.created, definition)
+	return definition, nil
+}
+
+func createOrchestrationDefinitionRequest(compensation string) *http.Request {
+	body := `{"id":"template-1","activities":{` +
+		`"test.deploy":[{"id":"a1","type":"test-activity"}],` +
+		`"test.rollback":[{"id":"a2","type":"test-activity"}]}` +
+		compensation + `}`
+	return httptest.NewRequest(http.MethodPost, "/orchestration-definitions", strings.NewReader(body))
+}
+
+func TestCreateOrchestrationDefinition_SetsCompensationType(t *testing.T) {
+	dm := &fakeDefinitionManager{}
+	claims := &cfmauth.Claims{Subject: "admin-1", Scopes: []string{scopePmAdmin}}
+	router := newClaimsRouter(NewHandler(nil, dm, nil, system.NoopMonitor{}), claims)
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, createOrchestrationDefinitionRequest(`,"compensation":{"test.deploy":"test.rollback"}`))
+
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	require.Len(t, dm.created, 2)
+	for _, definition := range dm.created {
+		if definition.Type == "test.deploy" {
+			assert.Equal(t, model.OrchestrationType("test.rollback"), definition.CompensationType)
+		} else {
+			assert.Empty(t, definition.CompensationType)
+		}
+	}
+}
+
+func TestCreateOrchestrationDefinition_WithoutCompensation(t *testing.T) {
+	dm := &fakeDefinitionManager{}
+	claims := &cfmauth.Claims{Subject: "admin-1", Scopes: []string{scopePmAdmin}}
+	router := newClaimsRouter(NewHandler(nil, dm, nil, system.NoopMonitor{}), claims)
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, createOrchestrationDefinitionRequest(""))
+
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	require.Len(t, dm.created, 2)
+	for _, definition := range dm.created {
+		assert.Empty(t, definition.CompensationType)
+	}
+}
+
+func TestCreateOrchestrationDefinition_RejectsInvalidCompensation(t *testing.T) {
+	dm := &fakeDefinitionManager{}
+	claims := &cfmauth.Claims{Subject: "admin-1", Scopes: []string{scopePmAdmin}}
+	router := newClaimsRouter(NewHandler(nil, dm, nil, system.NoopMonitor{}), claims)
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, createOrchestrationDefinitionRequest(`,"compensation":{"test.deploy":"test.unknown"}`))
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Empty(t, dm.created)
+}

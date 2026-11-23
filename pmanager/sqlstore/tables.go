@@ -52,7 +52,8 @@ func createOrchestrationDefinitionsTable(db sqlstore.Executor) error {
 			active BOOLEAN DEFAULT FALSE,
 			"schema" JSONB,
 			activities JSONB,
-		    templateref TEXT
+		    templateref TEXT,
+			compensation_type VARCHAR(255)
 		);
 		CREATE INDEX IF NOT EXISTS idx_orchestration_type ON orchestration_definitions(TYPE)
 	`, cfmOrchestrationDefinitionsTable))

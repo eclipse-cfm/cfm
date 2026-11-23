@@ -90,6 +90,8 @@ func ToOrchestrationDefinition(template *OrchestrationTemplate) (string, []*api.
 			Schema:      template.Schema,
 			Activities:  convertedActivities,
 			TemplateRef: templateRef,
+			// an empty value means that orchestrations of this type are not compensated
+			CompensationType: model.OrchestrationType(template.Compensation[orchType]),
 		}
 
 		convertedOrchestrationDefs = append(convertedOrchestrationDefs, &orchestrationDef)
@@ -118,6 +120,8 @@ func ToOrchestrationDefinitionDto(definition *api.OrchestrationDefinition) *Orch
 		Schema:      definition.Schema,
 		Activities:  convertedActivities,
 		TemplateRef: definition.TemplateRef,
+
+		CompensationType: definition.CompensationType.String(),
 	}
 }
 

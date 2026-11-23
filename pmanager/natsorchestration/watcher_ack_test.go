@@ -353,7 +353,7 @@ func TestOnMessage_CompensationStartError_NakWithDelay(t *testing.T) {
 	pManager := &aMocks.MockProvisionManager{}
 	pManager.On("Start", mock.Anything, mock.Anything).Return(nil, errors.New("kv unavailable"))
 	definitionManager := &aMocks.MockDefinitionManager{}
-	definitionManager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{{}}, nil)
+	definitionManager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{{CompensationType: "test.rollback"}}, nil)
 	watcher := createTestWatcher(index, &store.NoOpTransactionContext{}, pManager, definitionManager)
 
 	running := createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateRunning)
@@ -395,7 +395,7 @@ func TestOnMessage_RedeliveredFailure_SameCompensationID(t *testing.T) {
 		manifestIDs = append(manifestIDs, args.Get(1).(*model.OrchestrationManifest).ID)
 	}).Return(&api.Orchestration{}, nil)
 	definitionManager := &aMocks.MockDefinitionManager{}
-	definitionManager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{{}}, nil)
+	definitionManager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{{CompensationType: "test.rollback"}}, nil)
 
 	running := createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateRunning)
 	errored := createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateErrored)

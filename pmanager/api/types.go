@@ -230,6 +230,10 @@ type OrchestrationDefinition struct {
 	Active      bool                    `json:"active"`
 	Schema      map[string]any          `json:"schema"`
 	Activities  []Activity              `json:"activities"`
+	// CompensationType is the orchestration type that is started when an orchestration of this definition fails. The
+	// compensating definition is generated from the same template. When it is empty, a failed orchestration is not
+	// compensated.
+	CompensationType model.OrchestrationType `json:"compensationType,omitempty"`
 }
 
 func (o *OrchestrationDefinition) GetID() string {

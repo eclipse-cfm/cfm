@@ -187,28 +187,19 @@ func TestOnMessage_CompensationReferencesFailedOrchestration(t *testing.T) {
 	trxContext := &store.NoOpTransactionContext{}
 	pManager := &mocks.MockProvisionManager{}
 	pManager.On("Start", mock.Anything, mock.MatchedBy(func(manifest *model.OrchestrationManifest) bool {
-		return manifest.OrchestrationType == model.VPADisposeType &&
+		return manifest.OrchestrationType == "test.rollback" &&
 			manifest.CorrelationID == "corr-1" &&
 			manifest.CompensatedManifestID == "orch-1" &&
-			manifest.ID == "orch-1-compensation"
-	})).Return(&api.Orchestration{}, nil)
-	manager := mocks.MockDefinitionManager{}
-	manager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{{}}, nil)
-	watcher := createTestWatcher(index, trxContext, pManager, &manager)
+			manifest.ID == CompensationID("orch-1")
+	})).Return(&api.Orchestration{}, nil).Once()
+	manager := definitionManagerWithCompensation("TestType", "test.rollback")
+	watcher := createTestWatcher(index, trxContext, pManager, manager)
 
-	ctx := context.Background()
-
-	orch1 := createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateRunning)
-	_, err := index.Create(ctx, convertToEntry(orch1))
-	require.NoError(t, err)
-
-	orch2 := createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateErrored)
-	orch2.StateTimestamp = time.Now().Add(time.Second)
-	msg := createNatsMsg(t, orch2)
-
-	watcher.onMessage(msg.Data, msg)
+	msg := failOrchestration(t, index, watcher, createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateRunning))
 
 	pManager.AssertExpectations(t)
+	assert.Equal(t, 1, msg.AckCalls)
+	assert.Equal(t, 0, msg.NakCalls)
 }
 
 // The compensation reports to the initiator of the failed orchestration
@@ -219,23 +210,90 @@ func TestOnMessage_CompensationUsesReplyToOfFailedOrchestration(t *testing.T) {
 	pManager.On("Start", mock.Anything, mock.MatchedBy(func(manifest *model.OrchestrationManifest) bool {
 		return manifest.CompensatedManifestID == "orch-1" && manifest.ReplyTo == "second-manager-response"
 	})).Return(&api.Orchestration{}, nil)
-	manager := mocks.MockDefinitionManager{}
-	manager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{{}}, nil)
-	watcher := createTestWatcher(index, trxContext, pManager, &manager)
+	manager := definitionManagerWithCompensation("TestType", "test.rollback")
+	watcher := createTestWatcher(index, trxContext, pManager, manager)
 
-	ctx := context.Background()
+	orch := createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateRunning)
+	orch.ReplyTo = "second-manager-response"
+	failOrchestration(t, index, watcher, orch)
 
-	orch1 := createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateRunning)
-	orch1.ReplyTo = "second-manager-response"
-	_, err := index.Create(ctx, convertToEntry(orch1))
-	require.NoError(t, err)
+	pManager.AssertExpectations(t)
+}
 
-	orch2 := createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateErrored)
-	orch2.ReplyTo = "second-manager-response"
-	orch2.StateTimestamp = time.Now().Add(time.Second)
-	msg := createNatsMsg(t, orch2)
+// A failed orchestration whose definition declares no compensation type is not compensated
+func TestOnMessage_NoCompensationWithoutCompensationType(t *testing.T) {
+	index := createTestStore(t)
+	trxContext := &store.NoOpTransactionContext{}
+	pManager := &mocks.MockProvisionManager{}
+	manager := &mocks.MockDefinitionManager{}
+	manager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{
+		{Type: "TestType", TemplateRef: "template-1"},
+	}, nil).Once()
+	watcher := createTestWatcher(index, trxContext, pManager, manager)
 
-	watcher.onMessage(msg.Data, msg)
+	msg := failOrchestration(t, index, watcher, createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateRunning))
+
+	pManager.AssertNotCalled(t, "Start", mock.Anything, mock.Anything)
+	manager.AssertExpectations(t)
+	assert.Equal(t, 1, msg.AckCalls)
+	assert.Equal(t, 0, msg.NakCalls)
+}
+
+// A failed orchestration is not compensated if its template contains no definition of the declared compensation type
+func TestOnMessage_NoCompensationWhenCompensationDefinitionMissing(t *testing.T) {
+	index := createTestStore(t)
+	trxContext := &store.NoOpTransactionContext{}
+	pManager := &mocks.MockProvisionManager{}
+	manager := &mocks.MockDefinitionManager{}
+	manager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{
+		{Type: "TestType", TemplateRef: "template-1", CompensationType: "test.rollback"},
+	}, nil).Once()
+	manager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{}, nil).Once()
+	watcher := createTestWatcher(index, trxContext, pManager, manager)
+
+	msg := failOrchestration(t, index, watcher, createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateRunning))
+
+	pManager.AssertNotCalled(t, "Start", mock.Anything, mock.Anything)
+	assert.Equal(t, 1, msg.AckCalls)
+}
+
+// A failed compensation orchestration is not compensated again unless its own definition declares a compensation type
+func TestOnMessage_FailedCompensationNotCompensatedWithoutCompensationType(t *testing.T) {
+	index := createTestStore(t)
+	trxContext := &store.NoOpTransactionContext{}
+	pManager := &mocks.MockProvisionManager{}
+	manager := &mocks.MockDefinitionManager{}
+	manager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{
+		{Type: "test.rollback", TemplateRef: "template-1"},
+	}, nil).Once()
+	watcher := createTestWatcher(index, trxContext, pManager, manager)
+
+	compensation := createWatcherOrchestration(CompensationID("orch-1"), "corr-1", api.OrchestrationStateRunning)
+	compensation.OrchestrationType = "test.rollback"
+	compensation.DefinitionID = "test.rollback"
+	msg := failOrchestration(t, index, watcher, compensation)
+
+	pManager.AssertNotCalled(t, "Start", mock.Anything, mock.Anything)
+	assert.Equal(t, 1, msg.AckCalls)
+}
+
+// A failed compensation orchestration is compensated when its own definition declares a compensation type
+func TestOnMessage_FailedCompensationCompensatedWithCompensationType(t *testing.T) {
+	index := createTestStore(t)
+	trxContext := &store.NoOpTransactionContext{}
+	pManager := &mocks.MockProvisionManager{}
+	pManager.On("Start", mock.Anything, mock.MatchedBy(func(manifest *model.OrchestrationManifest) bool {
+		return manifest.OrchestrationType == "test.cleanup" &&
+			manifest.ID == CompensationID(CompensationID("orch-1")) &&
+			manifest.CompensatedManifestID == CompensationID("orch-1")
+	})).Return(&api.Orchestration{}, nil).Once()
+	manager := definitionManagerWithCompensation("test.rollback", "test.cleanup")
+	watcher := createTestWatcher(index, trxContext, pManager, manager)
+
+	compensation := createWatcherOrchestration(CompensationID("orch-1"), "corr-1", api.OrchestrationStateRunning)
+	compensation.OrchestrationType = "test.rollback"
+	compensation.DefinitionID = "test.rollback"
+	failOrchestration(t, index, watcher, compensation)
 
 	pManager.AssertExpectations(t)
 }
@@ -493,11 +551,37 @@ func createWatcherOrchestration(id, correlationID string, state api.Orchestratio
 		StateTimestamp:    time.Now(),
 		CreatedTimestamp:  time.Now().Add(-5 * time.Minute),
 		OrchestrationType: "TestType",
+		DefinitionID:      "TestType",
 		Steps:             []api.OrchestrationStep{},
 		ProcessingData:    map[string]any{},
 		OutputData:        map[string]any{},
 		Completed:         map[string]struct{}{},
 	}
+}
+
+// definitionManagerWithCompensation returns a definition manager that first returns the definition of the failed
+// orchestration, which declares the given compensation type, and then the compensation definition of the same template
+func definitionManagerWithCompensation(orchestrationType, compensationType model.OrchestrationType) *mocks.MockDefinitionManager {
+	manager := &mocks.MockDefinitionManager{}
+	manager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{
+		{Type: orchestrationType, TemplateRef: "template-1", CompensationType: compensationType},
+	}, nil).Once()
+	manager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{
+		{Type: compensationType, TemplateRef: "template-1"},
+	}, nil).Once()
+	return manager
+}
+
+// failOrchestration indexes the given orchestration and then delivers an update that moves it to the errored state
+func failOrchestration(t *testing.T, index store.EntityStore[*api.OrchestrationEntry], watcher *OrchestrationIndexWatcher, orch api.Orchestration) *MockMessage {
+	_, err := index.Create(context.Background(), convertToEntry(orch))
+	require.NoError(t, err)
+
+	orch.State = api.OrchestrationStateErrored
+	orch.StateTimestamp = time.Now().Add(time.Second)
+	msg := createNatsMsg(t, orch)
+	watcher.onMessage(msg.Data, msg)
+	return msg
 }
 
 func createNatsMsg(t *testing.T, orch api.Orchestration) *MockMessage {

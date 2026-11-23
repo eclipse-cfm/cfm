@@ -93,8 +93,8 @@ func (w *OrchestrationIndexWatcher) onMessage(data []byte, msg MessageAck) {
 			return fmt.Errorf("failed to update orchestration entry: %w", err)
 		}
 
-		// the orchestration failed, kick off the compensation
-		if orchestration.State == api.OrchestrationStateErrored && orchestration.OrchestrationType != model.VPADisposeType {
+		// the orchestration failed, kick off the compensation declared by its definition
+		if orchestration.State == api.OrchestrationStateErrored {
 			if err := w.startCompensationOrchestration(ctx, orchestration); err != nil {
 				return fmt.Errorf("failed to start compensation: %w", err)
 			}
@@ -117,17 +117,27 @@ func CompensationID(orchestrationID string) string {
 	return orchestrationID + "-compensation"
 }
 
-// startCompensationOrchestration initiates a compensation orchestration if a matching definition exists for the given orchestration.
-// an error is returned if no compensation orchestration definition exists, if the orchestration could not be started, or if the exists-check failed
-// de-duplication is handled by the ProvisionManager
+// startCompensationOrchestration starts an orchestration of the compensation type that the definition of the failed
+// orchestration declares. Nothing is started if the definition declares no compensation type, or if the template of the
+// definition does not contain a definition of that type. An error is returned if the definitions cannot be read or the
+// compensation cannot be started. De-duplication is handled by the ProvisionManager.
 func (w *OrchestrationIndexWatcher) startCompensationOrchestration(ctx context.Context, orchestration api.Orchestration) error {
+	definition, err := w.findOrchestrationDefinition(ctx, orchestration.DefinitionID)
+	if err != nil {
+		return err
+	}
+	compensationType := definition.CompensationType
+	if compensationType == "" {
+		w.monitor.Infof("Orchestration [%s] failed. Its definition [%s] declares no compensation", orchestration.ID, orchestration.DefinitionID)
+		return nil
+	}
 
-	exists, err := w.existsCompensationOrchestration(ctx, model.VPADisposeType, orchestration.DefinitionID)
+	exists, err := w.existsCompensationOrchestration(ctx, compensationType, definition.TemplateRef)
 	if err != nil {
 		return err
 	}
 	if !exists {
-		w.monitor.Warnf("No compensation orchestration definition found for orchestration [%s]", orchestration.ID)
+		w.monitor.Warnf("No compensation orchestration definition of type [%s] found for orchestration [%s]", compensationType, orchestration.ID)
 		return nil
 	}
 
@@ -146,11 +156,11 @@ func (w *OrchestrationIndexWatcher) startCompensationOrchestration(ctx context.C
 	w.monitor.Infof("Orchestration [%s] is in state [%s] with error: [%s]. Starting auto-compensation", orchestration.ID, orchestration.State.String(), orchestration.EngineState.Error)
 
 	correlationID := orchestration.CorrelationID //eg. participant profile id, etc.
-	pData := orchestration.ProcessingData        // stuff for the VPAs
+	pData := orchestration.ProcessingData        // the processing data of the failed orchestration
 	manifest := model.OrchestrationManifest{
 		ID:                    CompensationID(orchestration.ID),
 		CorrelationID:         correlationID,
-		OrchestrationType:     model.VPADisposeType,
+		OrchestrationType:     compensationType,
 		Payload:               pData,
 		CompensatedManifestID: orchestration.ID,
 		// The compensation reports to the initiator of the failed orchestration
@@ -164,19 +174,22 @@ func (w *OrchestrationIndexWatcher) startCompensationOrchestration(ctx context.C
 	return nil
 }
 
-// existsCompensationOrchestration verifies that another orchestration definition exists that was generated based on the same template
-// and that has the desired orchestration type
-func (w *OrchestrationIndexWatcher) existsCompensationOrchestration(ctx context.Context, orchestrationType model.OrchestrationType, orchestrationDefinitionID string) (bool, error) {
-	// get orchestration definition by ID
+// findOrchestrationDefinition returns the orchestration definition with the given ID
+func (w *OrchestrationIndexWatcher) findOrchestrationDefinition(ctx context.Context, orchestrationDefinitionID string) (*api.OrchestrationDefinition, error) {
 	idPredicate := query.Eq("type", orchestrationDefinitionID)
 	definitions, err := w.definitionManager.QueryOrchestrationDefinitions(ctx, idPredicate)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	if len(definitions) != 1 {
-		return false, types.NewFatalError("expected exactly one orchestration definition with ID %s, found %d", orchestrationDefinitionID, len(definitions))
+		return nil, types.NewFatalError("expected exactly one orchestration definition with ID %s, found %d", orchestrationDefinitionID, len(definitions))
 	}
-	templateRef := definitions[0].TemplateRef
+	return &definitions[0], nil
+}
+
+// existsCompensationOrchestration verifies that an orchestration definition of the desired orchestration type exists
+// that was generated based on the given template
+func (w *OrchestrationIndexWatcher) existsCompensationOrchestration(ctx context.Context, orchestrationType model.OrchestrationType, templateRef string) (bool, error) {
 	templateRefPredicate := query.And(query.Eq("templateRef", templateRef), query.Eq("type", orchestrationType.String()))
 	compensationDefinitions, err := w.definitionManager.QueryOrchestrationDefinitions(ctx, templateRefPredicate)
 

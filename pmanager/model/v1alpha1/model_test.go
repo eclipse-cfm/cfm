@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -370,6 +371,43 @@ func TestOrchestrationTemplateValidation(t *testing.T) {
 			} else {
 				require.NoError(t, model.Validator.Struct(&template))
 				require.NoError(t, model.Validator.Struct(&definition))
+			}
+		})
+	}
+}
+
+func TestOrchestrationTemplate_ValidateCompensation(t *testing.T) {
+	activities := map[string][]ActivityDto{
+		"test.deploy":   {{ID: "a1", Type: "test-activity"}},
+		"test.rollback": {{ID: "a2", Type: "test-activity"}},
+		"test.cleanup":  {{ID: "a3", Type: "test-activity"}},
+	}
+	tests := []struct {
+		name         string
+		compensation map[string]string
+		wantErr      bool
+		wantMsg      string
+	}{
+		{name: "no compensation", compensation: nil},
+		{name: "valid entry", compensation: map[string]string{"test.deploy": "test.rollback"}},
+		{name: "chain", compensation: map[string]string{"test.deploy": "test.rollback", "test.rollback": "test.cleanup"}},
+		{name: "unknown key", compensation: map[string]string{"test.unknown": "test.rollback"}, wantErr: true},
+		{name: "unknown value", compensation: map[string]string{"test.deploy": "test.unknown"}, wantErr: true},
+		{name: "self compensation", compensation: map[string]string{"test.deploy": "test.deploy"}, wantErr: true, wantMsg: "cannot compensate itself"},
+		{name: "cycle", compensation: map[string]string{"test.deploy": "test.rollback", "test.rollback": "test.deploy"}, wantErr: true, wantMsg: "cycle"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			template := OrchestrationTemplate{ID: "template-1", Activities: activities, Compensation: tt.compensation}
+			err := template.ValidateCompensation()
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.True(t, types.IsClientError(err))
+				if tt.wantMsg != "" {
+					assert.Contains(t, err.Error(), tt.wantMsg)
+				}
+			} else {
+				require.NoError(t, err)
 			}
 		})
 	}
