@@ -299,6 +299,9 @@
           "id": {
             "type": "string"
           },
+          "namespace": {
+            "type": "string"
+          },
           "orchestrationType": {
             "type": "string"
           },

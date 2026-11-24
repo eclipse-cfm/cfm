@@ -188,3 +188,51 @@ func TestManifestReplyToValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestManifestNamespaceValidation(t *testing.T) {
+	tests := []struct {
+		name      string
+		namespace string
+		wantErr   bool
+	}{
+		{"empty", "", false},
+		{"single token", "second-manager_1", false},
+		{"dot", "second.manager", true},
+		{"wildcard", "*", true},
+		{"full wildcard", ">", true},
+		{"slash", "second/manager", true},
+		{"space", "second manager", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := Validator.Struct(OrchestrationManifest{ID: "id", CorrelationID: "corr", OrchestrationType: "type", Namespace: tt.namespace})
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, ValidationMessage(err), "namespace")
+				assert.Error(t, ValidateNamespace(tt.namespace))
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateNamespace_Empty(t *testing.T) {
+	assert.Error(t, ValidateNamespace(""))
+}
+
+func TestNamespaceOrDefault(t *testing.T) {
+	assert.Equal(t, DefaultNamespace, NamespaceOrDefault(""))
+	assert.Equal(t, "other", NamespaceOrDefault("other"))
+}
+
+func TestManifestNamespace_JSON(t *testing.T) {
+	data, err := json.Marshal(OrchestrationManifest{ID: "id", CorrelationID: "corr", OrchestrationType: "type"})
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "namespace")
+
+	var manifest OrchestrationManifest
+	require.NoError(t, json.Unmarshal([]byte(`{"id":"id","namespace":"other"}`), &manifest))
+	assert.Equal(t, "other", manifest.Namespace)
+}

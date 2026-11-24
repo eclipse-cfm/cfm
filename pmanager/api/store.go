@@ -71,7 +71,9 @@ type DefinitionStore interface {
 }
 
 type OrchestrationEntry struct {
-	ID                string                  `json:"id"`
+	ID string `json:"id"`
+	// Namespace is the namespace of the orchestration
+	Namespace         string                  `json:"namespace"`
 	Version           int64                   `json:"version"`
 	CorrelationID     string                  `json:"correlationId"`
 	State             OrchestrationState      `json:"state"`

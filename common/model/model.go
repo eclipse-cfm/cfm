@@ -24,18 +24,40 @@ import (
 
 var Validator = initValidator()
 
-// replyToPattern restricts a reply-to subject token to the characters allowed by the modeltype check, without dots, so
-// that it is exactly one subject token.
-var replyToPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+// subjectTokenPattern restricts a reply-to subject token or a namespace to the characters allowed by the modeltype
+// check, without dots, so that it is exactly one subject token.
+var subjectTokenPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 // ValidateReplyTo returns an error if the given reply-to value is not a single subject token, that is, if it is empty or
 // contains anything other than letters, digits, underscores and hyphens. Dots, which separate subject tokens, and the
 // wildcards '*' and '>' are rejected.
 func ValidateReplyTo(replyTo string) error {
-	if !replyToPattern.MatchString(replyTo) {
+	if !subjectTokenPattern.MatchString(replyTo) {
 		return fmt.Errorf("invalid replyTo %q: must be a single subject token of letters, digits, '_' and '-'", replyTo)
 	}
 	return nil
+}
+
+// DefaultNamespace is the namespace of a manifest, an orchestration or a definition that does not name one. Managers
+// that do not use namespaces, such as the Tenant Manager, work in this namespace.
+const DefaultNamespace = "default"
+
+// ValidateNamespace returns an error if the given namespace is not a single subject token, that is, if it is empty or
+// contains anything other than letters, digits, underscores and hyphens. The namespace becomes part of subjects and
+// keys, so dots, which separate subject tokens, and the wildcards '*' and '>' are rejected.
+func ValidateNamespace(namespace string) error {
+	if !subjectTokenPattern.MatchString(namespace) {
+		return fmt.Errorf("invalid namespace %q: must be a single subject token of letters, digits, '_' and '-'", namespace)
+	}
+	return nil
+}
+
+// NamespaceOrDefault returns the given namespace, or DefaultNamespace if it is empty.
+func NamespaceOrDefault(namespace string) string {
+	if namespace == "" {
+		return DefaultNamespace
+	}
+	return namespace
 }
 
 // OrchestrationManifest represents the configuration details for the execution of an orchestration.
@@ -51,6 +73,10 @@ type OrchestrationManifest struct {
 	// initiator receives its own responses. It is a single token without dots, see ValidateReplyTo. When it is empty,
 	// the response is published to the default response subject.
 	ReplyTo string `json:"replyTo,omitempty" validate:"omitempty,replyto"`
+	// Namespace is the namespace of the manager that sends the manifest. The orchestration runs with the definitions of
+	// this namespace. It is a single token without dots, see ValidateNamespace. When it is empty, the Provision Manager
+	// uses DefaultNamespace.
+	Namespace string `json:"namespace,omitempty" validate:"omitempty,namespace"`
 	// CompensatedManifestID is set by the Provision Manager when it starts this orchestration to compensate a failed
 	// one. It is never read from serialized manifests, so external callers cannot claim to compensate an orchestration.
 	CompensatedManifestID string `json:"-"`
@@ -117,6 +143,11 @@ func initValidator() *validator.Validate {
 	// replyto validates reply-to subject tokens, see ValidateReplyTo
 	_ = v.RegisterValidation("replyto", func(fl validator.FieldLevel) bool {
 		return ValidateReplyTo(fl.Field().String()) == nil
+	})
+
+	// namespace validates namespaces, see ValidateNamespace
+	_ = v.RegisterValidation("namespace", func(fl validator.FieldLevel) bool {
+		return ValidateNamespace(fl.Field().String()) == nil
 	})
 	return v
 }
