@@ -9,6 +9,7 @@
  *
  *  Contributors:
  *       Metaform Systems, Inc. - initial API and implementation
+ *       Airbus SAS - accept all 2xx responses
  *
  */
 
@@ -143,10 +144,10 @@ func (h HttpManagementAPIClient) DeleteParticipantContext(ctx context.Context, p
 	}
 	defer httpx.DrainAndClose(resp)
 
-	switch resp.StatusCode {
-	case http.StatusNotFound:
+	switch {
+	case resp.StatusCode == http.StatusNotFound:
 		return fmt.Errorf("participant context %s not found in control plane", participantContextID)
-	case http.StatusOK:
+	case httpx.IsSuccessCode(resp.StatusCode):
 		return nil
 	default:
 		return fmt.Errorf("failed to delete participant context on control plane: received status code %d, body: %s", resp.StatusCode, httpx.ReadErrorBody(resp))
@@ -186,7 +187,7 @@ func (h HttpManagementAPIClient) CreateParticipantContext(ctx context.Context, m
 	}
 	defer httpx.DrainAndClose(resp)
 
-	if resp.StatusCode != http.StatusOK {
+	if !httpx.IsSuccessCode(resp.StatusCode) {
 		return fmt.Errorf("failed to create participant context on control plane: received status code %d, body: %s", resp.StatusCode, httpx.ReadErrorBody(resp))
 	}
 

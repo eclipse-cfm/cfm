@@ -9,6 +9,7 @@
  *
  *  Contributors:
  *       Metaform Systems, Inc. - initial API and implementation
+ *       Airbus SAS - accept all 2xx responses
  *
  */
 
@@ -198,7 +199,7 @@ func (i HttpApiClient) RevokeCredential(ctx context.Context, credentialID string
 	}
 	defer httpx.DrainAndClose(resp)
 
-	if resp.StatusCode != http.StatusOK {
+	if !httpx.IsSuccessCode(resp.StatusCode) {
 		return fmt.Errorf("failed to revoke credential with ID '%s' in issuer context '%s': received status code %d with message [%s]", credentialID, i.IssuerID, resp.StatusCode, httpx.ReadErrorBody(resp))
 	}
 	return nil

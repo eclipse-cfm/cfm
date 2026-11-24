@@ -9,6 +9,7 @@
  *
  *  Contributors:
  *       Metaform Systems, Inc. - initial API and implementation
+ *       Airbus SAS - accept all 2xx responses
  *
  */
 
@@ -25,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/common/httpx"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/common/token"
 )
@@ -142,7 +144,7 @@ func (t TokenExchangeProvider) GetExpiringToken(ctx context.Context, scope strin
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+	if !httpx.IsSuccessCode(resp.StatusCode) {
 		t.monitor.Debugw("token exchange failed", "status", resp.StatusCode, "body", string(bodyBytes))
 		return nil, fmt.Errorf("token exchange failed with status %d", resp.StatusCode)
 	}

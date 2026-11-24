@@ -9,6 +9,7 @@
  *
  *  Contributors:
  *       Metaform Systems, Inc. - initial API and implementation
+ *       Airbus SAS - accept all 2xx responses
  *
  */
 
@@ -256,4 +257,27 @@ func TestHttpIdentityAPIClient_DeleteParticipantContext_EscapesParticipantContex
 	}
 
 	require.NoError(t, client.DeleteParticipantContext(t.Context(), "../other?force=true#"))
+}
+
+func TestHttpIdentityAPIClient_DeleteParticipantContext_NoContent(t *testing.T) {
+	participantContextID := "test-id"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/participants/"+participantContextID && r.Method == http.MethodDelete {
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
+	client := HttpIdentityAPIClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	err := client.DeleteParticipantContext(t.Context(), participantContextID)
+	require.NoError(t, err, "the Identity Hub answers a delete with 204")
 }

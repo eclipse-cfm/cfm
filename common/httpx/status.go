@@ -9,6 +9,7 @@
  *
  *  Contributors:
  *       Metaform Systems, Inc. - initial API and implementation
+ *       Airbus SAS - accept all 2xx responses
  *
  */
 
@@ -82,4 +83,10 @@ func IsTransientStatus(statusCode int) bool {
 	return statusCode >= http.StatusInternalServerError ||
 		statusCode == http.StatusRequestTimeout ||
 		statusCode == http.StatusTooManyRequests
+}
+
+// IsSuccessCode reports whether an HTTP status code is a success (2xx). APIs answer successful calls with different 2xx
+// codes, e.g. 204 No Content on a delete, so callers should not check for 200 OK only.
+func IsSuccessCode(statusCode int) bool {
+	return statusCode >= http.StatusOK && statusCode < http.StatusMultipleChoices
 }

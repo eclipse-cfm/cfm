@@ -9,6 +9,7 @@
  *
  *  Contributors:
  *       Metaform Systems, Inc. - initial API and implementation
+ *       Airbus SAS - accept all 2xx responses
  *
  */
 
@@ -660,4 +661,49 @@ func TestHttpManagementAPIClient_DeleteParticipantContext_EscapesParticipantCont
 	}
 
 	require.NoError(t, client.DeleteParticipantContext(t.Context(), "../other?force=true#"))
+}
+
+func TestCreateParticipant_Created(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == CreateParticipantURL && r.Method == http.MethodPost {
+			w.WriteHeader(http.StatusCreated)
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
+	client := HttpManagementAPIClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	err := client.CreateParticipantContext(t.Context(), ParticipantContext{ParticipantContextID: "test-participant"})
+	require.NoError(t, err, "any 2xx is a success")
+}
+
+func TestDeleteParticipant_NoContent(t *testing.T) {
+	participantContextID := "test-participant"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == CreateParticipantURL+"/"+participantContextID && r.Method == http.MethodDelete {
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, mock.Anything, mock.Anything).Return("token", nil)
+	client := HttpManagementAPIClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		HttpClient:    &http.Client{},
+	}
+
+	err := client.DeleteParticipantContext(t.Context(), participantContextID)
+	require.NoError(t, err, "the control plane answers a delete with 204")
 }
