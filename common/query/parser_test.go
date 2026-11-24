@@ -421,32 +421,42 @@ func TestParse_CaseInsensitiveKeywords(t *testing.T) {
 // TestParse_EdgeCases tests edge cases and error handling
 func TestParse_EdgeCases(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       string
-		expectError bool
+		name           string
+		input          string
+		expectError    bool
+		expectMatchAll bool
 	}{
 		{
-			name:        "Empty string",
-			input:       "",
-			expectError: true,
+			name:           "Empty string returns match-all",
+			input:          "",
+			expectError:    false,
+			expectMatchAll: true,
 		},
 		{
-			name:        "Whitespace only",
-			input:       "   ",
-			expectError: true,
+			name:           "Whitespace only returns match-all",
+			input:          "   ",
+			expectError:    false,
+			expectMatchAll: true,
 		},
 		{
-			name:        "Valid AND",
-			input:       "Name = 'Alice' AND Age > 25",
-			expectError: false,
+			name:           "Valid AND",
+			input:          "Name = 'Alice' AND Age > 25",
+			expectError:    false,
+			expectMatchAll: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := ParsePredicate(tt.input)
+			pred, err := ParsePredicate(tt.input)
 			if (err != nil) != tt.expectError {
 				t.Errorf("ParsePredicate() error = %v, expectError = %v", err, tt.expectError)
+				return
+			}
+			if tt.expectMatchAll {
+				if _, ok := pred.(*MatchAllPredicate); !ok {
+					t.Errorf("expected *MatchAllPredicate, got %T", pred)
+				}
 			}
 		})
 	}
