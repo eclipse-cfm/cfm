@@ -18,7 +18,7 @@ import (
 
 	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
 	"github.com/eclipse-cfm/cfm/agent/common/issuerservice"
-	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"go.opentelemetry.io/otel"
@@ -204,5 +204,5 @@ func (p OnboardingActivityProcessor) processNewRequest(ctx api.ActivityContext, 
 }
 
 type onboardingData struct {
-	CredentialSpecs []model.CredentialSpec `json:"cfm.vpa.credentials" validate:"required,dive"`
+	CredentialSpecs []dataspace.CredentialSpec `json:"cfm.vpa.credentials" validate:"required,dive"`
 }

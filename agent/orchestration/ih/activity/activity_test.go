@@ -21,7 +21,7 @@ import (
 	"github.com/eclipse-cfm/cfm/agent/common"
 	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
 	"github.com/eclipse-cfm/cfm/agent/common/vpa"
-	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/stretchr/testify/assert"
@@ -50,7 +50,7 @@ func validConfig(opts ...ConfigOption) *Config {
 }
 
 var processingData = map[string]any{
-	model.ParticipantIdentifier:         "did:web:participant-abc",
+	dataspace.ParticipantIdentifier:     "did:web:participant-abc",
 	"clientID.vaultAccess":              "client-123",
 	"participantContextId":              "client-456",
 	"cfm.participant.credentialservice": "https://example.com/credentialservice",
@@ -76,7 +76,7 @@ func TestIHActivityProcessor_ProcessDeploy_WithValidData(t *testing.T) {
 func TestIHActivityProcessor_ProcessDeploy_MissingParticipantID(t *testing.T) {
 	processor := NewProcessor(validConfig())
 	pd := copyOf(processingData)
-	delete(pd, model.ParticipantIdentifier)
+	delete(pd, dataspace.ParticipantIdentifier)
 
 	activityContext := api.NewActivityContext(context.Background(), "orch-2", api.Activity{
 		ID:   "activity-1",

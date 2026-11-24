@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/natsfixtures"
 	"github.com/eclipse-cfm/cfm/common/sqlstore"
@@ -80,7 +81,7 @@ func verifyDeployAndDispose(t *testing.T, client *e2efixtures.ApiClient) {
 	newParticipantProfile := v1alpha1.NewParticipantProfileDeployment{
 		Identifier:       "did:web:foo.com",
 		ParticipantRoles: map[string][]string{dProfile.ID: {e2efixtures.OEMRole}},
-		VPAProperties:    map[string]map[string]any{string(model.ConnectorType): {"connectorkey": "connectorvalue"}},
+		VPAProperties:    map[string]map[string]any{string(dataspace.ConnectorType): {"connectorkey": "connectorvalue"}},
 	}
 
 	var participantProfile v1alpha1.ParticipantProfile
@@ -122,7 +123,7 @@ func verifyDeployAndDispose(t *testing.T, client *e2efixtures.ApiClient) {
 	// Check for VPA that contains a key with "cfm.connector" value and verify it has "connectorkey"
 	var connectorVPA *v1alpha1.VirtualParticipantAgent
 	for _, vpa := range statusProfile.VPAs {
-		if vpa.Type == model.ConnectorType {
+		if vpa.Type == dataspace.ConnectorType {
 			connectorVPA = &vpa
 			break
 		}
@@ -132,7 +133,7 @@ func verifyDeployAndDispose(t *testing.T, client *e2efixtures.ApiClient) {
 	require.Contains(t, connectorVPA.Properties, "connectorkey", "Connector VPA should contain 'connectorkey' property")
 
 	// verify return of agent state data
-	stateData := statusProfile.Properties[model.VPAStateData].(map[string]any)
+	stateData := statusProfile.Properties[dataspace.VPAStateData].(map[string]any)
 	assert.NotNil(t, 1, stateData)
 	assert.Equal(t, "test output", stateData["agent.test.output"])
 	assert.True(t, stateData["agent.test.credentials.received"].(bool))

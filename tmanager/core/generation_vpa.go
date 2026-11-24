@@ -15,7 +15,7 @@ package core
 import (
 	"time"
 
-	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/google/uuid"
 )
@@ -39,15 +39,15 @@ func (g participantGenerator) Generate(
 		dProfileIDs[i] = profile.ID
 	}
 
-	cell, err := g.CellSelector(model.VPADeployType, cells, dProfiles)
+	cell, err := g.CellSelector(dataspace.VPADeployType, cells, dProfiles)
 	if err != nil {
 		return nil, err
 	}
 
-	connector := g.generateVPA(model.ConnectorType, vpaProperties, cell)
-	cService := g.generateVPA(model.CredentialServiceType, vpaProperties, cell)
-	dPlane := g.generateVPA(model.DataPlaneType, vpaProperties, cell)
-	issuer := g.generateVPA(model.IssuerServiceType, vpaProperties, cell)
+	connector := g.generateVPA(dataspace.ConnectorType, vpaProperties, cell)
+	cService := g.generateVPA(dataspace.CredentialServiceType, vpaProperties, cell)
+	dPlane := g.generateVPA(dataspace.DataPlaneType, vpaProperties, cell)
+	issuer := g.generateVPA(dataspace.IssuerServiceType, vpaProperties, cell)
 	vpas := []api.VirtualParticipantAgent{connector, cService, dPlane, issuer}
 
 	pProfile := &api.ParticipantProfile{
@@ -67,7 +67,7 @@ func (g participantGenerator) Generate(
 
 // generateVPA creates a VPA targeted at given cell.
 func (g participantGenerator) generateVPA(
-	vpaType model.VPAType,
+	vpaType dataspace.VPAType,
 	vpaProperties api.VPAPropMap,
 	cell *api.Cell) api.VirtualParticipantAgent {
 

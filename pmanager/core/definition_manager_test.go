@@ -31,6 +31,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// testOrchestrationType is an orchestration type without meaning to the engine.
+const testOrchestrationType model.OrchestrationType = "test.orchestration"
+
 func TestCreateOrchestrationDefinition_Success(t *testing.T) {
 
 	store := memorystore.NewDefinitionStore()
@@ -544,7 +547,7 @@ func TestDeleteOrchestrationDefinition_WithOrchestrations(t *testing.T) {
 		State:             0,
 		StateTimestamp:    time.Time{},
 		CreatedTimestamp:  time.Time{},
-		OrchestrationType: model.VPADeployType,
+		OrchestrationType: testOrchestrationType,
 		DefinitionID:      orchestrationDef.GetID(),
 	})
 	require.NoError(t, err, "Failed to create orchestration entry")
@@ -1327,16 +1330,16 @@ func TestValidateActivitySchema_SchemaWithoutProperties(t *testing.T) {
 	}
 }
 
-// TestValidateActivitySchema_DataspaceFieldsDeclaredInSchema covers the dataspace deploy templates: the participant
-// identifier, VPA data, and credential data are provided because the template schema declares them, not because the
-// engine knows about them.
-func TestValidateActivitySchema_DataspaceFieldsDeclaredInSchema(t *testing.T) {
-	dataspaceSchema := map[string]any{
+// TestValidateActivitySchema_FieldsDeclaredInSchema covers templates whose payload carries fields that no activity
+// produces, such as the participant identifier, VPA data, and credential data of the dataspace deploy templates: they
+// are provided because the template schema declares them, not because the engine knows about them.
+func TestValidateActivitySchema_FieldsDeclaredInSchema(t *testing.T) {
+	templateSchema := map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			model.ParticipantIdentifier: map[string]any{"type": "string"},
-			model.VPAData:               map[string]any{"type": "array"},
-			model.CredentialData:        map[string]any{"type": "array"},
+			"payload.id":          map[string]any{"type": "string"},
+			"payload.data":        map[string]any{"type": "array"},
+			"payload.credentials": map[string]any{"type": "array"},
 		},
 	}
 	activities := []api.Activity{
@@ -1347,10 +1350,10 @@ func TestValidateActivitySchema_DataspaceFieldsDeclaredInSchema(t *testing.T) {
 		"type-a": {
 			InputSchema: map[string]any{
 				"properties": map[string]any{
-					model.ParticipantIdentifier: map[string]any{"type": "string"},
-					model.VPAData:               map[string]any{"type": "array"},
+					"payload.id":   map[string]any{"type": "string"},
+					"payload.data": map[string]any{"type": "array"},
 				},
-				"required": []any{model.ParticipantIdentifier, model.VPAData},
+				"required": []any{"payload.id", "payload.data"},
 			},
 			OutputSchema: map[string]any{
 				"properties": map[string]any{"field-a": map[string]any{"type": "string"}},
@@ -1359,19 +1362,19 @@ func TestValidateActivitySchema_DataspaceFieldsDeclaredInSchema(t *testing.T) {
 		"type-b": {
 			InputSchema: map[string]any{
 				"properties": map[string]any{
-					model.CredentialData: map[string]any{"type": "array"},
-					"field-a":            map[string]any{"type": "string"},
+					"payload.credentials": map[string]any{"type": "array"},
+					"field-a":             map[string]any{"type": "string"},
 				},
-				"required": []any{model.CredentialData, "field-a"},
+				"required": []any{"payload.credentials", "field-a"},
 			},
 		},
 	}
 
-	require.NoError(t, validateActivitySchema(dataspaceSchema, activities, activityDefinitions))
+	require.NoError(t, validateActivitySchema(templateSchema, activities, activityDefinitions))
 
 	err := validateActivitySchema(map[string]any{"type": "object"}, activities, activityDefinitions)
-	require.Error(t, err, "without the schema declaration the dataspace fields are not provided")
-	assert.Contains(t, err.Error(), "required input field "+model.ParticipantIdentifier)
+	require.Error(t, err, "without the schema declaration the payload fields are not provided")
+	assert.Contains(t, err.Error(), "required input field payload.id")
 }
 
 // Helper mock store for testing error scenarios

@@ -14,7 +14,6 @@ package model
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,7 +23,7 @@ import (
 func TestDeploymentManifest_JSONRoundTrip(t *testing.T) {
 	originalManifest := OrchestrationManifest{
 		ID:                "manifest-1",
-		OrchestrationType: VPADeployType,
+		OrchestrationType: "test.orchestration",
 		Payload: map[string]any{
 			"environment": "production",
 			"capacity":    100,
@@ -52,7 +51,7 @@ func TestDeploymentResponse_JSONRoundTrip(t *testing.T) {
 		Success:           true,
 		ErrorDetail:       "",
 		ManifestID:        "manifest-1",
-		OrchestrationType: VPADeployType,
+		OrchestrationType: "test.orchestration",
 		Properties: map[string]any{
 			"endpoint": "https://example.com",
 			"status":   "running",
@@ -75,35 +74,6 @@ func TestDeploymentResponse_JSONRoundTrip(t *testing.T) {
 
 	require.NotNil(t, unmarshaledResponse.Properties)
 	comparePayload(t, originalResponse.Properties, unmarshaledResponse.Properties)
-}
-
-func TestVPAManifest_JSONRoundTrip(t *testing.T) {
-	originalManifest := VPAManifest{
-		ID:      "vpa-manifest-1",
-		VPAType: ConnectorType,
-		CellID:  "cell-west-1",
-		Properties: map[string]any{
-			"region":    "us-west-1",
-			"replicas":  3,
-			"enabled":   true,
-			"endpoints": []string{"http://api1.example.com", "http://api2.example.com"},
-		},
-	}
-
-	jsonData, err := json.Marshal(originalManifest)
-	require.NoError(t, err)
-
-	var unmarshaledManifest VPAManifest
-	err = json.Unmarshal(jsonData, &unmarshaledManifest)
-	require.NoError(t, err)
-
-	assert.Equal(t, originalManifest.ID, unmarshaledManifest.ID)
-	assert.Equal(t, originalManifest.VPAType, unmarshaledManifest.VPAType)
-	assert.Equal(t, originalManifest.CellID, unmarshaledManifest.CellID)
-
-	// Handle properties comparison (JSON unmarshaling converts numbers to float64)
-	require.NotNil(t, unmarshaledManifest.Properties)
-	comparePayload(t, originalManifest.Properties, unmarshaledManifest.Properties)
 }
 
 // comparePayload is a helper function to compare payloads/properties accounting for JSON type conversions
@@ -190,46 +160,6 @@ func TestOrchestrationResponse_CompensatedManifestIDRoundTrip(t *testing.T) {
 	var response OrchestrationResponse
 	require.NoError(t, json.Unmarshal(data, &response))
 	assert.Equal(t, "m1", response.CompensatedManifestID)
-}
-
-func TestValidateParticipantContextID(t *testing.T) {
-	tests := []struct {
-		name  string
-		id    string
-		valid bool
-	}{
-		{"generated hex id", "0123456789abcdef0123456789abcdef", true},
-		{"hyphenated id", "test-participant", true},
-		{"underscore id", "pc_1", true},
-		{"max length", strings.Repeat("a", 128), true},
-		{"empty", "", false},
-		{"too long", strings.Repeat("a", 129), false},
-		{"path traversal", "../../other-participant", false},
-		{"slash", "a/b", false},
-		{"dot", "a.b", false},
-		{"query and fragment", "x?force=true#", false},
-		{"percent encoded", "x%2F..", false},
-		{"whitespace", "a b", false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateParticipantContextID(tt.id)
-			if tt.valid {
-				require.NoError(t, err)
-			} else {
-				require.Error(t, err)
-			}
-		})
-	}
-}
-
-func TestValidator_ParticipantContextIDTag(t *testing.T) {
-	type data struct {
-		ParticipantContextID string `validate:"required,participantcontextid"`
-	}
-	require.NoError(t, Validator.Struct(data{ParticipantContextID: "test-participant"}))
-	require.Error(t, Validator.Struct(data{ParticipantContextID: "../other"}))
-	require.Error(t, Validator.Struct(data{}))
 }
 
 func TestManifestReplyToValidation(t *testing.T) {

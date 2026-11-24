@@ -19,7 +19,7 @@ import (
 
 	"github.com/eclipse-cfm/cfm/agent/common/issuerservice"
 	"github.com/eclipse-cfm/cfm/agent/common/vpa"
-	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/stretchr/testify/assert"
@@ -42,9 +42,9 @@ func TestRegistrationActivityProcessor_MinimalValidData(t *testing.T) {
 	}
 
 	processingData := map[string]any{
-		"participantContextId":      "some-context-id",
-		model.ParticipantIdentifier: "did:web:someparticipant",
-		model.VPAData:               validVpaData(nil),
+		"participantContextId":          "some-context-id",
+		dataspace.ParticipantIdentifier: "did:web:someparticipant",
+		dataspace.VPAData:               validVpaData(nil),
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -74,10 +74,10 @@ func TestRegistrationActivityProcessor_FullValidData(t *testing.T) {
 	}
 
 	processingData := map[string]any{
-		"participantContextId":       "some-context-id",
-		model.ParticipantIdentifier:  "did:web:someparticipant",
-		"cfm.participant.holdername": "some holder",
-		model.VPAData:                validVpaData(nil),
+		"participantContextId":          "some-context-id",
+		dataspace.ParticipantIdentifier: "did:web:someparticipant",
+		"cfm.participant.holdername":    "some holder",
+		dataspace.VPAData:               validVpaData(nil),
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -133,9 +133,9 @@ func TestRegistrationActivityProcessor_IssuerServiceFails(t *testing.T) {
 	}
 
 	processingData := map[string]any{
-		"participantContextId":      "some-context-id",
-		model.ParticipantIdentifier: "did:web:someparticipant",
-		model.VPAData:               validVpaData(nil),
+		"participantContextId":          "some-context-id",
+		dataspace.ParticipantIdentifier: "did:web:someparticipant",
+		dataspace.VPAData:               validVpaData(nil),
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -154,8 +154,8 @@ func TestRegistrationActivityProcessor_VpaDataMissing(t *testing.T) {
 	})
 
 	processingData := map[string]any{
-		"participantContextId":      "some-context-id",
-		model.ParticipantIdentifier: "did:web:someparticipant",
+		"participantContextId":          "some-context-id",
+		dataspace.ParticipantIdentifier: "did:web:someparticipant",
 	}
 
 	activityContext := api.NewActivityContext(context.Background(), "orch-123", api.Activity{
@@ -178,7 +178,7 @@ func TestRegistrationActivityProcessor_ParticipantContextIDMissing(t *testing.T)
 	})
 
 	processingData := map[string]any{
-		model.ParticipantIdentifier: "did:web:someparticipant",
+		dataspace.ParticipantIdentifier: "did:web:someparticipant",
 	}
 
 	activityContext := api.NewActivityContext(context.Background(), "orch-123", api.Activity{
@@ -201,9 +201,9 @@ func TestRegistrationActivityProcessor_VpaDataEmptySlice(t *testing.T) {
 	})
 
 	processingData := map[string]any{
-		"participantContextId":      "some-context-id",
-		model.ParticipantIdentifier: "did:web:someparticipant",
-		model.VPAData:               []any{},
+		"participantContextId":          "some-context-id",
+		dataspace.ParticipantIdentifier: "did:web:someparticipant",
+		dataspace.VPAData:               []any{},
 	}
 
 	activityContext := api.NewActivityContext(context.Background(), "orch-123", api.Activity{
@@ -226,11 +226,11 @@ func TestRegistrationActivityProcessor_VpaDataTypeMismatch(t *testing.T) {
 	})
 
 	processingData := map[string]any{
-		"participantContextId":      "some-context-id",
-		model.ParticipantIdentifier: "did:web:someparticipant",
-		model.VPAData: []any{
+		"participantContextId":          "some-context-id",
+		dataspace.ParticipantIdentifier: "did:web:someparticipant",
+		dataspace.VPAData: []any{
 			map[string]any{
-				"vpaType": model.ConnectorType.String(),
+				"vpaType": dataspace.ConnectorType.String(),
 			},
 		},
 	}
@@ -256,9 +256,9 @@ func TestRegistrationActivityProcessor_VpaDataPropertiesPassedToIssuerService(t 
 
 	props := map[string]any{"region": "eu-west", "tier": "standard"}
 	processingData := map[string]any{
-		"participantContextId":      "some-context-id",
-		model.ParticipantIdentifier: "did:web:someparticipant",
-		model.VPAData:               validVpaData(props),
+		"participantContextId":          "some-context-id",
+		dataspace.ParticipantIdentifier: "did:web:someparticipant",
+		dataspace.VPAData:               validVpaData(props),
 	}
 
 	activityContext := api.NewActivityContext(context.Background(), "orch-123", api.Activity{
@@ -283,11 +283,11 @@ func TestRegistrationActivityProcessor_VpaDataNoProperties(t *testing.T) {
 	})
 
 	processingData := map[string]any{
-		"participantContextId":      "some-context-id",
-		model.ParticipantIdentifier: "did:web:someparticipant",
-		model.VPAData: []any{
+		"participantContextId":          "some-context-id",
+		dataspace.ParticipantIdentifier: "did:web:someparticipant",
+		dataspace.VPAData: []any{
 			map[string]any{
-				"vpaType": model.IssuerServiceType.String(),
+				"vpaType": dataspace.IssuerServiceType.String(),
 			},
 		},
 	}
@@ -322,8 +322,8 @@ func TestRegistrationActivityProcessor_ProcessDispose(t *testing.T) {
 	}
 
 	processingData := map[string]any{
-		"participantContextId":      "some-context-id",
-		model.ParticipantIdentifier: "did:web:someparticipant",
+		"participantContextId":          "some-context-id",
+		dataspace.ParticipantIdentifier: "did:web:someparticipant",
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -351,8 +351,8 @@ func TestRegistrationActivityProcessor_ProcessDispose_IssuerServiceFails(t *test
 	}
 
 	processingData := map[string]any{
-		"participantContextId":      "some-context-id",
-		model.ParticipantIdentifier: "did:web:someparticipant",
+		"participantContextId":          "some-context-id",
+		dataspace.ParticipantIdentifier: "did:web:someparticipant",
 	}
 
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, processingData, outputData)
@@ -367,7 +367,7 @@ func TestRegistrationActivityProcessor_ProcessDispose_IssuerServiceFails(t *test
 // If properties is nil, the entry has no properties field.
 func validVpaData(properties map[string]any) []any {
 	entry := map[string]any{
-		"vpaType": model.IssuerServiceType.String(),
+		"vpaType": dataspace.IssuerServiceType.String(),
 	}
 	if properties != nil {
 		entry["properties"] = properties

@@ -15,7 +15,7 @@ package core
 import (
 	"testing"
 
-	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -42,7 +42,7 @@ func TestGenerateCredentialSpecs(t *testing.T) {
 			{
 				Entity: api.Entity{ID: "ds-1", Version: 1},
 				DataspaceSpec: api.DataspaceSpec{
-					CredentialSpecs: []model.CredentialSpec{},
+					CredentialSpecs: []dataspace.CredentialSpec{},
 				},
 			},
 		}
@@ -55,7 +55,7 @@ func TestGenerateCredentialSpecs(t *testing.T) {
 
 	t.Run("includes specs with empty participant role regardless of participant roles", func(t *testing.T) {
 		participantRoles := map[string][]string{}
-		spec := model.CredentialSpec{
+		spec := dataspace.CredentialSpec{
 			Type:            "oauth2",
 			Issuer:          "https://issuer.example.com",
 			Format:          "jwt",
@@ -65,7 +65,7 @@ func TestGenerateCredentialSpecs(t *testing.T) {
 			{
 				Entity: api.Entity{ID: "ds-1", Version: 1},
 				DataspaceSpec: api.DataspaceSpec{
-					CredentialSpecs: []model.CredentialSpec{spec},
+					CredentialSpecs: []dataspace.CredentialSpec{spec},
 				},
 			},
 		}
@@ -81,7 +81,7 @@ func TestGenerateCredentialSpecs(t *testing.T) {
 		participantRoles := map[string][]string{
 			"ds-1": {"provider"},
 		}
-		spec := model.CredentialSpec{
+		spec := dataspace.CredentialSpec{
 			Type:            "oauth2",
 			Issuer:          "https://issuer.example.com",
 			Format:          "jwt",
@@ -91,7 +91,7 @@ func TestGenerateCredentialSpecs(t *testing.T) {
 			{
 				Entity: api.Entity{ID: "ds-1", Version: 1},
 				DataspaceSpec: api.DataspaceSpec{
-					CredentialSpecs: []model.CredentialSpec{spec},
+					CredentialSpecs: []dataspace.CredentialSpec{spec},
 				},
 			},
 		}
@@ -107,13 +107,13 @@ func TestGenerateCredentialSpecs(t *testing.T) {
 		participantRoles := map[string][]string{
 			"ds-1": {"provider", "manufacturer"},
 		}
-		matchingSpec := model.CredentialSpec{
+		matchingSpec := dataspace.CredentialSpec{
 			Type:            "oauth2",
 			Issuer:          "https://issuer.example.com",
 			Format:          "jwt",
 			ParticipantRole: "provider",
 		}
-		nonMatchingSpec := model.CredentialSpec{
+		nonMatchingSpec := dataspace.CredentialSpec{
 			Type:            "saml",
 			Issuer:          "https://issuer2.example.com",
 			Format:          "saml2",
@@ -123,7 +123,7 @@ func TestGenerateCredentialSpecs(t *testing.T) {
 			{
 				Entity: api.Entity{ID: "ds-1", Version: 1},
 				DataspaceSpec: api.DataspaceSpec{
-					CredentialSpecs: []model.CredentialSpec{matchingSpec, nonMatchingSpec},
+					CredentialSpecs: []dataspace.CredentialSpec{matchingSpec, nonMatchingSpec},
 				},
 			},
 		}
@@ -139,13 +139,13 @@ func TestGenerateCredentialSpecs(t *testing.T) {
 		participantRoles := map[string][]string{
 			"ds-1": {"role1"},
 		}
-		spec1 := model.CredentialSpec{
+		spec1 := dataspace.CredentialSpec{
 			Type:            "oauth2",
 			Issuer:          "https://issuer1.example.com",
 			Format:          "jwt",
 			ParticipantRole: "role1",
 		}
-		spec2 := model.CredentialSpec{
+		spec2 := dataspace.CredentialSpec{
 			Type:            "saml",
 			Issuer:          "https://issuer2.example.com",
 			Format:          "saml2",
@@ -155,13 +155,13 @@ func TestGenerateCredentialSpecs(t *testing.T) {
 			{
 				Entity: api.Entity{ID: "ds-1", Version: 1},
 				DataspaceSpec: api.DataspaceSpec{
-					CredentialSpecs: []model.CredentialSpec{spec1},
+					CredentialSpecs: []dataspace.CredentialSpec{spec1},
 				},
 			},
 			{
 				Entity: api.Entity{ID: "ds-2", Version: 1},
 				DataspaceSpec: api.DataspaceSpec{
-					CredentialSpecs: []model.CredentialSpec{spec2},
+					CredentialSpecs: []dataspace.CredentialSpec{spec2},
 				},
 			},
 		}
@@ -180,26 +180,26 @@ func TestGenerateCredentialSpecs(t *testing.T) {
 			"ds-2": {"unknown", "validator"},
 		}
 		// Specs that should be included
-		providerSpec := model.CredentialSpec{
+		providerSpec := dataspace.CredentialSpec{
 			Type:            "oauth2",
 			Issuer:          "https://issuer1.example.com",
 			Format:          "jwt",
 			ParticipantRole: "provider",
 		}
-		globalSpec := model.CredentialSpec{
+		globalSpec := dataspace.CredentialSpec{
 			Type:            "mtls",
 			Issuer:          "https://ca.example.com",
 			Format:          "pem",
 			ParticipantRole: "", // Global spec
 		}
-		validatorSpec := model.CredentialSpec{
+		validatorSpec := dataspace.CredentialSpec{
 			Type:            "saml",
 			Issuer:          "https://issuer2.example.com",
 			Format:          "saml2",
 			ParticipantRole: "validator",
 		}
 		// Specs that should be excluded
-		unknownRoleSpec := model.CredentialSpec{
+		unknownRoleSpec := dataspace.CredentialSpec{
 			Type:            "custom",
 			Issuer:          "https://issuer3.example.com",
 			Format:          "custom",
@@ -210,13 +210,13 @@ func TestGenerateCredentialSpecs(t *testing.T) {
 			{
 				Entity: api.Entity{ID: "ds-1", Version: 1},
 				DataspaceSpec: api.DataspaceSpec{
-					CredentialSpecs: []model.CredentialSpec{providerSpec, globalSpec, unknownRoleSpec},
+					CredentialSpecs: []dataspace.CredentialSpec{providerSpec, globalSpec, unknownRoleSpec},
 				},
 			},
 			{
 				Entity: api.Entity{ID: "ds-2", Version: 1},
 				DataspaceSpec: api.DataspaceSpec{
-					CredentialSpecs: []model.CredentialSpec{validatorSpec},
+					CredentialSpecs: []dataspace.CredentialSpec{validatorSpec},
 				},
 			},
 		}
@@ -238,7 +238,7 @@ func TestGenerateCredentialSpecs(t *testing.T) {
 	})
 
 	t.Run("handles nil participant roles map", func(t *testing.T) {
-		spec := model.CredentialSpec{
+		spec := dataspace.CredentialSpec{
 			Type:            "oauth2",
 			Issuer:          "https://issuer.example.com",
 			Format:          "jwt",
@@ -248,7 +248,7 @@ func TestGenerateCredentialSpecs(t *testing.T) {
 			{
 				Entity: api.Entity{ID: "ds-1", Version: 1},
 				DataspaceSpec: api.DataspaceSpec{
-					CredentialSpecs: []model.CredentialSpec{spec},
+					CredentialSpecs: []dataspace.CredentialSpec{spec},
 				},
 			},
 		}
@@ -264,19 +264,19 @@ func TestGenerateCredentialSpecs(t *testing.T) {
 		participantRoles := map[string][]string{
 			"ds-1": {"provider"},
 		}
-		emptyRoleSpec := model.CredentialSpec{
+		emptyRoleSpec := dataspace.CredentialSpec{
 			Type:            "mtls",
 			Issuer:          "https://ca.example.com",
 			Format:          "pem",
 			ParticipantRole: "",
 		}
-		matchingRoleSpec := model.CredentialSpec{
+		matchingRoleSpec := dataspace.CredentialSpec{
 			Type:            "oauth2",
 			Issuer:          "https://issuer.example.com",
 			Format:          "jwt",
 			ParticipantRole: "provider",
 		}
-		nonMatchingRoleSpec := model.CredentialSpec{
+		nonMatchingRoleSpec := dataspace.CredentialSpec{
 			Type:            "saml",
 			Issuer:          "https://issuer2.example.com",
 			Format:          "saml2",
@@ -286,7 +286,7 @@ func TestGenerateCredentialSpecs(t *testing.T) {
 			{
 				Entity: api.Entity{ID: "ds-1", Version: 1},
 				DataspaceSpec: api.DataspaceSpec{
-					CredentialSpecs: []model.CredentialSpec{emptyRoleSpec, matchingRoleSpec, nonMatchingRoleSpec},
+					CredentialSpecs: []dataspace.CredentialSpec{emptyRoleSpec, matchingRoleSpec, nonMatchingRoleSpec},
 				},
 			},
 		}

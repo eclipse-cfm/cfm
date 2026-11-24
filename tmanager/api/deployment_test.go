@@ -15,7 +15,7 @@ package api
 import (
 	"testing"
 
-	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,11 +23,11 @@ import (
 func TestToVPAMap(t *testing.T) {
 	t.Run("converts string keys to VPAType keys", func(t *testing.T) {
 		vpaProperties := map[string]map[string]any{
-			string(model.ConnectorType): {
+			string(dataspace.ConnectorType): {
 				"endpoint": "https://connector.example.com",
 				"port":     8080,
 			},
-			string(model.CredentialServiceType): {
+			string(dataspace.CredentialServiceType): {
 				"keystore": "/path/to/keystore",
 				"enabled":  true,
 			},
@@ -39,13 +39,13 @@ func TestToVPAMap(t *testing.T) {
 		assert.Len(t, *result, 2)
 
 		// Verify connector properties
-		connectorProps, exists := (*result)[model.ConnectorType]
+		connectorProps, exists := (*result)[dataspace.ConnectorType]
 		require.True(t, exists)
 		assert.Equal(t, "https://connector.example.com", connectorProps["endpoint"])
 		assert.Equal(t, 8080, connectorProps["port"])
 
 		// Verify credential service properties
-		csProps, exists := (*result)[model.CredentialServiceType]
+		csProps, exists := (*result)[dataspace.CredentialServiceType]
 		require.True(t, exists)
 		assert.Equal(t, "/path/to/keystore", csProps["keystore"])
 		assert.Equal(t, true, csProps["enabled"])
@@ -71,13 +71,13 @@ func TestToVPAMap(t *testing.T) {
 
 	t.Run("handles all VPA types", func(t *testing.T) {
 		vpaProperties := map[string]map[string]any{
-			string(model.ConnectorType): {
+			string(dataspace.ConnectorType): {
 				"connector_prop": "connector_value",
 			},
-			string(model.CredentialServiceType): {
+			string(dataspace.CredentialServiceType): {
 				"creds_prop": "creds_value",
 			},
-			string(model.DataPlaneType): {
+			string(dataspace.DataPlaneType): {
 				"dataplane_prop": "dataplane_value",
 			},
 		}
@@ -87,13 +87,13 @@ func TestToVPAMap(t *testing.T) {
 		require.NotNil(t, result)
 		assert.Len(t, *result, 3)
 
-		assert.Contains(t, *result, model.ConnectorType)
-		assert.Contains(t, *result, model.CredentialServiceType)
-		assert.Contains(t, *result, model.DataPlaneType)
+		assert.Contains(t, *result, dataspace.ConnectorType)
+		assert.Contains(t, *result, dataspace.CredentialServiceType)
+		assert.Contains(t, *result, dataspace.DataPlaneType)
 
-		assert.Equal(t, "connector_value", (*result)[model.ConnectorType]["connector_prop"])
-		assert.Equal(t, "creds_value", (*result)[model.CredentialServiceType]["creds_prop"])
-		assert.Equal(t, "dataplane_value", (*result)[model.DataPlaneType]["dataplane_prop"])
+		assert.Equal(t, "connector_value", (*result)[dataspace.ConnectorType]["connector_prop"])
+		assert.Equal(t, "creds_value", (*result)[dataspace.CredentialServiceType]["creds_prop"])
+		assert.Equal(t, "dataplane_value", (*result)[dataspace.DataPlaneType]["dataplane_prop"])
 	})
 
 	t.Run("handles custom VPA type", func(t *testing.T) {
@@ -110,7 +110,7 @@ func TestToVPAMap(t *testing.T) {
 		require.NotNil(t, result)
 		assert.Len(t, *result, 1)
 
-		customType := model.VPAType(customVPAType)
+		customType := dataspace.VPAType(customVPAType)
 		customProps, exists := (*result)[customType]
 		require.True(t, exists)
 		assert.Equal(t, "custom_value", customProps["custom_prop"])
@@ -119,8 +119,8 @@ func TestToVPAMap(t *testing.T) {
 
 	t.Run("handles empty properties for a VPA type", func(t *testing.T) {
 		vpaProperties := map[string]map[string]any{
-			string(model.ConnectorType): {},
-			string(model.DataPlaneType): {
+			string(dataspace.ConnectorType): {},
+			string(dataspace.DataPlaneType): {
 				"prop": "value",
 			},
 		}
@@ -130,11 +130,11 @@ func TestToVPAMap(t *testing.T) {
 		require.NotNil(t, result)
 		assert.Len(t, *result, 2)
 
-		connectorProps, exists := (*result)[model.ConnectorType]
+		connectorProps, exists := (*result)[dataspace.ConnectorType]
 		require.True(t, exists)
 		assert.Len(t, connectorProps, 0)
 
-		dataplaneProps, exists := (*result)[model.DataPlaneType]
+		dataplaneProps, exists := (*result)[dataspace.DataPlaneType]
 		require.True(t, exists)
 		assert.Len(t, dataplaneProps, 1)
 		assert.Equal(t, "value", dataplaneProps["prop"])
@@ -142,7 +142,7 @@ func TestToVPAMap(t *testing.T) {
 
 	t.Run("handles nil properties for a VPA type", func(t *testing.T) {
 		vpaProperties := map[string]map[string]any{
-			string(model.ConnectorType): nil,
+			string(dataspace.ConnectorType): nil,
 		}
 
 		result := ToVPAMap(vpaProperties)
@@ -150,7 +150,7 @@ func TestToVPAMap(t *testing.T) {
 		require.NotNil(t, result)
 		assert.Len(t, *result, 1)
 
-		connectorProps, exists := (*result)[model.ConnectorType]
+		connectorProps, exists := (*result)[dataspace.ConnectorType]
 		require.True(t, exists)
 		assert.Nil(t, connectorProps)
 	})
@@ -163,7 +163,7 @@ func TestToVPAMap(t *testing.T) {
 		slice := []string{"item1", "item2", "item3"}
 
 		vpaProperties := map[string]map[string]any{
-			string(model.ConnectorType): {
+			string(dataspace.ConnectorType): {
 				"string_prop": "string_value",
 				"int_prop":    42,
 				"float_prop":  3.14,
@@ -179,7 +179,7 @@ func TestToVPAMap(t *testing.T) {
 		require.NotNil(t, result)
 		assert.Len(t, *result, 1)
 
-		props := (*result)[model.ConnectorType]
+		props := (*result)[dataspace.ConnectorType]
 		assert.Equal(t, "string_value", props["string_prop"])
 		assert.Equal(t, 42, props["int_prop"])
 		assert.Equal(t, 3.14, props["float_prop"])
@@ -191,7 +191,7 @@ func TestToVPAMap(t *testing.T) {
 
 	t.Run("returns pointer to new VPAPropMap", func(t *testing.T) {
 		vpaProperties := map[string]map[string]any{
-			string(model.ConnectorType): {
+			string(dataspace.ConnectorType): {
 				"prop": "value",
 			},
 		}

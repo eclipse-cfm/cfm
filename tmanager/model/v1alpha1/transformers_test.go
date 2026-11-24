@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/types"
 	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/stretchr/testify/assert"
@@ -44,7 +44,7 @@ func TestToParticipantProfile(t *testing.T) {
 					State:          api.DeploymentStateActive,
 					StateTimestamp: testTime,
 				},
-				Type:       model.ConnectorType,
+				Type:       dataspace.ConnectorType,
 				CellID:     "cell-123",
 				Properties: api.Properties{"vpa-key": "vpa-value"},
 			},
@@ -83,7 +83,7 @@ func TestToVPACollection(t *testing.T) {
 					State:          api.DeploymentStateActive,
 					StateTimestamp: testTime,
 				},
-				Type:       model.ConnectorType,
+				Type:       dataspace.ConnectorType,
 				CellID:     "cell-1",
 				Properties: api.Properties{"key1": "value1"},
 			},
@@ -96,7 +96,7 @@ func TestToVPACollection(t *testing.T) {
 					State:          api.DeploymentStatePending,
 					StateTimestamp: testTime,
 				},
-				Type:       model.CredentialServiceType,
+				Type:       dataspace.CredentialServiceType,
 				CellID:     "cell-2",
 				Properties: api.Properties{"key2": "value2"},
 			},
@@ -112,7 +112,7 @@ func TestToVPACollection(t *testing.T) {
 	assert.Equal(t, int64(1), result[0].Version)
 	assert.Equal(t, "active", result[0].State)
 	assert.Equal(t, testTime, result[0].StateTimestamp)
-	assert.Equal(t, model.ConnectorType, result[0].Type)
+	assert.Equal(t, dataspace.ConnectorType, result[0].Type)
 	assert.Equal(t, "cell-1", result[0].CellID)
 	assert.Equal(t, map[string]any{"key1": "value1"}, result[0].Properties)
 
@@ -121,7 +121,7 @@ func TestToVPACollection(t *testing.T) {
 	assert.Equal(t, int64(2), result[1].Version)
 	assert.Equal(t, "pending", result[1].State)
 	assert.Equal(t, testTime, result[1].StateTimestamp)
-	assert.Equal(t, model.CredentialServiceType, result[1].Type)
+	assert.Equal(t, dataspace.CredentialServiceType, result[1].Type)
 	assert.Equal(t, "cell-2", result[1].CellID)
 	assert.Equal(t, map[string]any{"key2": "value2"}, result[1].Properties)
 }
@@ -138,7 +138,7 @@ func TestToVPA(t *testing.T) {
 			State:          api.DeploymentStateError,
 			StateTimestamp: testTime,
 		},
-		Type:       model.DataPlaneType,
+		Type:       dataspace.DataPlaneType,
 		CellID:     "cell-456",
 		Properties: api.Properties{"vpa-prop": "vpa-val"},
 	}
@@ -150,7 +150,7 @@ func TestToVPA(t *testing.T) {
 	assert.Equal(t, int64(3), result.Version)
 	assert.Equal(t, "error", result.State)
 	assert.Equal(t, testTime, result.StateTimestamp)
-	assert.Equal(t, model.DataPlaneType, result.Type)
+	assert.Equal(t, dataspace.DataPlaneType, result.Type)
 	assert.Equal(t, "cell-456", result.CellID)
 	assert.Equal(t, map[string]any{"vpa-prop": "vpa-val"}, result.Properties)
 }
@@ -210,7 +210,7 @@ func TestToAPIParticipantProfile(t *testing.T) {
 					State:          "active",
 					StateTimestamp: testTime,
 				},
-				Type:       model.ConnectorType,
+				Type:       dataspace.ConnectorType,
 				CellID:     "api-cell-123",
 				Properties: map[string]any{"vpa-key": "vpa-value"},
 			},
@@ -249,7 +249,7 @@ func TestToAPIVPACollection(t *testing.T) {
 				State:          "pending",
 				StateTimestamp: testTime,
 			},
-			Type:       model.ConnectorType,
+			Type:       dataspace.ConnectorType,
 			CellID:     "cell-collection-1",
 			Properties: map[string]any{"prop1": "val1"},
 		},
@@ -262,7 +262,7 @@ func TestToAPIVPACollection(t *testing.T) {
 				State:          "offline",
 				StateTimestamp: testTime,
 			},
-			Type:       model.DataPlaneType,
+			Type:       dataspace.DataPlaneType,
 			CellID:     "cell-collection-2",
 			Properties: map[string]any{"prop2": "val2"},
 		},
@@ -277,14 +277,14 @@ func TestToAPIVPACollection(t *testing.T) {
 	assert.Equal(t, int64(1), result[0].Version)
 	assert.Equal(t, api.DeploymentStatePending, result[0].State)
 	assert.Equal(t, testTime.UTC(), result[0].StateTimestamp) // Should be converted to UTC
-	assert.Equal(t, model.ConnectorType, result[0].Type)
+	assert.Equal(t, dataspace.ConnectorType, result[0].Type)
 
 	// Second VPA
 	assert.Equal(t, "vpa-collection-2", result[1].ID)
 	assert.Equal(t, int64(2), result[1].Version)
 	assert.Equal(t, api.DeploymentStateOffline, result[1].State)
 	assert.Equal(t, testTime.UTC(), result[1].StateTimestamp) // Should be converted to UTC
-	assert.Equal(t, model.DataPlaneType, result[1].Type)
+	assert.Equal(t, dataspace.DataPlaneType, result[1].Type)
 }
 
 func TestToAPIVPA(t *testing.T) {
@@ -300,7 +300,7 @@ func TestToAPIVPA(t *testing.T) {
 			State:          "locked",
 			StateTimestamp: testTime,
 		},
-		Type:       model.CredentialServiceType,
+		Type:       dataspace.CredentialServiceType,
 		CellID:     "api-cell-456",
 		Properties: map[string]any{"vpa-env": "staging"},
 	}
@@ -313,7 +313,7 @@ func TestToAPIVPA(t *testing.T) {
 	assert.Equal(t, api.DeploymentStateLocked, result.State)
 	assert.Equal(t, testTime.UTC(), result.StateTimestamp)      // Should be converted to UTC
 	assert.Equal(t, time.UTC, result.StateTimestamp.Location()) // Verify timezone is UTC
-	assert.Equal(t, model.CredentialServiceType, result.Type)
+	assert.Equal(t, dataspace.CredentialServiceType, result.Type)
 	assert.Equal(t, "api-cell-456", result.CellID)
 	assert.Contains(t, result.Properties, "vpa-env")
 }
@@ -411,7 +411,7 @@ func TestTimestampUTCConversion(t *testing.T) {
 					State:          "active",
 					StateTimestamp: testTime,
 				},
-				Type:       model.ConnectorType,
+				Type:       dataspace.ConnectorType,
 				CellID:     "cell",
 				Properties: map[string]any{},
 			}
@@ -540,7 +540,7 @@ func TestToDataspaceProfile(t *testing.T) {
 		},
 		DataspaceSpec: api.DataspaceSpec{
 			ProtocolStack: []string{"dsp-2025-1"},
-			CredentialSpecs: []model.CredentialSpec{
+			CredentialSpecs: []dataspace.CredentialSpec{
 				{
 					Type:            "FooCredential",
 					Issuer:          "did:web:bar.com",

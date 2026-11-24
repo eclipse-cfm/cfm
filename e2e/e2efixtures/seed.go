@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	pv1alpha1 "github.com/eclipse-cfm/cfm/pmanager/model/v1alpha1"
 	tv1alpha1 "github.com/eclipse-cfm/cfm/tmanager/model/v1alpha1"
@@ -44,9 +44,9 @@ func DataspaceTemplateSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			model.ParticipantIdentifier: map[string]any{"type": "string"},
-			model.VPAData:               map[string]any{"type": "array"},
-			model.CredentialData:        map[string]any{"type": "array"},
+			dataspace.ParticipantIdentifier: map[string]any{"type": "string"},
+			dataspace.VPAData:               map[string]any{"type": "array"},
+			dataspace.CredentialData:        map[string]any{"type": "array"},
 		},
 	}
 }
@@ -55,18 +55,18 @@ func CreateTestOrchestrationDefinitions(apiClient *ApiClient) error {
 	requestBody := pv1alpha1.OrchestrationTemplate{
 		Schema: DataspaceTemplateSchema(),
 		Activities: map[string][]pv1alpha1.ActivityDto{
-			model.VPADeployType.String(): {{
+			dataspace.VPADeployType.String(): {{
 				ID:   "activity1",
 				Type: "test-activity",
 			}},
-			model.VPADisposeType.String(): {{
+			dataspace.VPADisposeType.String(): {{
 				ID:   "activity2",
 				Type: "test-activity",
 			}},
 		},
 		// a failed deployment is rolled back by the dispose orchestration
 		Compensation: map[string]string{
-			model.VPADeployType.String(): model.VPADisposeType.String(),
+			dataspace.VPADeployType.String(): dataspace.VPADisposeType.String(),
 		},
 	}
 

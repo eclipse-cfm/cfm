@@ -19,7 +19,7 @@ import (
 
 	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
 	"github.com/eclipse-cfm/cfm/agent/common/vpa"
-	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/stretchr/testify/assert"
@@ -47,7 +47,7 @@ func validConfig(opts ...ConfigOptions) *Config {
 }
 
 var processingData = map[string]any{
-	model.ParticipantIdentifier:         "participant-abc",
+	dataspace.ParticipantIdentifier:     "participant-abc",
 	"clientID.vaultAccess":              "client-123",
 	"participantContextId":              "client-456",
 	"cfm.participant.credentialservice": "https://example.com/credentialservice",
@@ -60,7 +60,7 @@ var processingData = map[string]any{
 func connectorVpaData(profiles []string) []any {
 	return []any{
 		map[string]any{
-			"vpaType": model.ConnectorType.String(),
+			"vpaType": dataspace.ConnectorType.String(),
 			"properties": map[string]any{
 				DataspaceProfilesKey: profiles,
 			},
@@ -74,7 +74,7 @@ func TestEDCVActivityProcessor_Process_WithProfiles(t *testing.T) {
 
 	ctx := context.Background()
 	pd := copyOf(processingData)
-	pd[model.VPAData] = connectorVpaData([]string{"cx-neptune", "cx-pluto"})
+	pd[dataspace.VPAData] = connectorVpaData([]string{"cx-neptune", "cx-pluto"})
 
 	activity := api.Activity{ID: "test-activity", Type: "edcv", Discriminator: vpa.DeployDiscriminator}
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, pd, make(map[string]any))
@@ -92,7 +92,7 @@ func TestEDCVActivityProcessor_Process_EmptyProfiles_NoAssociation(t *testing.T)
 
 	ctx := context.Background()
 	pd := copyOf(processingData)
-	pd[model.VPAData] = connectorVpaData([]string{})
+	pd[dataspace.VPAData] = connectorVpaData([]string{})
 
 	activity := api.Activity{ID: "test-activity", Type: "edcv", Discriminator: vpa.DeployDiscriminator}
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, pd, make(map[string]any))
@@ -109,7 +109,7 @@ func TestEDCVActivityProcessor_Process_ProfileAssociationFailure(t *testing.T) {
 
 	ctx := context.Background()
 	pd := copyOf(processingData)
-	pd[model.VPAData] = connectorVpaData([]string{"cx-neptune"})
+	pd[dataspace.VPAData] = connectorVpaData([]string{"cx-neptune"})
 
 	activity := api.Activity{ID: "test-activity", Type: "edcv", Discriminator: vpa.DeployDiscriminator}
 	activityContext := api.NewActivityContext(ctx, "orch-123", activity, pd, make(map[string]any))
@@ -145,7 +145,7 @@ func TestEDCVActivityProcessor_Process_MissingParticipantID(t *testing.T) {
 	processor := NewProcessor(validConfig())
 	ctx := context.Background()
 	pd := copyOf(processingData)
-	delete(pd, model.ParticipantIdentifier)
+	delete(pd, dataspace.ParticipantIdentifier)
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
@@ -188,8 +188,8 @@ func TestEDCVActivityProcessor_Process_InvalidDataTypes(t *testing.T) {
 	processor := NewProcessor(validConfig())
 	ctx := context.Background()
 	pd := copyOf(processingData)
-	pd["clientID.vaultAccess"] = 456      // Should be string
-	pd[model.ParticipantIdentifier] = 123 // Should be string
+	pd["clientID.vaultAccess"] = 456          // Should be string
+	pd[dataspace.ParticipantIdentifier] = 123 // Should be string
 	outputData := make(map[string]any)
 
 	activity := api.Activity{
@@ -211,7 +211,7 @@ func TestEDCVActivityProcessor_Process_OrchestrationIDInError(t *testing.T) {
 
 	ctx := context.Background()
 	pd := map[string]any{
-		model.ParticipantIdentifier:         "participant-123",
+		dataspace.ParticipantIdentifier:     "participant-123",
 		"cfm.participant.credentialservice": "https://example.com/credentialservice",
 		"cfm.participant.protocolservice":   "https://example.com/protocolservice",
 		"publicURL":                         "http://test.example.com:1234/fizz/buzz",
