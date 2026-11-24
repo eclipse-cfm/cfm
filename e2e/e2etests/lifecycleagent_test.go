@@ -112,7 +112,7 @@ func Test_VerifyLifecycleAgentDispatchesCloudEvent(t *testing.T) {
 	event := lifecycleagent.CloudEvent[itemCreated]{
 		SpecVersion:     lifecycleagent.SpecVersion,
 		ID:              "evt-1",
-		Source:          "/cfm/tmanager",
+		Source:          "/cfm/manager",
 		Type:            "io.cfm.item.created",
 		Subject:         "item/42",
 		Time:            time.Date(2026, 6, 29, 12, 0, 0, 0, time.UTC),

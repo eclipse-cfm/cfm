@@ -2,13 +2,6 @@ module github.com/eclipse-cfm/cfm
 
 go 1.26.0
 
-replace (
-	github.com/eclipse-cfm/cfm/assembly => ./assembly
-	github.com/eclipse-cfm/cfm/common => ./common
-	github.com/eclipse-cfm/cfm/pmanager => ./pmanager
-	github.com/eclipse-cfm/cfm/tmanager => ./tmanager
-)
-
 require (
 	github.com/XSAM/otelsql v0.44.0
 	github.com/antlr4-go/antlr/v4 v4.13.1
@@ -18,8 +11,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/lib/pq v1.12.3
-	github.com/nats-io/nkeys v0.4.17
 	github.com/nats-io/nats.go v1.55.0
+	github.com/nats-io/nkeys v0.4.17
 	github.com/oaswrap/spec v0.5.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.12.1

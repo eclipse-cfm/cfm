@@ -42,7 +42,6 @@ func Test_VerifyDefinitionOperations(t *testing.T) {
 
 	client := launchPlatformWithAgent(t, nt.URI, dsn)
 
-	waitTManager(t, client)
 	waitPManager(t, client)
 
 	var activityDefinitions []v1alpha1.ActivityDefinitionDto

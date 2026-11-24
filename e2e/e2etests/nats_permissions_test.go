@@ -25,48 +25,15 @@ import (
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/natsfixtures"
-	"github.com/eclipse-cfm/cfm/common/sqlstore"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// leastPrivilegeConfig is the documented sample NATS authorization block. Running the deployment flow against it keeps
-// the documentation in sync with the subjects the components actually use.
+// leastPrivilegeConfig is the documented sample NATS authorization block. Running the tests below against it keeps the
+// documentation in sync with the subjects the components actually use.
 const leastPrivilegeConfig = "../../docs/developer/nats/least-privilege.conf"
-
-// Test_VerifyE2E_LeastPrivilegeNatsUsers runs the deploy and dispose flow with every component connected as its own
-// NATS user, restricted by the documented least-privilege permissions.
-func Test_VerifyE2E_LeastPrivilegeNatsUsers(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
-	defer cancel()
-
-	// The fixture client only verifies connectivity, so it connects with the Provision Manager's permissions
-	nt, err := natsfixtures.SetupNatsContainerWithConfig(ctx, cfmBucket, readLeastPrivilegeConfig(t, false), nil,
-		natsclient.ClientConfig{Auth: natsclient.UserInfoAuth{Username: "pmanager", Password: "pmanager-secret"}})
-	require.NoError(t, err)
-	defer natsfixtures.TeardownNatsContainer(ctx, nt)
-	defer cleanup()
-
-	pg, dsn, err := sqlstore.SetupTestContainer(t)
-	require.NoError(t, err)
-	defer pg.Terminate(context.Background())
-
-	client := launchPlatformWithAgentEnv(t, nt.URI, dsn, map[string]string{
-		"TM_NATS_AUTH_METHOD":          natsclient.AuthMethodUserInfo,
-		"TM_NATS_AUTH_USERNAME":        "tmanager",
-		"TM_NATS_AUTH_PASSWORD":        "tmanager-secret",
-		"PM_NATS_AUTH_METHOD":          natsclient.AuthMethodUserInfo,
-		"PM_NATS_AUTH_USERNAME":        "pmanager",
-		"PM_NATS_AUTH_PASSWORD":        "pmanager-secret",
-		"TESTAGENT_NATS_AUTH_METHOD":   natsclient.AuthMethodUserInfo,
-		"TESTAGENT_NATS_AUTH_USERNAME": "test-activity-agent",
-		"TESTAGENT_NATS_AUTH_PASSWORD": "test-activity-agent-secret",
-	})
-
-	verifyDeployAndDispose(t, client)
-}
 
 // Test_VerifyLeastPrivilegeNatsUsers_KeyManagementEvents verifies that the documented permissions let IdentityHub
 // deliver key pair events to the key management agent, and that no other component can publish them or start

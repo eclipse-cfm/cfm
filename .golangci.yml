@@ -7,28 +7,12 @@ linters:
   settings:
     depguard:
       rules:
-        # The Provision Manager is a generic orchestration engine. It must not depend on the dataspace model, the
-        # agents, or the Tenant Manager, so that other managers can run their orchestrations on it.
-        pmanager-is-generic:
+        # The engine (pmanager, common, assembly, e2e) is generic. The dataspace components (Tenant Manager, agents and
+        # dataspace model) live in github.com/eclipse-cfm/cfm-dataspace and build on the engine, never the other way round.
+        engine-is-generic:
           list-mode: lax
           files:
-            - "**/pmanager/**"
+            - $all
           deny:
-            - pkg: github.com/eclipse-cfm/cfm/common/dataspace
-              desc: pmanager is a generic orchestration engine and must not use the dataspace model
-            - pkg: github.com/eclipse-cfm/cfm/agent
-              desc: pmanager must not depend on the agents
-            - pkg: github.com/eclipse-cfm/cfm/tmanager
-              desc: pmanager must not depend on the Tenant Manager
-        # The common packages are shared by the engine and every manager. Only common/dataspace itself may define or use
-        # the dataspace model.
-        common-is-generic:
-          list-mode: lax
-          files:
-            - "**/common/**"
-            - "!**/common/dataspace/**"
-            # agent/common holds dataspace helpers for the agents and is not part of the shared common packages
-            - "!**/agent/common/**"
-          deny:
-            - pkg: github.com/eclipse-cfm/cfm/common/dataspace
-              desc: common packages are shared by every manager and must not use the dataspace model
+            - pkg: github.com/eclipse-cfm/cfm-dataspace
+              desc: the engine must not depend on the dataspace components

@@ -22,32 +22,8 @@ jobs:
     strategy:
       matrix:
         image:
-          - name: edcvagent
-            dockerfile: docker/Dockerfile.edcvagent.dockerfile
-            context: .
-          - name: ihagent
-            dockerfile: docker/Dockerfile.ihagent.dockerfile
-            context: .
-          - name: regagent
-            dockerfile: docker/Dockerfile.regagent.dockerfile
-            context: .
-          - name: obagent
-            dockerfile: docker/Dockerfile.obagent.dockerfile
-            context: .
-          - name: jwtletagent
-            dockerfile: docker/Dockerfile.jwtletagent.dockerfile
-            context: .
-          - name: keymanagementagent
-            dockerfile: docker/Dockerfile.keymanagementagent.dockerfile
-            context: .
-          - name: sigletagent
-            dockerfile: docker/Dockerfile.sigletagent.dockerfile
-            context: .
           - name: pmanager
             dockerfile: docker/Dockerfile.pmanager.dockerfile
-            context: .
-          - name: tmanager
-            dockerfile: docker/Dockerfile.tmanager.dockerfile
             context: .
     
     steps:
