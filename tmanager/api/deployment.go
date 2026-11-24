@@ -15,6 +15,7 @@ package api
 import (
 	"context"
 
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/system"
 )
@@ -24,7 +25,7 @@ const (
 	ProvisionClientKey          system.ServiceType = "tmapi:ProvisionClient"
 )
 
-type VPAPropMap = map[model.VPAType]map[string]any
+type VPAPropMap = map[dataspace.VPAType]map[string]any
 
 // ProvisionClient sends a manifest to the provision manager for asynchronous execution. Implementations may use
 // different wire protocols.
@@ -46,7 +47,7 @@ type ProvisionHandlerRegistry interface {
 func ToVPAMap(vpaProperties map[string]map[string]any) *VPAPropMap {
 	vpaPropsMap := make(VPAPropMap)
 	for vpaTypeStr, props := range vpaProperties {
-		vpaType := model.VPAType(vpaTypeStr)
+		vpaType := dataspace.VPAType(vpaTypeStr)
 		vpaPropsMap[vpaType] = props
 	}
 	return &vpaPropsMap

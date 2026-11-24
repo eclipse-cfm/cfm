@@ -18,7 +18,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -79,13 +79,13 @@ func TestAsActivityProcessor_OtherDiscriminatorIsFatal(t *testing.T) {
 	}
 }
 
-const testVpaType model.VPAType = "cfm.test.vpa.type"
-const otherVpaType model.VPAType = "cfm.test.vpa.other"
+const testVpaType dataspace.VPAType = "cfm.test.vpa.type"
+const otherVpaType dataspace.VPAType = "cfm.test.vpa.other"
 
 func TestProperties_NoEntryForVpa(t *testing.T) {
 	props := map[string]any{"foo": "bar", "quizz": "quazz"}
 	processingData := map[string]any{
-		model.VPAData: []any{
+		dataspace.VPAData: []any{
 			map[string]any{
 				"vpaType":    testVpaType.String(),
 				"properties": props,
@@ -101,7 +101,7 @@ func TestProperties_NoEntryForVpa(t *testing.T) {
 }
 
 func TestProperties_NilValue(t *testing.T) {
-	processingData := map[string]any{model.VPAData: nil}
+	processingData := map[string]any{dataspace.VPAData: nil}
 	ctx := api.NewActivityContext(context.Background(), "orch-1", testActivity, processingData, map[string]any{})
 
 	data, err := Properties(ctx, testVpaType)
@@ -111,7 +111,7 @@ func TestProperties_NilValue(t *testing.T) {
 }
 
 func TestProperties_NotASlice(t *testing.T) {
-	processingData := map[string]any{model.VPAData: "not-a-slice"}
+	processingData := map[string]any{dataspace.VPAData: "not-a-slice"}
 	ctx := api.NewActivityContext(context.Background(), "orch-1", testActivity, processingData, map[string]any{})
 
 	_, err := Properties(ctx, testVpaType)
@@ -121,7 +121,7 @@ func TestProperties_NotASlice(t *testing.T) {
 }
 
 func TestProperties_EmptySlice(t *testing.T) {
-	processingData := map[string]any{model.VPAData: []any{}}
+	processingData := map[string]any{dataspace.VPAData: []any{}}
 	ctx := api.NewActivityContext(context.Background(), "orch-1", testActivity, processingData, map[string]any{})
 
 	data, err := Properties(ctx, testVpaType)
@@ -132,7 +132,7 @@ func TestProperties_EmptySlice(t *testing.T) {
 
 func TestProperties_NoMatchingType(t *testing.T) {
 	processingData := map[string]any{
-		model.VPAData: []any{
+		dataspace.VPAData: []any{
 			map[string]any{"vpaType": otherVpaType.String()},
 		},
 	}
@@ -147,7 +147,7 @@ func TestProperties_NoMatchingType(t *testing.T) {
 func TestProperties_MatchingTypeWithProperties(t *testing.T) {
 	props := map[string]any{"region": "eu-west", "tier": "standard"}
 	processingData := map[string]any{
-		model.VPAData: []any{
+		dataspace.VPAData: []any{
 			map[string]any{
 				"vpaType":    testVpaType.String(),
 				"properties": props,
@@ -165,7 +165,7 @@ func TestProperties_MatchingTypeWithProperties(t *testing.T) {
 func TestProperties_MatchingTypeNotFirst(t *testing.T) {
 	props := map[string]any{"region": "eu-west", "tier": "standard"}
 	processingData := map[string]any{
-		model.VPAData: []any{
+		dataspace.VPAData: []any{
 			map[string]any{"vpaType": otherVpaType.String()},
 			map[string]any{
 				"vpaType":    testVpaType.String(),
@@ -183,7 +183,7 @@ func TestProperties_MatchingTypeNotFirst(t *testing.T) {
 
 func TestProperties_MatchingTypeWithoutProperties(t *testing.T) {
 	processingData := map[string]any{
-		model.VPAData: []any{
+		dataspace.VPAData: []any{
 			map[string]any{"vpaType": testVpaType.String()},
 		},
 	}

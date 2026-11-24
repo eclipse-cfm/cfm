@@ -45,7 +45,7 @@ func runReplyToResponseTest(t *testing.T, processor api.ActivityProcessor, engin
 		ReplyTo:           replyTo,
 		ID:                "test-response",
 		CorrelationID:     "profile-1",
-		OrchestrationType: model.VPADeployType,
+		OrchestrationType: testOrchestrationType,
 		State:             api.OrchestrationStateRunning,
 		ProcessingData:    map[string]any{},
 		OutputData:        map[string]any{},

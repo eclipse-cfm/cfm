@@ -20,7 +20,7 @@ import (
 	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
 	"github.com/eclipse-cfm/cfm/agent/common/siglet"
 	"github.com/eclipse-cfm/cfm/agent/common/vpa"
-	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/stretchr/testify/assert"
@@ -97,7 +97,7 @@ func tokenExchangeAuthorization(overrides map[string]any) map[string]any {
 // entry has no properties field.
 func validVpaData(properties map[string]any) []any {
 	entry := map[string]any{
-		"vpaType": model.DataPlaneType.String(),
+		"vpaType": dataspace.DataPlaneType.String(),
 	}
 	if properties != nil {
 		entry["properties"] = properties
@@ -110,7 +110,7 @@ func processingDataWith(vpaData []any) map[string]any {
 		"participantContextId": "participant-1",
 	}
 	if vpaData != nil {
-		pd[model.VPAData] = vpaData
+		pd[dataspace.VPAData] = vpaData
 	}
 	return pd
 }

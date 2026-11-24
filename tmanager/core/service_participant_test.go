@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/memorystore"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/query"
@@ -165,11 +166,11 @@ func TestDeployProfile(t *testing.T) {
 		// Setup mock to accept any manifest
 		var sentManifestID string
 		mockClient.On("Send", ctx, mock.MatchedBy(func(manifest model.OrchestrationManifest) bool {
-			vpaManifest := manifest.Payload[model.VPAData].([]model.VPAManifest)[0]
+			vpaManifest := manifest.Payload[dataspace.VPAData].([]dataspace.VPAManifest)[0]
 			assert.Equal(t, "cell-1", vpaManifest.CellID)
 			assert.Equal(t, "external-id", vpaManifest.ExternalCellID)
 			sentManifestID = manifest.ID
-			return manifest.OrchestrationType == model.VPADeployType
+			return manifest.OrchestrationType == dataspace.VPADeployType
 		})).Return(nil)
 
 		service.provisionClient = mockClient
@@ -187,12 +188,12 @@ func TestDeployProfile(t *testing.T) {
 		deployment := &api.NewParticipantProfileDeployment{
 			Identifier: "participant-identifier",
 			VPAProperties: api.VPAPropMap{
-				model.ConnectorType: {"prop": "value"},
+				dataspace.ConnectorType: {"prop": "value"},
 			},
 			Properties: map[string]any{
 				"name": "Test Participant",
 				// a caller-supplied pending orchestration must be replaced by the one TM starts
-				pendingOrchestrationKey: map[string]any{pendingManifestIDKey: "forged", pendingTypeKey: model.VPADeployType.String()},
+				pendingOrchestrationKey: map[string]any{pendingManifestIDKey: "forged", pendingTypeKey: dataspace.VPADeployType.String()},
 			},
 		}
 
@@ -206,15 +207,15 @@ func TestDeployProfile(t *testing.T) {
 		mockClient.AssertExpectations(t)
 
 		require.NotEmpty(t, sentManifestID)
-		assert.True(t, isPendingOrchestration(result, model.OrchestrationResponse{ManifestID: sentManifestID, OrchestrationType: model.VPADeployType}))
-		assert.False(t, isPendingOrchestration(result, model.OrchestrationResponse{ManifestID: "forged", OrchestrationType: model.VPADeployType}))
+		assert.True(t, isPendingOrchestration(result, model.OrchestrationResponse{ManifestID: sentManifestID, OrchestrationType: dataspace.VPADeployType}))
+		assert.False(t, isPendingOrchestration(result, model.OrchestrationResponse{ManifestID: "forged", OrchestrationType: dataspace.VPADeployType}))
 	})
 
 	t.Run("deploy participant with roles successfully", func(t *testing.T) {
 		service := newTestParticipantService()
 		createTestTenant(t, service, "tenant-1")
 		mockClient := new(mockProvisionClient)
-		credentialSpecs := []model.CredentialSpec{
+		credentialSpecs := []dataspace.CredentialSpec{
 			{
 				Id:              "test-id",
 				Type:            "test-type",
@@ -233,14 +234,14 @@ func TestDeployProfile(t *testing.T) {
 
 		// Setup mock to accept any manifest
 		mockClient.On("Send", ctx, mock.MatchedBy(func(manifest model.OrchestrationManifest) bool {
-			vpaManifest := manifest.Payload[model.VPAData].([]model.VPAManifest)[0]
+			vpaManifest := manifest.Payload[dataspace.VPAData].([]dataspace.VPAManifest)[0]
 			assert.Equal(t, "cell-1", vpaManifest.CellID)
 			assert.Equal(t, "external-id", vpaManifest.ExternalCellID)
 
-			credData := manifest.Payload[model.CredentialData].([]model.CredentialSpec)
+			credData := manifest.Payload[dataspace.CredentialData].([]dataspace.CredentialSpec)
 			assert.NotNil(t, credData)
 			assert.ElementsMatch(t, credentialSpecs, credData)
-			return manifest.OrchestrationType == model.VPADeployType
+			return manifest.OrchestrationType == dataspace.VPADeployType
 		})).Return(nil)
 
 		service.provisionClient = mockClient
@@ -259,7 +260,7 @@ func TestDeployProfile(t *testing.T) {
 		deployment := &api.NewParticipantProfileDeployment{
 			Identifier: "participant-identifier",
 			VPAProperties: api.VPAPropMap{
-				model.ConnectorType: {"prop": "value"},
+				dataspace.ConnectorType: {"prop": "value"},
 			},
 			Properties: map[string]any{
 				"name": "Test Participant",
@@ -286,7 +287,7 @@ func TestDeployProfile(t *testing.T) {
 
 		// Setup mock to return error
 		mockClient.On("Send", ctx, mock.MatchedBy(func(manifest model.OrchestrationManifest) bool {
-			return manifest.OrchestrationType == model.VPADeployType
+			return manifest.OrchestrationType == dataspace.VPADeployType
 		})).Return(assert.AnError)
 
 		service.provisionClient = mockClient
@@ -303,7 +304,7 @@ func TestDeployProfile(t *testing.T) {
 		deployment := &api.NewParticipantProfileDeployment{
 			Identifier: "participant-identifier",
 			VPAProperties: api.VPAPropMap{
-				model.ConnectorType: {"prop": "value"},
+				dataspace.ConnectorType: {"prop": "value"},
 			},
 			Properties: map[string]any{
 				"name": "Test Participant",
@@ -324,7 +325,7 @@ func TestDeployProfile(t *testing.T) {
 
 		// Setup mock to accept manifest
 		mockClient.On("Send", ctx, mock.MatchedBy(func(manifest model.OrchestrationManifest) bool {
-			return manifest.OrchestrationType == model.VPADeployType
+			return manifest.OrchestrationType == dataspace.VPADeployType
 		})).Return(nil)
 
 		service.provisionClient = mockClient
@@ -348,7 +349,7 @@ func TestDeployProfile(t *testing.T) {
 			Identifier:          "participant-identifier",
 			DataspaceProfileIDs: []string{"ds-1"},
 			VPAProperties: api.VPAPropMap{
-				model.ConnectorType: {"prop": "value"},
+				dataspace.ConnectorType: {"prop": "value"},
 			},
 			Properties: map[string]any{
 				"name": "Test Participant",
@@ -375,7 +376,7 @@ func TestDisposeProfile(t *testing.T) {
 		service := newTestParticipantService()
 		mockClient := new(mockProvisionClient)
 
-		credentialSpecs := []model.CredentialSpec{
+		credentialSpecs := []dataspace.CredentialSpec{
 			{
 				Id:              "test-id",
 				Type:            "test-type",
@@ -395,14 +396,14 @@ func TestDisposeProfile(t *testing.T) {
 		// Setup mock to accept dispose manifest
 		var sentManifestID string
 		mockClient.On("Send", ctx, mock.MatchedBy(func(manifest model.OrchestrationManifest) bool {
-			vpaManifest := manifest.Payload[model.VPAData].([]model.VPAManifest)[0]
+			vpaManifest := manifest.Payload[dataspace.VPAData].([]dataspace.VPAManifest)[0]
 			assert.Equal(t, "cell-1", vpaManifest.CellID)
 			assert.Equal(t, "external-id", vpaManifest.ExternalCellID)
 
-			credData := manifest.Payload[model.CredentialData].([]model.CredentialSpec)
+			credData := manifest.Payload[dataspace.CredentialData].([]dataspace.CredentialSpec)
 			assert.ElementsMatch(t, credentialSpecs, credData)
 			sentManifestID = manifest.ID
-			return manifest.OrchestrationType == model.VPADisposeType
+			return manifest.OrchestrationType == dataspace.VPADisposeType
 		})).Return(nil)
 
 		service.provisionClient = mockClient
@@ -415,7 +416,7 @@ func TestDisposeProfile(t *testing.T) {
 		// Create a deployed participant and mark it as active
 		profile := newTestParticipantProfile("tenant-1", "participant-1")
 		profile.ParticipantRoles = map[string][]string{"dataspace-1": {"test-role"}}
-		profile.Properties[model.VPAStateData] = map[string]any{"state": "deployed"}
+		profile.Properties[dataspace.VPAStateData] = map[string]any{"state": "deployed"}
 		profile.VPAs[0].State = api.DeploymentStateActive
 
 		createdProfile, err := service.participantStore.Create(ctx, profile)
@@ -432,7 +433,7 @@ func TestDisposeProfile(t *testing.T) {
 		require.NotNil(t, updated)
 		assert.Equal(t, api.DeploymentStateDisposing, updated.VPAs[0].State)
 		require.NotEmpty(t, sentManifestID)
-		assert.True(t, isPendingOrchestration(updated, model.OrchestrationResponse{ManifestID: sentManifestID, OrchestrationType: model.VPADisposeType}))
+		assert.True(t, isPendingOrchestration(updated, model.OrchestrationResponse{ManifestID: sentManifestID, OrchestrationType: dataspace.VPADisposeType}))
 	})
 
 	t.Run("dispose non-existent participant returns error", func(t *testing.T) {
@@ -458,7 +459,7 @@ func TestDisposeProfile(t *testing.T) {
 	t.Run("dispose profile with non-active VPAs fails", func(t *testing.T) {
 		service := newTestParticipantService()
 		profile := newTestParticipantProfile("tenant-1", "participant-1")
-		profile.Properties[model.VPAStateData] = map[string]any{"state": "deployed"}
+		profile.Properties[dataspace.VPAStateData] = map[string]any{"state": "deployed"}
 		// Mark VPA as pending (not active)
 		if len(profile.VPAs) > 0 {
 			profile.VPAs[0].State = api.DeploymentStatePending
@@ -493,7 +494,7 @@ func TestDisposeProfile(t *testing.T) {
 		service := newTestParticipantService()
 		// Do not seed the dataspace store - credential specs cannot be regenerated
 		profile := newTestParticipantProfile("tenant-1", "participant-1")
-		profile.Properties[model.VPAStateData] = map[string]any{"state": "deployed"}
+		profile.Properties[dataspace.VPAStateData] = map[string]any{"state": "deployed"}
 		profile.VPAs[0].State = api.DeploymentStateActive
 
 		createdProfile, err := service.participantStore.Create(ctx, profile)
@@ -511,7 +512,7 @@ func TestDisposeProfile(t *testing.T) {
 
 		// Setup mock to return error
 		mockClient.On("Send", ctx, mock.MatchedBy(func(manifest model.OrchestrationManifest) bool {
-			return manifest.OrchestrationType == model.VPADisposeType
+			return manifest.OrchestrationType == dataspace.VPADisposeType
 		})).Return(assert.AnError)
 
 		service.provisionClient = mockClient
@@ -522,7 +523,7 @@ func TestDisposeProfile(t *testing.T) {
 
 		// Create a deployed participant
 		profile := newTestParticipantProfile("tenant-1", "participant-1")
-		profile.Properties[model.VPAStateData] = map[string]any{"state": "deployed"}
+		profile.Properties[dataspace.VPAStateData] = map[string]any{"state": "deployed"}
 		profile.VPAs[0].State = api.DeploymentStateActive
 
 		createdProfile, err := service.participantStore.Create(ctx, profile)
@@ -540,7 +541,7 @@ func TestVPACallbackHandlerDeploy(t *testing.T) {
 	service := newTestParticipantService()
 
 	profile := newTestParticipantProfile("tenant-1", "participant-1")
-	setPendingOrchestration(profile, model.OrchestrationManifest{ID: "manifest-1", OrchestrationType: model.VPADeployType})
+	setPendingOrchestration(profile, model.OrchestrationManifest{ID: "manifest-1", OrchestrationType: dataspace.VPADeployType})
 	createdProfile, err := service.participantStore.Create(ctx, profile)
 	require.NoError(t, err)
 
@@ -554,7 +555,7 @@ func TestVPACallbackHandlerDeploy(t *testing.T) {
 		ID:                "response-1",
 		ManifestID:        "manifest-1",
 		CorrelationID:     createdProfile.ID,
-		OrchestrationType: model.VPADeployType,
+		OrchestrationType: dataspace.VPADeployType,
 		Success:           true,
 		Properties: map[string]any{
 			"connectionString": "test-value",
@@ -571,7 +572,7 @@ func TestVPACallbackHandlerDeploy(t *testing.T) {
 	require.NotNil(t, updated)
 	assert.False(t, updated.Error)
 	assert.Equal(t, api.DeploymentStateActive, updated.VPAs[0].State)
-	assert.NotNil(t, updated.Properties[model.VPAStateData])
+	assert.NotNil(t, updated.Properties[dataspace.VPAStateData])
 	assert.NotContains(t, updated.Properties, pendingOrchestrationKey, "pending orchestration is cleared once its response is applied")
 }
 
@@ -585,17 +586,17 @@ func TestVPACallbackHandlerIgnoresUnexpectedResponses(t *testing.T) {
 	}{
 		{
 			name:     "no pending orchestration",
-			response: model.OrchestrationResponse{ManifestID: "manifest-1", OrchestrationType: model.VPADeployType},
+			response: model.OrchestrationResponse{ManifestID: "manifest-1", OrchestrationType: dataspace.VPADeployType},
 		},
 		{
 			name:     "different manifest",
-			pending:  &model.OrchestrationManifest{ID: "manifest-1", OrchestrationType: model.VPADeployType},
-			response: model.OrchestrationResponse{ManifestID: "manifest-2", OrchestrationType: model.VPADeployType},
+			pending:  &model.OrchestrationManifest{ID: "manifest-1", OrchestrationType: dataspace.VPADeployType},
+			response: model.OrchestrationResponse{ManifestID: "manifest-2", OrchestrationType: dataspace.VPADeployType},
 		},
 		{
 			name:     "different orchestration type",
-			pending:  &model.OrchestrationManifest{ID: "manifest-1", OrchestrationType: model.VPADisposeType},
-			response: model.OrchestrationResponse{ManifestID: "manifest-1", OrchestrationType: model.VPADeployType},
+			pending:  &model.OrchestrationManifest{ID: "manifest-1", OrchestrationType: dataspace.VPADisposeType},
+			response: model.OrchestrationResponse{ManifestID: "manifest-1", OrchestrationType: dataspace.VPADeployType},
 		},
 	}
 	for _, tt := range tests {
@@ -626,7 +627,7 @@ func TestVPACallbackHandlerIgnoresUnexpectedResponses(t *testing.T) {
 			updated, err := participantStore.FindByID(ctx, createdProfile.ID)
 			require.NoError(t, err)
 			assert.Equal(t, api.DeploymentStateInitial, updated.VPAs[0].State)
-			assert.NotContains(t, updated.Properties, model.VPAStateData)
+			assert.NotContains(t, updated.Properties, dataspace.VPAStateData)
 		})
 	}
 }
@@ -636,7 +637,7 @@ func TestVPACallbackHandlerAppliesCompensation(t *testing.T) {
 	participantStore := memorystore.NewInMemoryEntityStore[*api.ParticipantProfile]()
 
 	profile := newTestParticipantProfile("tenant-1", "participant-1")
-	setPendingOrchestration(profile, model.OrchestrationManifest{ID: "deploy-1", OrchestrationType: model.VPADeployType})
+	setPendingOrchestration(profile, model.OrchestrationManifest{ID: "deploy-1", OrchestrationType: dataspace.VPADeployType})
 	createdProfile, err := participantStore.Create(ctx, profile)
 	require.NoError(t, err)
 
@@ -651,7 +652,7 @@ func TestVPACallbackHandlerAppliesCompensation(t *testing.T) {
 		ID:                "response-1",
 		ManifestID:        "deploy-1",
 		CorrelationID:     createdProfile.ID,
-		OrchestrationType: model.VPADeployType,
+		OrchestrationType: dataspace.VPADeployType,
 		Success:           false,
 		ErrorDetail:       "failed",
 	}))
@@ -665,7 +666,7 @@ func TestVPACallbackHandlerAppliesCompensation(t *testing.T) {
 		ID:                    "response-2",
 		ManifestID:            "dispose-x",
 		CorrelationID:         createdProfile.ID,
-		OrchestrationType:     model.VPADisposeType,
+		OrchestrationType:     dataspace.VPADisposeType,
 		Success:               true,
 		CompensatedManifestID: "deploy-other",
 	}))
@@ -678,7 +679,7 @@ func TestVPACallbackHandlerAppliesCompensation(t *testing.T) {
 		ID:                    "response-3",
 		ManifestID:            "compensation-1",
 		CorrelationID:         createdProfile.ID,
-		OrchestrationType:     model.VPADisposeType,
+		OrchestrationType:     dataspace.VPADisposeType,
 		Success:               true,
 		CompensatedManifestID: "deploy-1",
 	}))
@@ -695,7 +696,7 @@ func TestVPACallbackHandlerFailedCompensationKeepsDeployError(t *testing.T) {
 	participantStore := memorystore.NewInMemoryEntityStore[*api.ParticipantProfile]()
 
 	profile := newTestParticipantProfile("tenant-1", "participant-1")
-	setPendingOrchestration(profile, model.OrchestrationManifest{ID: "deploy-1", OrchestrationType: model.VPADeployType})
+	setPendingOrchestration(profile, model.OrchestrationManifest{ID: "deploy-1", OrchestrationType: dataspace.VPADeployType})
 	createdProfile, err := participantStore.Create(ctx, profile)
 	require.NoError(t, err)
 
@@ -709,7 +710,7 @@ func TestVPACallbackHandlerFailedCompensationKeepsDeployError(t *testing.T) {
 		ID:                "response-1",
 		ManifestID:        "deploy-1",
 		CorrelationID:     createdProfile.ID,
-		OrchestrationType: model.VPADeployType,
+		OrchestrationType: dataspace.VPADeployType,
 		Success:           false,
 		ErrorDetail:       "activity A1 of orchestration deploy-1 failed",
 		ErrorCause:        "activity A1 failed 10 times: not ready",
@@ -719,7 +720,7 @@ func TestVPACallbackHandlerFailedCompensationKeepsDeployError(t *testing.T) {
 		ID:                    "response-2",
 		ManifestID:            "compensation-1",
 		CorrelationID:         createdProfile.ID,
-		OrchestrationType:     model.VPADisposeType,
+		OrchestrationType:     dataspace.VPADisposeType,
 		Success:               false,
 		ErrorDetail:           "activity A2 of orchestration compensation-1 failed",
 		ErrorCause:            "cannot delete participant context",
@@ -739,7 +740,7 @@ func TestVPACallbackHandlerIgnoresDuplicateResponse(t *testing.T) {
 	participantStore := memorystore.NewInMemoryEntityStore[*api.ParticipantProfile]()
 
 	profile := newTestParticipantProfile("tenant-1", "participant-1")
-	setPendingOrchestration(profile, model.OrchestrationManifest{ID: "manifest-1", OrchestrationType: model.VPADeployType})
+	setPendingOrchestration(profile, model.OrchestrationManifest{ID: "manifest-1", OrchestrationType: dataspace.VPADeployType})
 	createdProfile, err := participantStore.Create(ctx, profile)
 	require.NoError(t, err)
 
@@ -753,7 +754,7 @@ func TestVPACallbackHandlerIgnoresDuplicateResponse(t *testing.T) {
 		ID:                "response-1",
 		ManifestID:        "manifest-1",
 		CorrelationID:     createdProfile.ID,
-		OrchestrationType: model.VPADeployType,
+		OrchestrationType: dataspace.VPADeployType,
 		Success:           true,
 		Properties:        map[string]any{"connectionString": "test-value"},
 	}
@@ -777,7 +778,7 @@ func TestVPACallbackHandlerDispose(t *testing.T) {
 
 	profile := newTestParticipantProfile("tenant-1", "participant-1")
 	profile.VPAs[0].State = api.DeploymentStateDisposing
-	setPendingOrchestration(profile, model.OrchestrationManifest{ID: "manifest-1", OrchestrationType: model.VPADisposeType})
+	setPendingOrchestration(profile, model.OrchestrationManifest{ID: "manifest-1", OrchestrationType: dataspace.VPADisposeType})
 	createdProfile, err := service.participantStore.Create(ctx, profile)
 	require.NoError(t, err)
 
@@ -791,7 +792,7 @@ func TestVPACallbackHandlerDispose(t *testing.T) {
 		ID:                "response-1",
 		ManifestID:        "manifest-1",
 		CorrelationID:     createdProfile.ID,
-		OrchestrationType: model.VPADisposeType,
+		OrchestrationType: dataspace.VPADisposeType,
 		Success:           true,
 		Properties:        map[string]any{},
 	}
@@ -813,7 +814,7 @@ func TestVPACallbackHandlerFailedResponse(t *testing.T) {
 	participantStore := memorystore.NewInMemoryEntityStore[*api.ParticipantProfile]()
 
 	profile := newTestParticipantProfile("tenant-1", "participant-1")
-	setPendingOrchestration(profile, model.OrchestrationManifest{ID: "manifest-1", OrchestrationType: model.VPADeployType})
+	setPendingOrchestration(profile, model.OrchestrationManifest{ID: "manifest-1", OrchestrationType: dataspace.VPADeployType})
 	createdProfile, err := participantStore.Create(ctx, profile)
 	require.NoError(t, err)
 
@@ -827,7 +828,7 @@ func TestVPACallbackHandlerFailedResponse(t *testing.T) {
 		ID:                "response-1",
 		ManifestID:        "manifest-1",
 		CorrelationID:     createdProfile.ID,
-		OrchestrationType: model.VPADeployType,
+		OrchestrationType: dataspace.VPADeployType,
 		Success:           false,
 		ErrorDetail:       "Deployment failed due to network error",
 	}
@@ -857,7 +858,7 @@ func TestVPACallbackHandlerNonExistentProfile(t *testing.T) {
 		ID:                "response-1",
 		ManifestID:        "manifest-1",
 		CorrelationID:     "non-existent-profile",
-		OrchestrationType: model.VPADeployType,
+		OrchestrationType: dataspace.VPADeployType,
 		Success:           true,
 		Properties:        map[string]any{},
 	}
@@ -999,7 +1000,7 @@ func newTestParticipantProfile(tenantID string, participantID string) *api.Parti
 					State:          api.DeploymentStateInitial,
 					StateTimestamp: time.Now(),
 				},
-				Type:           model.ConnectorType,
+				Type:           dataspace.ConnectorType,
 				CellID:         "cell-1",
 				ExternalCellID: "external-id",
 				Properties: api.Properties{
@@ -1092,7 +1093,7 @@ func newDisposableTestProfile(t *testing.T, service *participantService) *api.Pa
 	_, err := service.dataspaceStore.Create(t.Context(), newTestDataspaceProfile("dataspace-1"))
 	require.NoError(t, err)
 	profile := newTestParticipantProfile("tenant-1", "participant-1")
-	profile.Properties[model.VPAStateData] = map[string]any{"state": "deployed"}
+	profile.Properties[dataspace.VPAStateData] = map[string]any{"state": "deployed"}
 	profile.VPAs[0].State = api.DeploymentStateActive
 	created, err := service.participantStore.Create(t.Context(), profile)
 	require.NoError(t, err)

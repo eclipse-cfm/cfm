@@ -22,9 +22,9 @@ import (
 
 	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
 	"github.com/eclipse-cfm/cfm/agent/common/siglet"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/httpx"
 	"github.com/eclipse-cfm/cfm/common/lifecycleagent"
-	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/common/types"
 )
@@ -99,7 +99,7 @@ func (p *Processor) Process(ctx context.Context, evt lifecycleagent.EventContext
 // validateParticipantContextID rejects events whose participant context ID is not a plain identifier, since the ID ends
 // up in admin API paths. The returned error is a client error, so the message is dropped instead of being redelivered.
 func validateParticipantContextID(subject string, data KeyPairEventData) error {
-	if err := model.ValidateParticipantContextID(data.ParticipantContextID); err != nil {
+	if err := dataspace.ValidateParticipantContextID(data.ParticipantContextID); err != nil {
 		return types.NewClientWrappedError(err, "rejecting key management event %s", subject)
 	}
 	return nil

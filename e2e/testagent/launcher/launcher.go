@@ -14,7 +14,7 @@ package launcher
 
 import (
 	"github.com/eclipse-cfm/cfm/agent/common/vpa"
-	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/runtime"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
@@ -84,5 +84,5 @@ func processDefault(ctx api.ActivityContext, t TestActivityProcessor) api.Activi
 }
 
 type TestAgentData struct {
-	CredentialSpecs []model.CredentialSpec `json:"cfm.vpa.credentials"`
+	CredentialSpecs []dataspace.CredentialSpec `json:"cfm.vpa.credentials"`
 }

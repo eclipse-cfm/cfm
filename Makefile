@@ -1,4 +1,4 @@
-.PHONY: help build test clean docker-build docker-clean install-tools generate-mocks install-mockery
+.PHONY: help build test lint clean docker-build docker-clean install-tools generate-mocks install-mockery
 
 #==============================================================================
 # Multi-Service Orchestration - Delegates to Individual Makefiles
@@ -46,6 +46,7 @@ help:
 	@echo "  test           - Run tests for all services"
 	@echo "  test-pmanager  - Test pmanager service"
 	@echo "  test-tmanager  - Test tmanager service"
+	@echo "  lint           - Run golangci-lint on all modules"
 	@echo ""
 	@echo "Development Commands:"
 	@echo "  dev-pmanager   - Run pmanager in development mode"
@@ -117,6 +118,10 @@ test: install-gotestsum
 	$(MAKE) -C $(ASSEMBLY_DIR) test
 	$(MAKE) -C $(AGENT_COMMON) test
 
+lint: install-golangci-lint
+	@echo "Linting all modules..."
+	golangci-lint run ./...
+
 test-common:
 	@echo "Testing common..."
 	$(MAKE) -C $(COMMON_DIR) test
@@ -176,6 +181,9 @@ clean:
 
 install-mockery:
 	go install github.com/vektra/mockery/v2@v2.53.7
+
+install-golangci-lint:
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
 
 install-gotestsum:
 	go install gotest.tools/gotestsum@latest

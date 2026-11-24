@@ -50,7 +50,7 @@ func TestNatsActivityExecutor_ProcessingDataPersistedAcrossReschedules(t *testin
 		ID:                "test-persist-data",
 		CorrelationID:     "correlation-persist-test",
 		State:             api.OrchestrationStateRunning,
-		OrchestrationType: model.VPADeployType,
+		OrchestrationType: testOrchestrationType,
 		ProcessingData:    make(map[string]any),
 		OutputData:        make(map[string]any),
 		Completed:         make(map[string]struct{}),

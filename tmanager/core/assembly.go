@@ -13,7 +13,7 @@
 package core
 
 import (
-	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/tmanager/api"
@@ -93,8 +93,8 @@ func (a *TMCoreServiceAssembly) Init(context *system.InitContext) error {
 		participantStore: participantStore,
 		monitor:          context.LogMonitor,
 	}
-	registry.Register(model.VPADeployType, deploymentHandler.handleDeploy)
-	registry.Register(model.VPADisposeType, deploymentHandler.handleDispose)
+	registry.Register(dataspace.VPADeployType, deploymentHandler.handleDeploy)
+	registry.Register(dataspace.VPADisposeType, deploymentHandler.handleDispose)
 
 	return nil
 }

@@ -1,0 +1,22 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - depguard
+  settings:
+    depguard:
+      rules:
+        # The Provision Manager is a generic orchestration engine. It must not depend on the dataspace model, the
+        # agents, or the Tenant Manager, so that other managers can run their orchestrations on it.
+        pmanager-is-generic:
+          list-mode: lax
+          files:
+            - "**/pmanager/**"
+          deny:
+            - pkg: github.com/eclipse-cfm/cfm/common/dataspace
+              desc: pmanager is a generic orchestration engine and must not use the dataspace model
+            - pkg: github.com/eclipse-cfm/cfm/agent
+              desc: pmanager must not depend on the agents
+            - pkg: github.com/eclipse-cfm/cfm/tmanager
+              desc: pmanager must not depend on the Tenant Manager

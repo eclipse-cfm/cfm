@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/query"
 	"github.com/eclipse-cfm/cfm/common/sqlstore"
 	"github.com/eclipse-cfm/cfm/common/store"
@@ -51,7 +51,7 @@ func TestNewDataspaceProfileStore_FindByID_Success(t *testing.T) {
 		},
 		DataspaceSpec: api.DataspaceSpec{
 			ProtocolStack: []string{"dspace-2025-1"},
-			CredentialSpecs: []model.CredentialSpec{
+			CredentialSpecs: []dataspace.CredentialSpec{
 				{
 					Type:   "FooCredential",
 					Issuer: "did:web:bar.com",

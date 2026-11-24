@@ -22,36 +22,7 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-const (
-	ConnectorType         VPAType = "cfm.connector"
-	CredentialServiceType VPAType = "cfm.credentialservice"
-	DataPlaneType         VPAType = "cfm.dataplane"
-	IssuerServiceType     VPAType = "cfm.issuer"
-	ParticipantIdentifier         = "cfm.participant.id"
-
-	VPADeployType  OrchestrationType = "cfm.orchestration.vpa.deploy"
-	VPADisposeType OrchestrationType = "cfm.orchestration.vpa.dispose"
-
-	VPAData        = "cfm.vpa.data"
-	CredentialData = "cfm.vpa.credentials"
-	VPAStateData   = "cfm.vpa.state"
-)
-
 var Validator = initValidator()
-
-// participantContextIDPattern restricts participant context IDs to characters that are safe to use verbatim as a URL path
-// segment and as a Vault folder name. Generated IDs are 32 hex characters, so the length cap leaves ample headroom.
-var participantContextIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,128}$`)
-
-// ValidateParticipantContextID returns an error if the given ID contains anything other than letters, digits, underscores
-// and hyphens, or is empty or longer than 128 characters. This rejects path separators, dots, query and fragment
-// delimiters and percent-encoding, which could otherwise re-target admin API requests or Vault paths.
-func ValidateParticipantContextID(id string) error {
-	if !participantContextIDPattern.MatchString(id) {
-		return fmt.Errorf("invalid participant context ID %q", id)
-	}
-	return nil
-}
 
 // replyToPattern restricts a reply-to subject token to the characters allowed by the modeltype check, without dots, so
 // that it is exactly one subject token.
@@ -102,32 +73,9 @@ type OrchestrationResponse struct {
 	CompensatedManifestID string `json:"compensatedManifestId,omitempty"`
 }
 
-// VPAManifest represents the configuration details for a VPA deployment.
-type VPAManifest struct {
-	ID             string         `json:"id" validate:"required"`
-	VPAType        VPAType        `json:"vpaType" validate:"required"`
-	CellID         string         `json:"cellId" validate:"required"`
-	ExternalCellID string         `json:"externalCellId"`
-	Properties     map[string]any `json:"properties,omitempty"`
-}
-
-type CredentialSpec struct {
-	Id              string `json:"id" validate:"required"`
-	Type            string `json:"type" validate:"required"`
-	Issuer          string `json:"issuer" validate:"required"`
-	Format          string `json:"format" validate:"required"`
-	ParticipantRole string `json:"role"`
-}
-
 type OrchestrationType string
 
 func (dt OrchestrationType) String() string {
-	return string(dt)
-}
-
-type VPAType string
-
-func (dt VPAType) String() string {
 	return string(dt)
 }
 
@@ -169,11 +117,6 @@ func initValidator() *validator.Validate {
 	// replyto validates reply-to subject tokens, see ValidateReplyTo
 	_ = v.RegisterValidation("replyto", func(fl validator.FieldLevel) bool {
 		return ValidateReplyTo(fl.Field().String()) == nil
-	})
-
-	// participantcontextid validates participant context IDs, see ValidateParticipantContextID
-	_ = v.RegisterValidation("participantcontextid", func(fl validator.FieldLevel) bool {
-		return ValidateParticipantContextID(fl.Field().String()) == nil
 	})
 	return v
 }

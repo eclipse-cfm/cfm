@@ -30,6 +30,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// testOrchestrationType is an orchestration type without meaning to the engine.
+const testOrchestrationType model.OrchestrationType = "test.orchestration"
+
 type fakeProvisionManager struct {
 	api.ProvisionManager
 	orchestration *api.Orchestration
@@ -48,7 +51,7 @@ func newTestOrchestration() *api.Orchestration {
 	return &api.Orchestration{
 		ID:                "orchestration-1",
 		CorrelationID:     "profile-1",
-		OrchestrationType: model.VPADeployType,
+		OrchestrationType: testOrchestrationType,
 		ProcessingData:    map[string]any{"participantContextId": "secret-context"},
 		OutputData:        map[string]any{"holderPid": "holder-1"},
 		EngineState:       api.EngineState{Error: "boom"},

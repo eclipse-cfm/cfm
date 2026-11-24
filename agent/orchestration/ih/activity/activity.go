@@ -19,6 +19,8 @@ import (
 	"strings"
 
 	"github.com/eclipse-cfm/cfm/agent/common/vault"
+	// dataspace registers the participantcontextid validation tag used by ihData
+	_ "github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 

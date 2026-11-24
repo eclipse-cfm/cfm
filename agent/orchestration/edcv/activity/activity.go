@@ -23,7 +23,7 @@ import (
 	"github.com/eclipse-cfm/cfm/agent/common/vpa"
 	"github.com/eclipse-cfm/cfm/agent/orchestration/edcv"
 	. "github.com/eclipse-cfm/cfm/common/collection"
-	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"go.opentelemetry.io/otel"
@@ -79,7 +79,7 @@ func (p EDCVActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.Activi
 	}
 
 	// dataspace profiles are optional; they are carried in the cfm.connector VPA properties
-	props, err := vpa.Properties(ctx, model.ConnectorType)
+	props, err := vpa.Properties(ctx, dataspace.ConnectorType)
 	if err != nil {
 		span.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error reading connector VPA properties for orchestration %s: %w", ctx.OID(), err)}

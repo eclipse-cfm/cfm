@@ -15,7 +15,7 @@ package v1alpha1
 import (
 	"time"
 
-	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 )
 
 // Request DTOs declare their constraints with `validate` tags, which ReadPayload enforces and the OpenAPI generator turns
@@ -116,9 +116,9 @@ type ParticipantProfile struct {
 
 type VirtualParticipantAgent struct {
 	DeployableEntity
-	Type       model.VPAType  `json:"type" required:"true"`
-	CellID     string         `json:"cellId" required:"true"`
-	Properties map[string]any `json:"properties,omitempty"`
+	Type       dataspace.VPAType `json:"type" required:"true"`
+	CellID     string            `json:"cellId" required:"true"`
+	Properties map[string]any    `json:"properties,omitempty"`
 }
 
 type DeployableEntity struct {

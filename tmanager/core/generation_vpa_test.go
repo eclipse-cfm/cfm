@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/google/uuid"
@@ -48,9 +49,9 @@ func TestParticipantProfileGenerator_Generate(t *testing.T) {
 		identifier := "participant-abc"
 
 		vpaProperties := make(api.VPAPropMap, 2)
-		vpaProperties[model.ConnectorType] = map[string]any{"connector": "connector"}
-		vpaProperties[model.CredentialServiceType] = map[string]any{"credentialservice": "credentialservice"}
-		vpaProperties[model.DataPlaneType] = map[string]any{"dataplane": "dataplane"}
+		vpaProperties[dataspace.ConnectorType] = map[string]any{"connector": "connector"}
+		vpaProperties[dataspace.CredentialServiceType] = map[string]any{"credentialservice": "credentialservice"}
+		vpaProperties[dataspace.DataPlaneType] = map[string]any{"dataplane": "dataplane"}
 
 		properties := api.Properties{
 			"test": "value",
@@ -101,13 +102,13 @@ func TestParticipantProfileGenerator_Generate(t *testing.T) {
 		assert.Len(t, profile.VPAs, 4)
 
 		// Extract VPA types and verify they match expected types
-		expectedTypes := []model.VPAType{
-			model.ConnectorType,
-			model.CredentialServiceType,
-			model.DataPlaneType,
-			model.IssuerServiceType,
+		expectedTypes := []dataspace.VPAType{
+			dataspace.ConnectorType,
+			dataspace.CredentialServiceType,
+			dataspace.DataPlaneType,
+			dataspace.IssuerServiceType,
 		}
-		actualTypes := make([]model.VPAType, len(profile.VPAs))
+		actualTypes := make([]dataspace.VPAType, len(profile.VPAs))
 		for i, vpa := range profile.VPAs {
 			actualTypes[i] = vpa.Type
 		}
@@ -181,7 +182,7 @@ func TestParticipantProfileGenerator_Generate(t *testing.T) {
 			[]api.DataspaceProfile{})
 
 		require.NoError(t, err)
-		assert.Equal(t, model.VPADeployType, receivedDeploymentType)
+		assert.Equal(t, dataspace.VPADeployType, receivedDeploymentType)
 	})
 
 	t.Run("cell selector receives correct parameters", func(t *testing.T) {
@@ -326,7 +327,7 @@ func TestParticipantProfileGenerator_generateConnector(t *testing.T) {
 			Properties: cellProperties,
 		}
 
-		connector := generator.generateVPA(model.ConnectorType, make(api.VPAPropMap), inputCell)
+		connector := generator.generateVPA(dataspace.ConnectorType, make(api.VPAPropMap), inputCell)
 
 		assert.Equal(t, inputCell.ID, connector.CellID)
 		assert.Equal(t, inputCell.ExternalID, connector.ExternalCellID)
@@ -347,9 +348,9 @@ func TestParticipantProfileGenerator_generateConnector(t *testing.T) {
 			Properties: make(api.Properties),
 		}
 
-		connector1 := generator.generateVPA(model.ConnectorType, make(api.VPAPropMap), inputCell)
-		connector2 := generator.generateVPA(model.ConnectorType, make(api.VPAPropMap), inputCell)
-		connector3 := generator.generateVPA(model.ConnectorType, make(api.VPAPropMap), inputCell)
+		connector1 := generator.generateVPA(dataspace.ConnectorType, make(api.VPAPropMap), inputCell)
+		connector2 := generator.generateVPA(dataspace.ConnectorType, make(api.VPAPropMap), inputCell)
+		connector3 := generator.generateVPA(dataspace.ConnectorType, make(api.VPAPropMap), inputCell)
 
 		ids := map[string]bool{
 			connector1.ID: true,

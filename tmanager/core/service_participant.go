@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/eclipse-cfm/cfm/common/collection"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/query"
 	"github.com/eclipse-cfm/cfm/common/store"
@@ -123,15 +124,15 @@ func (p participantService) DeployProfile(ctx context.Context, tenantID string, 
 		oManifest = model.OrchestrationManifest{
 			ID:                uuid.New().String(),
 			CorrelationID:     participantProfile.ID,
-			OrchestrationType: model.VPADeployType,
+			OrchestrationType: dataspace.VPADeployType,
 			Payload:           make(map[string]any),
 		}
 
-		oManifest.Payload[model.ParticipantIdentifier] = participantProfile.Identifier
+		oManifest.Payload[dataspace.ParticipantIdentifier] = participantProfile.Identifier
 
-		vpaManifests := make([]model.VPAManifest, 0, len(participantProfile.VPAs))
+		vpaManifests := make([]dataspace.VPAManifest, 0, len(participantProfile.VPAs))
 		for _, vpa := range participantProfile.VPAs {
-			vpaManifest := model.VPAManifest{
+			vpaManifest := dataspace.VPAManifest{
 				ID:             vpa.ID,
 				VPAType:        vpa.Type,
 				CellID:         vpa.CellID,
@@ -140,10 +141,10 @@ func (p participantService) DeployProfile(ctx context.Context, tenantID string, 
 			}
 			vpaManifests = append(vpaManifests, vpaManifest)
 		}
-		oManifest.Payload[model.VPAData] = vpaManifests
+		oManifest.Payload[dataspace.VPAData] = vpaManifests
 
 		specs := generateCredentialSpecs(participantProfile.ParticipantRoles, dProfiles)
-		oManifest.Payload[model.CredentialData] = specs
+		oManifest.Payload[dataspace.CredentialData] = specs
 
 		if err := p.lockReferences(ctx, participantProfile); err != nil {
 			return nil, err
@@ -253,7 +254,7 @@ func (p participantService) DisposeProfile(ctx context.Context, tenantID string,
 		if len(states) > 0 {
 			return fmt.Errorf("cannot dispose VPAs %s in states: %s", participantID, strings.Join(states, ","))
 		}
-		stateData, found := profile.Properties[model.VPAStateData]
+		stateData, found := profile.Properties[dataspace.VPAStateData]
 		if !found {
 			return fmt.Errorf("profile is not deployed or is missing state data: %s", participantID)
 		}
@@ -266,16 +267,16 @@ func (p participantService) DisposeProfile(ctx context.Context, tenantID string,
 		oManifest = model.OrchestrationManifest{
 			ID:                uuid.New().String(),
 			CorrelationID:     participantID,
-			OrchestrationType: model.VPADisposeType,
+			OrchestrationType: dataspace.VPADisposeType,
 			Payload:           make(map[string]any),
 		}
 
-		oManifest.Payload[model.ParticipantIdentifier] = profile.Identifier
-		oManifest.Payload[model.VPAStateData] = stateData
+		oManifest.Payload[dataspace.ParticipantIdentifier] = profile.Identifier
+		oManifest.Payload[dataspace.VPAStateData] = stateData
 
-		vpaManifests := make([]model.VPAManifest, 0, len(profile.VPAs))
+		vpaManifests := make([]dataspace.VPAManifest, 0, len(profile.VPAs))
 		for i, vpa := range profile.VPAs {
-			vpaManifest := model.VPAManifest{
+			vpaManifest := dataspace.VPAManifest{
 				ID:             vpa.ID,
 				VPAType:        vpa.Type,
 				CellID:         vpa.CellID,
@@ -288,8 +289,8 @@ func (p participantService) DisposeProfile(ctx context.Context, tenantID string,
 			profile.VPAs[i].State = api.DeploymentStateDisposing
 		}
 
-		oManifest.Payload[model.VPAData] = vpaManifests
-		oManifest.Payload[model.CredentialData] = generateCredentialSpecs(profile.ParticipantRoles, dProfiles)
+		oManifest.Payload[dataspace.VPAData] = vpaManifests
+		oManifest.Payload[dataspace.CredentialData] = generateCredentialSpecs(profile.ParticipantRoles, dProfiles)
 
 		setPendingOrchestration(profile, oManifest)
 		err = p.participantStore.Update(c, profile)
@@ -373,8 +374,8 @@ func isPendingOrchestration(profile *api.ParticipantProfile, response model.Orch
 		return orchestrationType == response.OrchestrationType.String()
 	}
 	return manifestID == response.CompensatedManifestID &&
-		orchestrationType == model.VPADeployType.String() &&
-		response.OrchestrationType == model.VPADisposeType
+		orchestrationType == dataspace.VPADeployType.String() &&
+		response.OrchestrationType == dataspace.VPADisposeType
 }
 
 // checkProfileAccess returns ErrNotFound when the caller may not access the participant profile.
@@ -408,9 +409,9 @@ func (p participantService) executeStoreIterator(ctx context.Context, storeOp fu
 
 func generateCredentialSpecs(
 	participantRoles map[string][]string,
-	dProfiles []api.DataspaceProfile) []model.CredentialSpec {
+	dProfiles []api.DataspaceProfile) []dataspace.CredentialSpec {
 
-	credentials := make([]model.CredentialSpec, 0)
+	credentials := make([]dataspace.CredentialSpec, 0)
 	for _, profile := range dProfiles {
 		for _, credentialSpec := range profile.DataspaceSpec.CredentialSpecs {
 			credentialRole := credentialSpec.ParticipantRole
@@ -445,7 +446,7 @@ func (h vpaCallbackHandler) handleDeploy(ctx context.Context, response model.Orc
 		for key, value := range resp.Properties {
 			vpaProps[key] = value
 		}
-		profile.Properties[model.VPAStateData] = vpaProps
+		profile.Properties[dataspace.VPAStateData] = vpaProps
 
 		targetState := api.DeploymentStateActive
 		if !resp.Success {

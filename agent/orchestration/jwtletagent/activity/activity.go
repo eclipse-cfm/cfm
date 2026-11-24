@@ -29,7 +29,7 @@ import (
 	"github.com/eclipse-cfm/cfm/agent/common/controlplane"
 	"github.com/eclipse-cfm/cfm/agent/common/identityhub"
 	"github.com/eclipse-cfm/cfm/agent/common/siglet"
-	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/common/token"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
@@ -276,7 +276,7 @@ func (p TokenExchangeActivityProcessor) ProcessDispose(ctx api.ActivityContext) 
 		span.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}
 	}
-	if err := model.ValidateParticipantContextID(participantContextID); err != nil {
+	if err := dataspace.ValidateParticipantContextID(participantContextID); err != nil {
 		err = fmt.Errorf("error processing token exchange dispose for orchestration %s: %w", ctx.OID(), err)
 		span.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: err}

@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 )
 
 // Entity is the base type for all entities.
@@ -99,18 +99,18 @@ type DataspaceProfile struct {
 }
 
 type DataspaceSpec struct {
-	ProtocolStack   []string               `json:"protocolStack"`
-	CredentialSpecs []model.CredentialSpec `json:"credentialSpecs"`
+	ProtocolStack   []string                   `json:"protocolStack"`
+	CredentialSpecs []dataspace.CredentialSpec `json:"credentialSpecs"`
 }
 
 // VirtualParticipantAgent is a runtime context deployed when a participant profile is provisioned to a cell. A runtime
 // context could be a connector, credential service, or another component.
 type VirtualParticipantAgent struct {
 	DeployableEntity
-	Type           model.VPAType `json:"type"`
-	CellID         string        `json:"cellId"`
-	ExternalCellID string        `json:"externalCellId"`
-	Properties     Properties    `json:"properties"`
+	Type           dataspace.VPAType `json:"type"`
+	CellID         string            `json:"cellId"`
+	ExternalCellID string            `json:"externalCellId"`
+	Properties     Properties        `json:"properties"`
 }
 
 // DataspaceDeployment is runtime capabilities and configuration deployed when a dataspace profile to a cell.

@@ -20,16 +20,16 @@ package vpa
 import (
 	"fmt"
 
-	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 )
 
 const (
 	// DeployDiscriminator is the discriminator of activities that run as part of a VPA deploy orchestration.
-	DeployDiscriminator = api.Discriminator(model.VPADeployType)
+	DeployDiscriminator = api.Discriminator(dataspace.VPADeployType)
 
 	// DisposeDiscriminator is the discriminator of activities that run as part of a VPA dispose orchestration.
-	DisposeDiscriminator = api.Discriminator(model.VPADisposeType)
+	DisposeDiscriminator = api.Discriminator(dataspace.VPADisposeType)
 )
 
 // DeployDisposeProcessor handles the activities of the VPA deploy and dispose orchestrations.
@@ -68,8 +68,8 @@ func (a adapter) Process(ctx api.ActivityContext) api.ActivityResult {
 // not present, or it does not contain an entry for the VPA type, nil is returned. Otherwise the contents of the
 // `properties` field of the matching entry are returned. If the `cfm.vpa.data` value is not a slice, an error is
 // returned.
-func Properties(ctx api.ActivityContext, vpaType model.VPAType) (map[string]any, error) {
-	vpaData, ok := ctx.Value(model.VPAData)
+func Properties(ctx api.ActivityContext, vpaType dataspace.VPAType) (map[string]any, error) {
+	vpaData, ok := ctx.Value(dataspace.VPAData)
 	if !ok || vpaData == nil {
 		return nil, nil
 	}

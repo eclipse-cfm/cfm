@@ -27,7 +27,7 @@ import (
 	"github.com/eclipse-cfm/cfm/agent/common/siglet"
 	"github.com/eclipse-cfm/cfm/agent/common/vpa"
 	. "github.com/eclipse-cfm/cfm/common/collection"
-	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"go.opentelemetry.io/otel"
@@ -112,7 +112,7 @@ func (p SigletActivityProcessor) ProcessDeploy(ctx api.ActivityContext) api.Acti
 	spanCtx, span := p.tracer.Start(ctx.Context(), "cfm.agent.siglet.deploy")
 	defer span.End()
 
-	props, err := vpa.Properties(ctx, model.DataPlaneType)
+	props, err := vpa.Properties(ctx, dataspace.DataPlaneType)
 	if err != nil {
 		span.RecordError(err)
 		return api.ActivityResult{Result: api.ActivityResultFatalError, Error: fmt.Errorf("error reading data plane VPA properties for orchestration %s: %w", ctx.OID(), err)}
@@ -309,9 +309,9 @@ func (p SigletActivityProcessor) authorizationProfile(participantContextId strin
 
 	if profileType := strings.TrimSpace(vpa.Type); profileType != authorizationType {
 		if profileType == "" {
-			return nil, fmt.Errorf("data plane authorization property 'type' is not set in the %s VPA: the only supported type is '%s'", model.DataPlaneType, authorizationType)
+			return nil, fmt.Errorf("data plane authorization property 'type' is not set in the %s VPA: the only supported type is '%s'", dataspace.DataPlaneType, authorizationType)
 		}
-		return nil, fmt.Errorf("unsupported data plane authorization type '%s' in the %s VPA: the only supported type is '%s'", profileType, model.DataPlaneType, authorizationType)
+		return nil, fmt.Errorf("unsupported data plane authorization type '%s' in the %s VPA: the only supported type is '%s'", profileType, dataspace.DataPlaneType, authorizationType)
 	}
 
 	endpoint := firstNonEmpty(vpa.TokenExchangeEndpoint, p.authorization.TokenExchangeEndpoint)
@@ -333,9 +333,9 @@ func (p SigletActivityProcessor) authorizationProfile(participantContextId strin
 	for _, r := range required {
 		if r.value == "" {
 			if r.configKey == "" {
-				return nil, fmt.Errorf("data plane authorization property '%s' is not set in the %s VPA", r.property, model.DataPlaneType)
+				return nil, fmt.Errorf("data plane authorization property '%s' is not set in the %s VPA", r.property, dataspace.DataPlaneType)
 			}
-			return nil, fmt.Errorf("data plane authorization property '%s' is not set in the %s VPA and no fallback is configured (%s)", r.property, model.DataPlaneType, r.configKey)
+			return nil, fmt.Errorf("data plane authorization property '%s' is not set in the %s VPA and no fallback is configured (%s)", r.property, dataspace.DataPlaneType, r.configKey)
 		}
 	}
 

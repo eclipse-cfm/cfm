@@ -34,6 +34,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// testOrchestrationType is an orchestration type without meaning to the engine.
+const testOrchestrationType model.OrchestrationType = "test.orchestration"
+
 func TestNatsProvisionHandler_Dispatcher_SuccessfulDispatch(t *testing.T) {
 	mockClient := mocks.NewMockMsgClient(t)
 	mockProvisionManager := &MockProvisionManager{}
@@ -43,7 +46,7 @@ func TestNatsProvisionHandler_Dispatcher_SuccessfulDispatch(t *testing.T) {
 	ctx := context.Background()
 	manifest := model.OrchestrationManifest{
 		ID:                "test-manifest-id",
-		OrchestrationType: model.VPADeployType,
+		OrchestrationType: testOrchestrationType,
 		Payload:           map[string]any{"key": "value"},
 	}
 
@@ -74,7 +77,7 @@ func TestNatsProvisionHandler_Dispatcher_ValidResponseStructure(t *testing.T) {
 	ctx := context.Background()
 	manifest := model.OrchestrationManifest{
 		ID:                "test-manifest-id",
-		OrchestrationType: model.VPADeployType,
+		OrchestrationType: testOrchestrationType,
 		Payload:           map[string]any{"key": "value"},
 	}
 
@@ -102,7 +105,7 @@ func TestNatsProvisionHandler_Dispatcher_ValidResponseStructure(t *testing.T) {
 	assert.Regexp(t, `^orchestration could not be started \[[0-9a-f-]{36}\]$`, response.ErrorDetail)
 	assert.NotContains(t, response.ErrorDetail, "provision failed")
 	assert.Equal(t, "test-manifest-id", response.ManifestID)
-	assert.Equal(t, model.VPADeployType, response.OrchestrationType)
+	assert.Equal(t, testOrchestrationType, response.OrchestrationType)
 	assert.NotEmpty(t, response.ID) // Should have a generated UUID
 	assert.NotNil(t, response.Properties)
 	assert.Equal(t, 0, len(response.Properties)) // Should be empty map
@@ -130,7 +133,7 @@ func TestNatsProvisionHandler_Dispatcher_ErrorDetail(t *testing.T) {
 			handler := newNatsProvisionHandler(mockClient, mockProvisionManager, system.NoopMonitor{})
 
 			ctx := context.Background()
-			manifest := model.OrchestrationManifest{ID: "test-manifest-id", OrchestrationType: model.VPADeployType}
+			manifest := model.OrchestrationManifest{ID: "test-manifest-id", OrchestrationType: testOrchestrationType}
 			mockProvisionManager.On("Start", ctx, &manifest).Return(nil, tc.error)
 
 			var capturedPayload []byte
@@ -175,7 +178,7 @@ func TestNatsProvisionHandler_Dispatcher_ErrorTypes(t *testing.T) {
 			ctx := context.Background()
 			manifest := model.OrchestrationManifest{
 				ID:                "test-manifest-id",
-				OrchestrationType: model.VPADeployType,
+				OrchestrationType: testOrchestrationType,
 				Payload:           map[string]any{"key": "value"},
 			}
 
@@ -255,7 +258,7 @@ func TestNatsProvisionHandler_Dispatcher_StartErrorIsPublishedToReplyTo(t *testi
 			handler := newNatsProvisionHandler(mockClient, mockProvisionManager, system.NoopMonitor{})
 
 			ctx := context.Background()
-			manifest := model.OrchestrationManifest{ID: "test-manifest-id", OrchestrationType: model.VPADeployType, ReplyTo: tc.replyTo}
+			manifest := model.OrchestrationManifest{ID: "test-manifest-id", OrchestrationType: testOrchestrationType, ReplyTo: tc.replyTo}
 			mockProvisionManager.On("Start", ctx, &manifest).Return(nil, types.NewClientError("orchestration type 'x' not found"))
 
 			var capturedPayload []byte

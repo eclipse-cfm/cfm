@@ -20,6 +20,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// testOrchestrationType is an orchestration type without meaning to the engine.
+const testOrchestrationType model.OrchestrationType = "test.orchestration"
+
 func TestInstantiateOrchestration(t *testing.T) {
 	t.Run("successful instantiation with no dependencies", func(t *testing.T) {
 		orchestrationID := "test-orchestration-123"
@@ -40,7 +43,7 @@ func TestInstantiateOrchestration(t *testing.T) {
 			"key2": 42,
 		}
 
-		orchestration, err := InstantiateOrchestration(orchestrationID, "123", model.VPADeployType, "test-definition-id", definition, data)
+		orchestration, err := InstantiateOrchestration(orchestrationID, "123", testOrchestrationType, "test-definition-id", definition, data)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, orchestration)
@@ -84,7 +87,7 @@ func TestInstantiateOrchestration(t *testing.T) {
 		}
 		data := map[string]any{"test": "data"}
 
-		orchestration, err := InstantiateOrchestration(orchestrationID, "123", model.VPADeployType, "some-definition-id", definition, data)
+		orchestration, err := InstantiateOrchestration(orchestrationID, "123", testOrchestrationType, "some-definition-id", definition, data)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, orchestration)
@@ -135,7 +138,7 @@ func TestInstantiateOrchestration(t *testing.T) {
 		}
 		data := map[string]any{"parallel": "test"}
 
-		orchestration, err := InstantiateOrchestration(orchestrationID, "123", model.VPADeployType, "test-definition-id", definition, data)
+		orchestration, err := InstantiateOrchestration(orchestrationID, "123", testOrchestrationType, "test-definition-id", definition, data)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, orchestration)
@@ -180,7 +183,7 @@ func TestInstantiateOrchestration(t *testing.T) {
 		}
 		data := map[string]any{"cycle": "test"}
 
-		orchestration, err := InstantiateOrchestration(orchestrationID, "123", model.VPADeployType, "test-definition-id", activities, data)
+		orchestration, err := InstantiateOrchestration(orchestrationID, "123", testOrchestrationType, "test-definition-id", activities, data)
 
 		assert.Error(t, err)
 		assert.Nil(t, orchestration)
@@ -192,7 +195,7 @@ func TestInstantiateOrchestration(t *testing.T) {
 		var activities []Activity
 		data := map[string]any{"empty": "test"}
 
-		orchestration, err := InstantiateOrchestration(orchestrationID, "123", model.VPADeployType, "test-activities-id", activities, data)
+		orchestration, err := InstantiateOrchestration(orchestrationID, "123", testOrchestrationType, "test-activities-id", activities, data)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, orchestration)
@@ -211,7 +214,7 @@ func TestInstantiateOrchestration(t *testing.T) {
 			},
 		}
 
-		orchestration, err := InstantiateOrchestration(orchestrationID, "123", model.VPADeployType, "test-definition-id", activities, nil)
+		orchestration, err := InstantiateOrchestration(orchestrationID, "123", testOrchestrationType, "test-definition-id", activities, nil)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, orchestration)
@@ -261,7 +264,7 @@ func TestInstantiateOrchestration(t *testing.T) {
 			},
 		}
 
-		orchestration, err := InstantiateOrchestration(orchestrationID, "123", model.VPADeployType, "test-activities-id", activities, data)
+		orchestration, err := InstantiateOrchestration(orchestrationID, "123", testOrchestrationType, "test-activities-id", activities, data)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, orchestration)
@@ -317,7 +320,7 @@ func TestInstantiateOrchestration(t *testing.T) {
 		}
 		data := map[string]any{"test": "data"}
 
-		orchestration, err1 := InstantiateOrchestration(orchestrationID, "123", model.VPADeployType, "test-activities-id", activities, data)
+		orchestration, err1 := InstantiateOrchestration(orchestrationID, "123", testOrchestrationType, "test-activities-id", activities, data)
 
 		assert.NoError(t, err1)
 		assert.NotNil(t, orchestration)
@@ -335,7 +338,7 @@ func TestInstantiateOrchestration(t *testing.T) {
 		}
 		data := map[string]any{"test": "data"}
 
-		orchestration, err := InstantiateOrchestration(orchestrationID, "123", model.VPADeployType, "test-activities-id", activities, data)
+		orchestration, err := InstantiateOrchestration(orchestrationID, "123", testOrchestrationType, "test-activities-id", activities, data)
 
 		assert.Error(t, err)
 		assert.Nil(t, orchestration)

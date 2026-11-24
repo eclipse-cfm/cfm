@@ -27,7 +27,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	"github.com/stretchr/testify/assert"
@@ -365,7 +365,7 @@ func TestProcessDeploy_DerivesValidDistinctParticipantContextIDs(t *testing.T) {
 	secondID, _ := second.Value(participantContextIDKey)
 	assert.NotEqual(t, firstID, secondID)
 	assert.Len(t, firstID, 32)
-	assert.NoError(t, model.ValidateParticipantContextID(firstID.(string)))
+	assert.NoError(t, dataspace.ValidateParticipantContextID(firstID.(string)))
 }
 
 // The participant context ID must not come from the orchestration payload, which would let a caller point the deploy at

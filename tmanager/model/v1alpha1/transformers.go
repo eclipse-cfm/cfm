@@ -13,7 +13,7 @@
 package v1alpha1
 
 import (
-	"github.com/eclipse-cfm/cfm/common/model"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/types"
 	"github.com/eclipse-cfm/cfm/tmanager/api"
 	"github.com/google/uuid"
@@ -42,9 +42,9 @@ func NewAPITenant(input *NewTenant) *api.Tenant {
 }
 
 func NewAPIDataspaceProfile(input *NewDataspaceProfile) *api.DataspaceProfile {
-	cspecs := make([]model.CredentialSpec, len(input.DataspaceSpec.CredentialSpecs))
+	cspecs := make([]dataspace.CredentialSpec, len(input.DataspaceSpec.CredentialSpecs))
 	for i, cspec := range input.DataspaceSpec.CredentialSpecs {
-		cspecs[i] = model.CredentialSpec{
+		cspecs[i] = dataspace.CredentialSpec{
 			Id:              cspec.Id,
 			Type:            cspec.Type,
 			Issuer:          cspec.Issuer,

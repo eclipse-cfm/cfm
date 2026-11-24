@@ -19,6 +19,7 @@ import (
 
 	"github.com/eclipse-cfm/cfm/agent/common/vpa"
 	"github.com/eclipse-cfm/cfm/common/collection"
+	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/natsfixtures"
 	"github.com/eclipse-cfm/cfm/common/sqlstore"
@@ -96,7 +97,7 @@ func Test_VerifyAutoCompensation(t *testing.T) {
 	newParticipantProfile := v1alpha1.NewParticipantProfileDeployment{
 		Identifier:       "did:web:foo.com",
 		ParticipantRoles: map[string][]string{dProfile.ID: {e2efixtures.OEMRole}},
-		VPAProperties:    map[string]map[string]any{string(model.ConnectorType): {"connectorkey": "connectorvalue"}},
+		VPAProperties:    map[string]map[string]any{string(dataspace.ConnectorType): {"connectorkey": "connectorvalue"}},
 	}
 
 	var participantProfile v1alpha1.ParticipantProfile
@@ -187,7 +188,7 @@ func Test_VerifyAutoCompensation_NoCompensationOrchestration(t *testing.T) {
 	requestBody := pv1alpha1.OrchestrationTemplate{
 		Schema: e2efixtures.DataspaceTemplateSchema(),
 		Activities: map[string][]pv1alpha1.ActivityDto{
-			model.VPADeployType.String(): {{
+			dataspace.VPADeployType.String(): {{
 				ID:   "activity1",
 				Type: "test-activity",
 			}},
@@ -217,7 +218,7 @@ func Test_VerifyAutoCompensation_NoCompensationOrchestration(t *testing.T) {
 	newParticipantProfile := v1alpha1.NewParticipantProfileDeployment{
 		Identifier:       "did:web:foo.com",
 		ParticipantRoles: map[string][]string{dProfile.ID: {e2efixtures.OEMRole}},
-		VPAProperties:    map[string]map[string]any{string(model.ConnectorType): {"connectorkey": "connectorvalue"}},
+		VPAProperties:    map[string]map[string]any{string(dataspace.ConnectorType): {"connectorkey": "connectorvalue"}},
 	}
 
 	var participantProfile v1alpha1.ParticipantProfile
