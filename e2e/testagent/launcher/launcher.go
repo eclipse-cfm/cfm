@@ -13,8 +13,6 @@
 package launcher
 
 import (
-	"github.com/eclipse-cfm/cfm/agent/common/vpa"
-	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/common/runtime"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
@@ -68,21 +66,7 @@ func (t TestActivityProcessor) Process(ctx api.ActivityContext) api.ActivityResu
 }
 
 func processDefault(ctx api.ActivityContext, t TestActivityProcessor) api.ActivityResult {
-	if ctx.Discriminator() == vpa.DisposeDiscriminator {
-		// a disposal request
-		t.monitor.Infof("Processed dispose")
-		return api.ActivityResult{Result: api.ActivityResultComplete}
-	}
 	ctx.SetOutputValue("agent.test.output", "test output")
-
-	var data TestAgentData
-	ctx.ReadValues(&data)
-	ctx.SetOutputValue("agent.test.credentials.received", len(data.CredentialSpecs) > 0)
-
-	t.monitor.Infof("Processed deploy")
+	t.monitor.Infof("Processed %s", ctx.Discriminator())
 	return api.ActivityResult{Result: api.ActivityResultComplete}
-}
-
-type TestAgentData struct {
-	CredentialSpecs []dataspace.CredentialSpec `json:"cfm.vpa.credentials"`
 }

@@ -24,7 +24,6 @@ import (
 	testLauncher "github.com/eclipse-cfm/cfm/e2e/testagent/launcher"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	plauncher "github.com/eclipse-cfm/cfm/pmanager/cmd/server/launcher"
-	tlauncher "github.com/eclipse-cfm/cfm/tmanager/cmd/server/launcher"
 	"github.com/stretchr/testify/require"
 )
 
@@ -34,16 +33,8 @@ const (
 	cfmBucket   = "cfm-bucket"
 )
 
+// launchPlatformWithAgent launches the Provision Manager and the test agent.
 func launchPlatformWithAgent(t *testing.T, natsURI string, pgDsn string) *e2efixtures.ApiClient {
-	return launchPlatformWithAgentEnv(t, natsURI, pgDsn, nil)
-}
-
-// launchPlatformWithAgentEnv launches the platform and test agent with additional environment variables, e.g. NATS
-// credentials for each component. The variables are restored when the test completes.
-func launchPlatformWithAgentEnv(t *testing.T, natsURI string, pgDsn string, env map[string]string) *e2efixtures.ApiClient {
-	for key, value := range env {
-		t.Setenv(key, value)
-	}
 	shutdownChannel, client := launchPlatform(t, natsURI, pgDsn)
 	go func() {
 		testLauncher.Launch(shutdownChannel)
@@ -54,15 +45,6 @@ func launchPlatformWithAgentEnv(t *testing.T, natsURI string, pgDsn string, env 
 
 func launchPlatform(t *testing.T, natsURI string, pgDsn string) (chan struct{}, *e2efixtures.ApiClient) {
 	fixtures.IsolateConfig(t)
-
-	_ = os.Setenv("TM_POSTGRES", "true")
-	_ = os.Setenv("TM_DSN", pgDsn)
-	_ = os.Setenv("TM_URI", natsURI)
-	_ = os.Setenv("TM_NATS_AUTH_ALLOWANONYMOUS", "true")
-	_ = os.Setenv("TM_BUCKET", cfmBucket)
-	_ = os.Setenv("TM_STREAM", streamName)
-	_ = os.Setenv("TM_AUTH_ENABLED", "false")
-	_ = os.Setenv("TM_AUTH_ALLOWDISABLED", "true")
 
 	_ = os.Setenv("PM_POSTGRES", "true")
 	_ = os.Setenv("PM_DSN", pgDsn)
@@ -78,8 +60,6 @@ func launchPlatform(t *testing.T, natsURI string, pgDsn string) (chan struct{}, 
 	_ = os.Setenv("TESTAGENT_BUCKET", cfmBucket)
 	_ = os.Setenv("TESTAGENT_STREAM", streamName)
 
-	tPort := fixtures.GetRandomPort(t)
-	_ = os.Setenv("TM_HTTPPORT", strconv.Itoa(tPort))
 	pPort := fixtures.GetRandomPort(t)
 	_ = os.Setenv("PM_HTTPPORT", strconv.Itoa(pPort))
 
@@ -88,26 +68,7 @@ func launchPlatform(t *testing.T, natsURI string, pgDsn string) (chan struct{}, 
 		plauncher.Launch(shutdownChannel)
 	}()
 
-	go func() {
-		tlauncher.Launch(shutdownChannel)
-	}()
-
-	return shutdownChannel, e2efixtures.NewApiClient(fmt.Sprintf("http://localhost:%d/api/v1alpha1", tPort), fmt.Sprintf("http://localhost:%d/api/v1alpha1", pPort))
-}
-
-func waitTManager(t *testing.T, client *e2efixtures.ApiClient) {
-	var err error
-	for start := time.Now(); time.Since(start) < 5*time.Second; {
-		// Wait until a tenant can be created
-		tenant, createErr := e2efixtures.CreateTenant(client, map[string]any{"group": "suppliers"})
-		if err = createErr; err == nil {
-			err = client.DeleteToTManager(fmt.Sprintf("tenants/%s", tenant.ID))
-			require.NoError(t, err)
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	require.NoError(t, err)
+	return shutdownChannel, e2efixtures.NewApiClient(fmt.Sprintf("http://localhost:%d/api/v1alpha1", pPort))
 }
 
 func waitPManager(t *testing.T, client *e2efixtures.ApiClient) {
@@ -128,12 +89,6 @@ func waitPManager(t *testing.T, client *e2efixtures.ApiClient) {
 }
 
 func cleanup() {
-	_ = os.Unsetenv("TM_URI")
-	_ = os.Unsetenv("TM_NATS_AUTH_ALLOWANONYMOUS")
-	_ = os.Unsetenv("TM_AUTH_ALLOWDISABLED")
-	_ = os.Unsetenv("TM_BUCKET")
-	_ = os.Unsetenv("TM_STREAM")
-
 	_ = os.Unsetenv("PM_URI")
 	_ = os.Unsetenv("PM_NATS_AUTH_ALLOWANONYMOUS")
 	_ = os.Unsetenv("PM_AUTH_ALLOWDISABLED")
@@ -145,6 +100,5 @@ func cleanup() {
 	_ = os.Unsetenv("TESTAGENT_BUCKET")
 	_ = os.Unsetenv("TESTAGENT_STREAM")
 
-	_ = os.Unsetenv("TM_HTTPPORT")
 	_ = os.Unsetenv("PM_HTTPPORT")
 }

@@ -22,14 +22,12 @@ import (
 
 type ApiClient struct {
 	pmanagerBaseUrl string
-	tmanagerBaseUrl string
 	cfmAgentBaseUrl string
 	client          http.Client
 }
 
-func NewApiClient(tmanagerBaseUrl string, pmanagerBaseUrl string) *ApiClient {
+func NewApiClient(pmanagerBaseUrl string) *ApiClient {
 	return &ApiClient{
-		tmanagerBaseUrl: tmanagerBaseUrl,
 		pmanagerBaseUrl: pmanagerBaseUrl,
 		client:          http.Client{},
 	}
@@ -48,39 +46,13 @@ func (c *ApiClient) DeleteToPManager(endpoint string) error {
 	return c.deleteRequest(url)
 }
 
-func (c *ApiClient) PostToTManager(endpoint string, payload any) error {
-	url := fmt.Sprintf("%s/%s", c.tmanagerBaseUrl, endpoint)
-	_, err := c.bodyRequestWithResponse(url, http.MethodPost, payload, nil)
-	return err
-}
-
-func (c *ApiClient) PostToTManagerWithResponse(endpoint string, payload any, result any) error {
-	url := fmt.Sprintf("%s/%s", c.tmanagerBaseUrl, endpoint)
-	return c.postWithResponse(url, payload, result)
-}
-
 func (c *ApiClient) PostToPManagerWithResponse(endpoint string, payload any, result any) error {
 	url := fmt.Sprintf("%s/%s", c.pmanagerBaseUrl, endpoint)
 	return c.postWithResponse(url, payload, result)
 }
 
-func (c *ApiClient) PatchToTManager(endpoint string, payload any) error {
-	url := fmt.Sprintf("%s/%s", c.tmanagerBaseUrl, endpoint)
-	return c.bodyRequest(url, http.MethodPatch, payload, nil)
-}
-
-func (c *ApiClient) GetTManager(endpoint string, result any) error {
-	return c.getRequest(c.tmanagerBaseUrl, endpoint, result)
-}
-
 func (c *ApiClient) GetPManager(endpoint string, result any) error {
 	return c.getRequest(c.pmanagerBaseUrl, endpoint, result)
-}
-
-// DeleteToTManager makes a DELETE request to Tenant Manager API
-func (c *ApiClient) DeleteToTManager(endpoint string) error {
-	url := fmt.Sprintf("%s/%s", c.tmanagerBaseUrl, endpoint)
-	return c.deleteRequest(url)
 }
 
 func (c *ApiClient) postWithResponse(url string, payload any, result any) error {

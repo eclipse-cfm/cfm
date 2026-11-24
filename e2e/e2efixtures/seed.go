@@ -13,20 +13,14 @@
 package e2efixtures
 
 import (
-	"fmt"
-	"time"
-
-	"github.com/eclipse-cfm/cfm/common/dataspace"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
 	pv1alpha1 "github.com/eclipse-cfm/cfm/pmanager/model/v1alpha1"
-	tv1alpha1 "github.com/eclipse-cfm/cfm/tmanager/model/v1alpha1"
 )
 
 const (
-	MembershipCredential = "MembershipCredential"
-	GovernanceCredential = "GovernanceCredential"
-	OEMRole              = "oem"
-	IssuerDID            = "did:web:issuer.com"
+	// DeployType and DisposeType are the orchestration types of the test orchestration definitions
+	DeployType  = "cfm.orchestration.test.deploy"
+	DisposeType = "cfm.orchestration.test.dispose"
 )
 
 func CreateTestActivityDefinition(apiClient *ApiClient) error {
@@ -38,99 +32,23 @@ func CreateTestActivityDefinition(apiClient *ApiClient) error {
 	return apiClient.PostToPManager("activity-definitions", requestBody)
 }
 
-// DataspaceTemplateSchema returns the template schema of a dataspace orchestration template. It declares the fields that
-// tmanager writes into the manifest payload, so that pmanager can validate the activity inputs against them.
-func DataspaceTemplateSchema() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			dataspace.ParticipantIdentifier: map[string]any{"type": "string"},
-			dataspace.VPAData:               map[string]any{"type": "array"},
-			dataspace.CredentialData:        map[string]any{"type": "array"},
-		},
-	}
-}
-
 func CreateTestOrchestrationDefinitions(apiClient *ApiClient) error {
 	requestBody := pv1alpha1.OrchestrationTemplate{
-		Schema: DataspaceTemplateSchema(),
 		Activities: map[string][]pv1alpha1.ActivityDto{
-			dataspace.VPADeployType.String(): {{
+			DeployType: {{
 				ID:   "activity1",
 				Type: "test-activity",
 			}},
-			dataspace.VPADisposeType.String(): {{
+			DisposeType: {{
 				ID:   "activity2",
 				Type: "test-activity",
 			}},
 		},
 		// a failed deployment is rolled back by the dispose orchestration
 		Compensation: map[string]string{
-			dataspace.VPADeployType.String(): dataspace.VPADisposeType.String(),
+			DeployType: DisposeType,
 		},
 	}
 
 	return apiClient.PostToPManager("orchestration-definitions", requestBody)
-}
-
-func CreateCell(apiClient *ApiClient) (*tv1alpha1.Cell, error) {
-	requestBody := tv1alpha1.NewCell{
-		State:          "active",
-		StateTimestamp: time.Time{}.UTC(),
-		Properties:     make(map[string]any),
-	}
-	var cell tv1alpha1.Cell
-	err := apiClient.PostToTManagerWithResponse("cells", requestBody, &cell)
-	if err != nil {
-		return nil, err
-	}
-	return &cell, nil
-}
-
-func CreateTenant(apiClient *ApiClient, properties map[string]any) (*tv1alpha1.Tenant, error) {
-	requestBody := tv1alpha1.NewTenant{Properties: properties}
-	var tenant tv1alpha1.Tenant
-	err := apiClient.PostToTManagerWithResponse("tenants", requestBody, &tenant)
-	if err != nil {
-		return nil, err
-	}
-	return &tenant, nil
-}
-
-func CreateDataspaceProfile(apiClient *ApiClient) (*tv1alpha1.DataspaceProfile, error) {
-	requestBody := tv1alpha1.NewDataspaceProfile{
-		Artifacts:  make([]string, 0),
-		Properties: make(map[string]any),
-		DataspaceSpec: tv1alpha1.DataspaceSpec{
-			ProtocolStack: []string{"dsp-2025-1", "dcp-2025-1"},
-			CredentialSpecs: []tv1alpha1.CredentialSpec{
-				{
-					Id:     "membership-credential",
-					Type:   MembershipCredential,
-					Issuer: IssuerDID,
-					Format: "VC1_0_JWT",
-				},
-				{
-					Id:              "governance-credential",
-					Type:            GovernanceCredential,
-					Issuer:          IssuerDID,
-					Format:          "VC1_0_JWT",
-					ParticipantRole: OEMRole,
-				}},
-		},
-	}
-	var profile tv1alpha1.DataspaceProfile
-	err := apiClient.PostToTManagerWithResponse("dataspace-profiles", requestBody, &profile)
-	if err != nil {
-		return nil, err
-	}
-	return &profile, nil
-}
-
-func DeployDataspaceProfile(deployment tv1alpha1.NewDataspaceProfileDeployment, apiClient *ApiClient) error {
-	err := apiClient.PostToTManager(fmt.Sprintf("dataspace-profiles/%s/deployments", deployment.ProfileID), deployment)
-	if err != nil {
-		return err
-	}
-	return nil
 }

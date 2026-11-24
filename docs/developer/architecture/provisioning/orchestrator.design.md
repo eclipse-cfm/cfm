@@ -232,7 +232,7 @@ The following is an example of an activity agent configuration:
 package launcher
 
 import (
-	"github.com/eclipse-cfm/cfm/agent/orchestration/edcv/activity"
+	"github.com/eclipse-cfm/cfm-dataspace/agent/orchestration/edcv/activity"
 	"github.com/eclipse-cfm/cfm/assembly/httpclient"
 	"github.com/eclipse-cfm/cfm/assembly/serviceapi"
 	"github.com/eclipse-cfm/cfm/assembly/vault"
@@ -291,7 +291,8 @@ func (p ExampleProcessor) Process(ctx api.ActivityContext) api.ActivityResult {
 }
 ```
 
-Agents that deploy and dispose VPAs implement `vpa.DeployDisposeProcessor` from `agent/common/vpa`, which has a
+Agents that deploy and dispose VPAs implement `vpa.DeployDisposeProcessor` from
+[`agent/common/vpa`](https://github.com/eclipse-cfm/cfm-dataspace/tree/main/agent/common/vpa), which has a
 `ProcessDeploy` and a `ProcessDispose` method, and register `vpa.AsActivityProcessor(processor)` as their
 `ActivityProcessor`. It calls `ProcessDeploy` for the VPA deploy orchestration type, `ProcessDispose` for the VPA dispose
 orchestration type, and fails the activity with a fatal error for any other type. `vpa.Properties(ctx, vpaType)` returns
