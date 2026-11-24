@@ -44,7 +44,7 @@ func TestPostgresDefinitionStore_FindOrchestrationDefinition(t *testing.T) {
 
 	_, err := testDB.Exec(
 		"INSERT INTO orchestration_definitions (id, type, version, description, active,templateref) VALUES ($1, $2, $3, $4, $5, $6)",
-		definition.Type,
+		definition.GetID(),
 		definition.Type,
 		definition.Version,
 		definition.Description,
@@ -62,7 +62,7 @@ func TestPostgresDefinitionStore_FindOrchestrationDefinition(t *testing.T) {
 
 	txCtx := context.WithValue(ctx, sqlstore.SQLTransactionKey, tx)
 
-	found, err := store.FindOrchestrationDefinition(txCtx, "provision")
+	found, err := store.FindOrchestrationDefinition(txCtx, model.DefaultNamespace, "provision")
 	require.NoError(t, err)
 	assert.NotNil(t, found)
 	assert.Equal(t, model.OrchestrationType("provision"), found.Type)
@@ -70,7 +70,7 @@ func TestPostgresDefinitionStore_FindOrchestrationDefinition(t *testing.T) {
 	assert.Equal(t, "Test provisioning orchestration", found.Description)
 	assert.Equal(t, true, found.Active)
 
-	exists, err := store.ExistsOrchestrationDefinition(txCtx, "provision")
+	exists, err := store.ExistsOrchestrationDefinition(txCtx, model.DefaultNamespace, "provision")
 	require.NoError(t, err)
 	assert.True(t, exists)
 }
@@ -90,7 +90,7 @@ func TestFindOrchestrationDefinition_NotFound(t *testing.T) {
 	txCtx := context.WithValue(ctx, sqlstore.SQLTransactionKey, tx)
 
 	// Test finding non-existent orchestration definition
-	found, err := store.FindActivityDefinition(txCtx, "non-existent-orchestration")
+	found, err := store.FindActivityDefinition(txCtx, model.DefaultNamespace, "non-existent-orchestration")
 	require.Error(t, err)
 	assert.Nil(t, found)
 	assert.ErrorIs(t, err, types.ErrNotFound)
@@ -143,7 +143,7 @@ func TestPostgresDefinitionStore_FindOrchestrationDefinitionsByPredicate_Type(t 
 	predicate := query.Eq("type", "workflow-v1")
 
 	count := 0
-	for definition, err := range store.FindOrchestrationDefinitionsByPredicate(txCtx, predicate) {
+	for definition, err := range store.FindOrchestrationDefinitionsByPredicate(txCtx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		assert.Equal(t, model.OrchestrationType("workflow-v1"), definition.Type)
 		count++
@@ -199,7 +199,7 @@ func TestPostgresDefinitionStore_FindOrchestrationDefinitionsByPredicate_Active(
 	predicate := query.Eq("active", true)
 
 	count := 0
-	for definition, err := range store.FindOrchestrationDefinitionsByPredicate(txCtx, predicate) {
+	for definition, err := range store.FindOrchestrationDefinitionsByPredicate(txCtx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		assert.True(t, definition.Active)
 		count++
@@ -255,7 +255,7 @@ func TestPostgresDefinitionStore_FindOrchestrationDefinitionsByPredicate_ActiveF
 	predicate := query.Eq("active", false)
 
 	count := 0
-	for definition, err := range store.FindOrchestrationDefinitionsByPredicate(txCtx, predicate) {
+	for definition, err := range store.FindOrchestrationDefinitionsByPredicate(txCtx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		assert.False(t, definition.Active)
 		count++
@@ -315,7 +315,7 @@ func TestPostgresDefinitionStore_FindOrchestrationDefinitionsByPredicate_Activit
 	predicate := query.Eq("activities.type", "dns-provision")
 
 	count := 0
-	for definition, err := range store.FindOrchestrationDefinitionsByPredicate(txCtx, predicate) {
+	for definition, err := range store.FindOrchestrationDefinitionsByPredicate(txCtx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		// Verify at least one activity has type "dns-provision"
 		found := false
@@ -383,7 +383,7 @@ func TestPostgresDefinitionStore_FindOrchestrationDefinitionsByPredicate_Activit
 	predicate := query.Eq("activities.type", "logging")
 
 	count := 0
-	for definition, err := range store.FindOrchestrationDefinitionsByPredicate(txCtx, predicate) {
+	for definition, err := range store.FindOrchestrationDefinitionsByPredicate(txCtx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		// Verify at least one activity has type "logging"
 		found := false
@@ -452,10 +452,10 @@ func TestPostgresDefinitionStore_FindOrchestrationDefinitionsByPredicate_Compoun
 		query.Eq("activities.type", "dns-provision"),
 	)
 
-	results, err := collection.CollectAll(store.FindOrchestrationDefinitionsByPredicate(txCtx, predicate))
+	results, err := collection.CollectAll(store.FindOrchestrationDefinitionsByPredicate(txCtx, model.DefaultNamespace, predicate))
 	require.NoError(t, err)
 	assert.Len(t, results, 1)
-	for definition, err := range store.FindOrchestrationDefinitionsByPredicate(txCtx, predicate) {
+	for definition, err := range store.FindOrchestrationDefinitionsByPredicate(txCtx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		assert.True(t, definition.Active)
 		// Verify at least one activity has type "dns-provision"
@@ -493,7 +493,7 @@ func TestPostgresDefinitionStore_FindOrchestrationDefinitionsByPredicate_NoMatch
 	predicate := query.Eq("type", "nonexistent")
 
 	count := 0
-	for _, err := range store.FindOrchestrationDefinitionsByPredicate(txCtx, predicate) {
+	for _, err := range store.FindOrchestrationDefinitionsByPredicate(txCtx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		count++
 	}
@@ -533,7 +533,7 @@ func TestPostgresDefinitionStore_FindOrchestrationDefinitionsByPredicate_Activit
 	predicate := query.Eq("activities.type", "dns-provision")
 
 	count := 0
-	for _, err := range store.FindOrchestrationDefinitionsByPredicate(txCtx, predicate) {
+	for _, err := range store.FindOrchestrationDefinitionsByPredicate(txCtx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		count++
 	}
@@ -563,7 +563,7 @@ func TestPostgresDefinitionStore_FindActivityDefinition(t *testing.T) {
 
 	_, err = testDB.Exec(
 		"INSERT INTO activity_definitions (id, type, version, description, input_schema, output_schema) VALUES ($1, $2, $3, $4, $5, $6)",
-		definition.Type,
+		definition.GetID(),
 		definition.Type,
 		definition.Version,
 		definition.Description,
@@ -581,7 +581,7 @@ func TestPostgresDefinitionStore_FindActivityDefinition(t *testing.T) {
 
 	txCtx := context.WithValue(ctx, sqlstore.SQLTransactionKey, tx)
 
-	found, err := store.FindActivityDefinition(txCtx, "dns-activation")
+	found, err := store.FindActivityDefinition(txCtx, model.DefaultNamespace, "dns-activation")
 	require.NoError(t, err)
 	assert.NotNil(t, found)
 	assert.Equal(t, api.ActivityType("dns-activation"), found.Type)
@@ -590,7 +590,7 @@ func TestPostgresDefinitionStore_FindActivityDefinition(t *testing.T) {
 	assert.NotNil(t, found.InputSchema)
 	assert.NotNil(t, found.OutputSchema)
 
-	exists, err := store.ExistsActivityDefinition(txCtx, "dns-activation")
+	exists, err := store.ExistsActivityDefinition(txCtx, model.DefaultNamespace, "dns-activation")
 	require.NoError(t, err)
 	assert.True(t, exists)
 
@@ -611,7 +611,7 @@ func TestFindActivityDefinition_NotFound(t *testing.T) {
 	txCtx := context.WithValue(ctx, sqlstore.SQLTransactionKey, tx)
 
 	// Test finding non-existent activity definition
-	found, err := store.FindActivityDefinition(txCtx, "non-existent-activity")
+	found, err := store.FindActivityDefinition(txCtx, model.DefaultNamespace, "non-existent-activity")
 	require.Error(t, err)
 	assert.Nil(t, found)
 	assert.ErrorIs(t, err, types.ErrNotFound)
@@ -658,7 +658,7 @@ func TestPostgresDefinitionStore_FindActivityDefinitionsByPredicate_Type(t *test
 	predicate := query.Eq("type", "email-v1")
 
 	count := 0
-	for definition, err := range store.FindActivityDefinitionsByPredicate(txCtx, predicate) {
+	for definition, err := range store.FindActivityDefinitionsByPredicate(txCtx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		assert.Equal(t, api.ActivityType("email-v1"), definition.Type)
 		count++
@@ -708,7 +708,7 @@ func TestPostgresDefinitionStore_FindActivityDefinitionsByPredicate_Version(t *t
 	predicate := query.Eq("version", int64(1))
 
 	count := 0
-	for definition, err := range store.FindActivityDefinitionsByPredicate(txCtx, predicate) {
+	for definition, err := range store.FindActivityDefinitionsByPredicate(txCtx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		assert.Equal(t, int64(1), definition.Version)
 		count++
@@ -758,7 +758,7 @@ func TestPostgresDefinitionStore_FindActivityDefinitionsByPredicate_Description(
 	predicate := query.Eq("description", "Email notification activity")
 
 	count := 0
-	for definition, err := range store.FindActivityDefinitionsByPredicate(txCtx, predicate) {
+	for definition, err := range store.FindActivityDefinitionsByPredicate(txCtx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		assert.Equal(t, "Email notification activity", definition.Description)
 		count++
@@ -810,10 +810,10 @@ func TestPostgresDefinitionStore_FindActivityDefinitionsByPredicate_CompoundPred
 		query.Eq("description", "Email activity"),
 	)
 
-	results, err := collection.CollectAll(store.FindActivityDefinitionsByPredicate(txCtx, predicate))
+	results, err := collection.CollectAll(store.FindActivityDefinitionsByPredicate(txCtx, model.DefaultNamespace, predicate))
 	require.NoError(t, err)
 	assert.Len(t, results, 1)
-	for definition, err := range store.FindActivityDefinitionsByPredicate(txCtx, predicate) {
+	for definition, err := range store.FindActivityDefinitionsByPredicate(txCtx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		assert.Equal(t, int64(1), definition.Version)
 		assert.Equal(t, "Email activity", definition.Description)
@@ -848,7 +848,7 @@ func TestPostgresDefinitionStore_FindActivityDefinitionsByPredicate_NoMatches(t 
 	predicate := query.Eq("type", "nonexistent-activity")
 
 	count := 0
-	for _, err := range store.FindActivityDefinitionsByPredicate(txCtx, predicate) {
+	for _, err := range store.FindActivityDefinitionsByPredicate(txCtx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		count++
 	}
@@ -897,7 +897,7 @@ func TestPostgresDefinitionStore_FindActivityDefinitionsByPredicate_MultipleMatc
 	predicate := query.Eq("description", "Email notification")
 
 	count := 0
-	for definition, err := range store.FindActivityDefinitionsByPredicate(txCtx, predicate) {
+	for definition, err := range store.FindActivityDefinitionsByPredicate(txCtx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		assert.Equal(t, "Email notification", definition.Description)
 		count++
@@ -933,22 +933,22 @@ func TestPostgresDefinitionStore_DeleteOrchestrationDefinition(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify it exists before deletion
-	exists, err := store.ExistsOrchestrationDefinition(txCtx, "delete-test-orchestration")
+	exists, err := store.ExistsOrchestrationDefinition(txCtx, model.DefaultNamespace, "delete-test-orchestration")
 	require.NoError(t, err)
 	assert.True(t, exists)
 
 	// Delete the orchestration definition
-	deleted, err := store.DeleteOrchestrationDefinition(txCtx, "delete-test-orchestration")
+	deleted, err := store.DeleteOrchestrationDefinition(txCtx, model.DefaultNamespace, "delete-test-orchestration")
 	require.NoError(t, err)
 	assert.True(t, deleted)
 
 	// Verify it no longer exists after deletion
-	exists, err = store.ExistsOrchestrationDefinition(txCtx, "delete-test-orchestration")
+	exists, err = store.ExistsOrchestrationDefinition(txCtx, model.DefaultNamespace, "delete-test-orchestration")
 	require.NoError(t, err)
 	assert.False(t, exists)
 
 	// Verify FindOrchestrationDefinition returns error after deletion
-	found, err := store.FindOrchestrationDefinition(txCtx, "delete-test-orchestration")
+	found, err := store.FindOrchestrationDefinition(txCtx, model.DefaultNamespace, "delete-test-orchestration")
 	require.Error(t, err)
 	assert.Nil(t, found)
 	assert.ErrorIs(t, err, types.ErrNotFound)
@@ -969,7 +969,7 @@ func TestPostgresDefinitionStore_DeleteOrchestrationDefinition_NotFound(t *testi
 	txCtx := context.WithValue(ctx, sqlstore.SQLTransactionKey, tx)
 
 	// Attempt to delete non-existent orchestration definition
-	deleted, err := store.DeleteOrchestrationDefinition(txCtx, "nonexistent-orchestration")
+	deleted, err := store.DeleteOrchestrationDefinition(txCtx, model.DefaultNamespace, "nonexistent-orchestration")
 	require.NoError(t, err)
 	assert.False(t, deleted)
 }
@@ -1019,22 +1019,22 @@ func TestPostgresDefinitionStore_DeleteOrchestrationDefinition_Multiple(t *testi
 	}
 
 	// Delete the second definition
-	deleted, err := store.DeleteOrchestrationDefinition(txCtx, "orchestration-2")
+	deleted, err := store.DeleteOrchestrationDefinition(txCtx, model.DefaultNamespace, "orchestration-2")
 	require.NoError(t, err)
 	assert.True(t, deleted)
 
 	// Verify first definition still exists
-	exists, err := store.ExistsOrchestrationDefinition(txCtx, "orchestration-1")
+	exists, err := store.ExistsOrchestrationDefinition(txCtx, model.DefaultNamespace, "orchestration-1")
 	require.NoError(t, err)
 	assert.True(t, exists)
 
 	// Verify deleted definition does not exist
-	exists, err = store.ExistsOrchestrationDefinition(txCtx, "orchestration-2")
+	exists, err = store.ExistsOrchestrationDefinition(txCtx, model.DefaultNamespace, "orchestration-2")
 	require.NoError(t, err)
 	assert.False(t, exists)
 
 	// Verify third definition still exists
-	exists, err = store.ExistsOrchestrationDefinition(txCtx, "orchestration-3")
+	exists, err = store.ExistsOrchestrationDefinition(txCtx, model.DefaultNamespace, "orchestration-3")
 	require.NoError(t, err)
 	assert.True(t, exists)
 }
@@ -1064,22 +1064,22 @@ func TestPostgresDefinitionStore_DeleteActivityDefinition(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify it exists before deletion
-	exists, err := store.ExistsActivityDefinition(txCtx, "delete-test-activity")
+	exists, err := store.ExistsActivityDefinition(txCtx, model.DefaultNamespace, "delete-test-activity")
 	require.NoError(t, err)
 	assert.True(t, exists)
 
 	// Delete the activity definition
-	deleted, err := store.DeleteActivityDefinition(txCtx, "delete-test-activity")
+	deleted, err := store.DeleteActivityDefinition(txCtx, model.DefaultNamespace, "delete-test-activity")
 	require.NoError(t, err)
 	assert.True(t, deleted)
 
 	// Verify it no longer exists after deletion
-	exists, err = store.ExistsActivityDefinition(txCtx, "delete-test-activity")
+	exists, err = store.ExistsActivityDefinition(txCtx, model.DefaultNamespace, "delete-test-activity")
 	require.NoError(t, err)
 	assert.False(t, exists)
 
 	// Verify FindActivityDefinition returns error after deletion
-	found, err := store.FindActivityDefinition(txCtx, "delete-test-activity")
+	found, err := store.FindActivityDefinition(txCtx, model.DefaultNamespace, "delete-test-activity")
 	require.Error(t, err)
 	assert.Nil(t, found)
 	assert.ErrorIs(t, err, types.ErrNotFound)
@@ -1100,7 +1100,7 @@ func TestPostgresDefinitionStore_DeleteActivityDefinition_NotFound(t *testing.T)
 	txCtx := context.WithValue(ctx, sqlstore.SQLTransactionKey, tx)
 
 	// Attempt to delete non-existent activity definition
-	deleted, err := store.DeleteActivityDefinition(txCtx, "nonexistent-activity")
+	deleted, err := store.DeleteActivityDefinition(txCtx, model.DefaultNamespace, "nonexistent-activity")
 	require.NoError(t, err)
 	assert.False(t, deleted)
 }
@@ -1144,22 +1144,22 @@ func TestPostgresDefinitionStore_DeleteActivityDefinition_Multiple(t *testing.T)
 	}
 
 	// Delete the second definition
-	deleted, err := store.DeleteActivityDefinition(txCtx, "activity-2")
+	deleted, err := store.DeleteActivityDefinition(txCtx, model.DefaultNamespace, "activity-2")
 	require.NoError(t, err)
 	assert.True(t, deleted)
 
 	// Verify first definition still exists
-	exists, err := store.ExistsActivityDefinition(txCtx, "activity-1")
+	exists, err := store.ExistsActivityDefinition(txCtx, model.DefaultNamespace, "activity-1")
 	require.NoError(t, err)
 	assert.True(t, exists)
 
 	// Verify deleted definition does not exist
-	exists, err = store.ExistsActivityDefinition(txCtx, "activity-2")
+	exists, err = store.ExistsActivityDefinition(txCtx, model.DefaultNamespace, "activity-2")
 	require.NoError(t, err)
 	assert.False(t, exists)
 
 	// Verify third definition still exists
-	exists, err = store.ExistsActivityDefinition(txCtx, "activity-3")
+	exists, err = store.ExistsActivityDefinition(txCtx, model.DefaultNamespace, "activity-3")
 	require.NoError(t, err)
 	assert.True(t, exists)
 }
@@ -1216,7 +1216,7 @@ func TestPostgresDefinitionStore_ListOrchestrationDefinitions(t *testing.T) {
 	}
 
 	// List all orchestration definitions
-	definitions, err := store.ListOrchestrationDefinitions(txCtx)
+	definitions, err := store.ListOrchestrationDefinitions(txCtx, model.DefaultNamespace)
 	require.NoError(t, err)
 	assert.Len(t, definitions, 3)
 
@@ -1265,7 +1265,7 @@ func TestPostgresDefinitionStore_ListOrchestrationDefinitions_Empty(t *testing.T
 	txCtx := context.WithValue(ctx, sqlstore.SQLTransactionKey, tx)
 
 	// List orchestration definitions when none exist
-	definitions, err := store.ListOrchestrationDefinitions(txCtx)
+	definitions, err := store.ListOrchestrationDefinitions(txCtx, model.DefaultNamespace)
 	require.NoError(t, err)
 	assert.Empty(t, definitions)
 }
@@ -1311,7 +1311,7 @@ func TestPostgresDefinitionStore_ListActivityDefinitions(t *testing.T) {
 	}
 
 	// List all activity definitions
-	definitions, err := store.ListActivityDefinitions(txCtx)
+	definitions, err := store.ListActivityDefinitions(txCtx, model.DefaultNamespace)
 	require.NoError(t, err)
 	assert.Len(t, definitions, 3)
 
@@ -1358,7 +1358,7 @@ func TestPostgresDefinitionStore_ListActivityDefinitions_Empty(t *testing.T) {
 	txCtx := context.WithValue(ctx, sqlstore.SQLTransactionKey, tx)
 
 	// List activity definitions when none exist
-	definitions, err := store.ListActivityDefinitions(txCtx)
+	definitions, err := store.ListActivityDefinitions(txCtx, model.DefaultNamespace)
 	require.NoError(t, err)
 	assert.Empty(t, definitions)
 }
@@ -1412,7 +1412,7 @@ func TestPostgresDefinitionStore_ActivityDefinitionReferences(t *testing.T) {
 	}
 
 	// Find all orchestrations that reference the email activity
-	references, err := store.ActivityDefinitionReferences(txCtx, "dns-provision")
+	references, err := store.ActivityDefinitionReferences(txCtx, model.DefaultNamespace, "dns-provision")
 	require.NoError(t, err)
 	assert.Len(t, references, 2)
 
@@ -1466,7 +1466,7 @@ func TestPostgresDefinitionStore_ActivityDefinitionReferences_SingleReference(t 
 	}
 
 	// Find orchestrations that reference the sms activity
-	references, err := store.ActivityDefinitionReferences(txCtx, "sms")
+	references, err := store.ActivityDefinitionReferences(txCtx, model.DefaultNamespace, "sms")
 	require.NoError(t, err)
 	assert.Len(t, references, 1)
 	assert.Equal(t, "orchestration-sms-only", references[0])
@@ -1511,7 +1511,7 @@ func TestPostgresDefinitionStore_ActivityDefinitionReferences_NoReferences(t *te
 	}
 
 	// Find orchestrations that reference the email activity (should find nothing)
-	references, err := store.ActivityDefinitionReferences(txCtx, "dns-provision")
+	references, err := store.ActivityDefinitionReferences(txCtx, model.DefaultNamespace, "dns-provision")
 	require.NoError(t, err)
 	assert.Empty(t, references)
 }
@@ -1531,7 +1531,7 @@ func TestPostgresDefinitionStore_ActivityDefinitionReferences_EmptyOrchestration
 	txCtx := context.WithValue(ctx, sqlstore.SQLTransactionKey, tx)
 
 	// Find references when no orchestrations exist
-	references, err := store.ActivityDefinitionReferences(txCtx, "dns-provision")
+	references, err := store.ActivityDefinitionReferences(txCtx, model.DefaultNamespace, "dns-provision")
 	require.NoError(t, err)
 	assert.Empty(t, references)
 }
@@ -1568,7 +1568,7 @@ func TestPostgresDefinitionStore_ActivityDefinitionReferences_MultipleActivities
 
 	// Verify the orchestration is found for each activity type
 	for _, activityType := range []string{"dns-provision", "sms", "logging", "webhook"} {
-		references, err := store.ActivityDefinitionReferences(txCtx, api.ActivityType(activityType))
+		references, err := store.ActivityDefinitionReferences(txCtx, model.DefaultNamespace, api.ActivityType(activityType))
 		require.NoError(t, err)
 		assert.Len(t, references, 1)
 		assert.Equal(t, "multi-activity-orchestration", references[0])
@@ -1614,7 +1614,7 @@ func TestPostgresDefinitionStore_ActivityDefinitionReferences_ActiveAndInactive(
 	}
 
 	// Find references - should include both active and inactive
-	references, err := store.ActivityDefinitionReferences(txCtx, "dns-provision")
+	references, err := store.ActivityDefinitionReferences(txCtx, model.DefaultNamespace, "dns-provision")
 	require.NoError(t, err)
 	assert.Len(t, references, 2)
 

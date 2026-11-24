@@ -36,27 +36,32 @@ const (
 )
 
 // ProvisionManager handles orchestration execution and resource management.
+//
+// An orchestration belongs to the namespace of the manifest that started it. The methods that read orchestrations only
+// return orchestrations of the given namespace. An empty namespace is model.DefaultNamespace.
 type ProvisionManager interface {
 
-	// Start initializes a new orchestration and starts its execution.
+	// Start initializes a new orchestration and starts its execution, using the definitions of the namespace of the
+	// manifest. A manifest without a namespace is started in model.DefaultNamespace.
 	// If a recoverable error is encountered one of model.RecoverableError, model.ClientError, or model.FatalError will be returned.
 	Start(ctx context.Context, manifest *model.OrchestrationManifest) (*Orchestration, error)
 
 	// Cancel terminates an orchestration execution.
 	// If a recoverable error is encountered one of model.RecoverableError, model.ClientError, or model.FatalError will be returned.
-	Cancel(ctx context.Context, orchestrationID string) error
+	Cancel(ctx context.Context, namespace string, orchestrationID string) error
 
-	// GetOrchestration returns an orchestration by its ID or nil if not found.
-	GetOrchestration(ctx context.Context, orchestrationID string) (*Orchestration, error)
+	// GetOrchestration returns the orchestration of the namespace with the given ID, or nil if not found.
+	GetOrchestration(ctx context.Context, namespace string, orchestrationID string) (*Orchestration, error)
 
-	// QueryOrchestrations returns a sequence of orchestration entries matching the given predicate.
+	// QueryOrchestrations returns a sequence of the orchestration entries of the namespace matching the given predicate.
 	QueryOrchestrations(
 		ctx context.Context,
+		namespace string,
 		predicate query.Predicate,
 		options store.PaginationOptions) iter.Seq2[*OrchestrationEntry, error]
 
-	// CountOrchestrations returns the number of orchestrations matching the given predicate.
-	CountOrchestrations(ctx context.Context, predicate query.Predicate) (int64, error)
+	// CountOrchestrations returns the number of orchestrations of the namespace matching the given predicate.
+	CountOrchestrations(ctx context.Context, namespace string, predicate query.Predicate) (int64, error)
 }
 
 // Orchestrator manages asynchronous execution of orchestrations.
@@ -153,16 +158,20 @@ type ActivityContext interface {
 	Context() context.Context
 }
 
+// DefinitionManager manages the orchestration and activity definitions of each namespace. An orchestration definition
+// can only use the activity definitions of its own namespace. An empty namespace is model.DefaultNamespace.
 type DefinitionManager interface {
+	// CreateOrchestrationDefinition stores the definition in its namespace
 	CreateOrchestrationDefinition(ctx context.Context, definition *OrchestrationDefinition) (*OrchestrationDefinition, error)
-	DeleteOrchestrationDefinition(ctx context.Context, templateRef string) error
-	GetOrchestrationDefinitions(ctx context.Context) ([]OrchestrationDefinition, error)
-	GetOrchestrationDefinitionsByTemplate(ctx context.Context, templateRef string) ([]OrchestrationDefinition, error)
-	QueryOrchestrationDefinitions(ctx context.Context, predicate query.Predicate) ([]OrchestrationDefinition, error)
+	DeleteOrchestrationDefinition(ctx context.Context, namespace string, templateRef string) error
+	GetOrchestrationDefinitions(ctx context.Context, namespace string) ([]OrchestrationDefinition, error)
+	GetOrchestrationDefinitionsByTemplate(ctx context.Context, namespace string, templateRef string) ([]OrchestrationDefinition, error)
+	QueryOrchestrationDefinitions(ctx context.Context, namespace string, predicate query.Predicate) ([]OrchestrationDefinition, error)
 
+	// CreateActivityDefinition stores the definition in its namespace
 	CreateActivityDefinition(ctx context.Context, definition *ActivityDefinition) (*ActivityDefinition, error)
-	DeleteActivityDefinition(ctx context.Context, atype ActivityType) error
-	GetActivityDefinitions(ctx context.Context) ([]ActivityDefinition, error)
+	DeleteActivityDefinition(ctx context.Context, namespace string, atype ActivityType) error
+	GetActivityDefinitions(ctx context.Context, namespace string) ([]ActivityDefinition, error)
 }
 
 type defaultActivityContext struct {

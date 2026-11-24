@@ -735,3 +735,22 @@ func TestToOrchestrationDefinition_CompensationType(t *testing.T) {
 		}
 	}
 }
+
+func TestTransformers_Namespace(t *testing.T) {
+	activity := ToActivityDefinition(&ActivityDefinitionDto{Namespace: "second", Type: "test-activity"})
+	assert.Equal(t, "second", activity.Namespace)
+	assert.Equal(t, "second", ToActivityDefinitionDto(activity).Namespace)
+
+	_, definitions := ToOrchestrationDefinition(&OrchestrationTemplate{
+		Namespace:  "second",
+		Activities: map[string][]ActivityDto{"test.deploy": {{ID: "a1", Type: "test-activity"}}},
+	})
+	require.Len(t, definitions, 1)
+	assert.Equal(t, "second", definitions[0].Namespace)
+	assert.Equal(t, "second", ToOrchestrationDefinitionDto(definitions[0]).Namespace)
+
+	// an orchestration or entry stored without a namespace is in the default namespace
+	assert.Equal(t, model.DefaultNamespace, ToOrchestration(&api.Orchestration{}).Namespace)
+	assert.Equal(t, "second", ToOrchestration(&api.Orchestration{Namespace: "second"}).Namespace)
+	assert.Equal(t, model.DefaultNamespace, ToOrchestrationEntry(&api.OrchestrationEntry{}).Namespace)
+}

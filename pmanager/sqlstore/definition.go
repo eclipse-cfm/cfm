@@ -44,7 +44,7 @@ func newPostgresDefinitionStore() api.DefinitionStore {
 }
 
 func newOrchestrationStore() store.EntityStore[*api.OrchestrationDefinition] {
-	columnNames := []string{"id", "type", "version", "description", "active", "schema", "activities", "templateref", "compensation_type"}
+	columnNames := []string{"id", "namespace", "type", "version", "description", "active", "schema", "activities", "templateref", "compensation_type"}
 	builder := sqlstore.NewPostgresJSONBBuilder().WithJSONBFieldTypes(map[string]sqlstore.JSONBFieldType{
 		"schema":     sqlstore.JSONBFieldTypeArrayOfObjects,
 		"activities": sqlstore.JSONBFieldTypeArrayOfObjects,
@@ -64,7 +64,7 @@ func newOrchestrationStore() store.EntityStore[*api.OrchestrationDefinition] {
 }
 
 func newActivityStore() store.EntityStore[*api.ActivityDefinition] {
-	columnNames := []string{"id", "type", "version", "description", "input_schema", "output_schema"}
+	columnNames := []string{"id", "namespace", "type", "version", "description", "input_schema", "output_schema"}
 	builder := sqlstore.NewPostgresJSONBBuilder().WithJSONBFieldTypes(map[string]sqlstore.JSONBFieldType{
 		"inputSchema":  sqlstore.JSONBFieldTypeArrayOfObjects,
 		"outputSchema": sqlstore.JSONBFieldTypeArrayOfObjects,
@@ -87,18 +87,20 @@ func newActivityStore() store.EntityStore[*api.ActivityDefinition] {
 // FindOrchestrationDefinition retrieves the OrchestrationDefinition associated with the given type
 func (p *PostgresDefinitionStore) FindOrchestrationDefinition(
 	ctx context.Context,
+	namespace string,
 	orchestrationType model.OrchestrationType,
 ) (*api.OrchestrationDefinition, error) {
-	return p.orchestrationStore.FindByID(ctx, string(orchestrationType))
+	return p.orchestrationStore.FindByID(ctx, api.DefinitionKey(namespace, orchestrationType.String()))
 }
 
 // FindOrchestrationDefinitionsByPredicate retrieves OrchestrationDefinition instances matching the given predicate
 func (p *PostgresDefinitionStore) FindOrchestrationDefinitionsByPredicate(
 	ctx context.Context,
+	namespace string,
 	predicate query.Predicate,
 ) iter.Seq2[api.OrchestrationDefinition, error] {
 	return func(yield func(api.OrchestrationDefinition, error) bool) {
-		for definition, err := range p.orchestrationStore.FindByPredicate(ctx, predicate) {
+		for definition, err := range p.orchestrationStore.FindByPredicate(ctx, namespacePredicate(namespace, predicate)) {
 			if definition == nil {
 				if !yield(api.OrchestrationDefinition{}, err) {
 					return
@@ -115,26 +117,29 @@ func (p *PostgresDefinitionStore) FindOrchestrationDefinitionsByPredicate(
 // ExistsOrchestrationDefinition returns true if an OrchestrationDefinition exists for the given type
 func (p *PostgresDefinitionStore) ExistsOrchestrationDefinition(
 	ctx context.Context,
+	namespace string,
 	orchestrationType model.OrchestrationType,
 ) (bool, error) {
-	return p.orchestrationStore.Exists(ctx, string(orchestrationType))
+	return p.orchestrationStore.Exists(ctx, api.DefinitionKey(namespace, orchestrationType.String()))
 }
 
 // FindActivityDefinition retrieves the ActivityDefinition associated with the given type
 func (p *PostgresDefinitionStore) FindActivityDefinition(
 	ctx context.Context,
+	namespace string,
 	activityType api.ActivityType,
 ) (*api.ActivityDefinition, error) {
-	return p.activityStore.FindByID(ctx, string(activityType))
+	return p.activityStore.FindByID(ctx, api.DefinitionKey(namespace, activityType.String()))
 }
 
 // FindActivityDefinitionsByPredicate retrieves ActivityDefinition instances matching the given predicate
 func (p *PostgresDefinitionStore) FindActivityDefinitionsByPredicate(
 	ctx context.Context,
+	namespace string,
 	predicate query.Predicate,
 ) iter.Seq2[api.ActivityDefinition, error] {
 	return func(yield func(api.ActivityDefinition, error) bool) {
-		for definition, err := range p.activityStore.FindByPredicate(ctx, predicate) {
+		for definition, err := range p.activityStore.FindByPredicate(ctx, namespacePredicate(namespace, predicate)) {
 			if definition == nil {
 				if !yield(api.ActivityDefinition{}, err) {
 					return
@@ -151,9 +156,10 @@ func (p *PostgresDefinitionStore) FindActivityDefinitionsByPredicate(
 // ExistsActivityDefinition returns true if an ActivityDefinition exists for the given type
 func (p *PostgresDefinitionStore) ExistsActivityDefinition(
 	ctx context.Context,
+	namespace string,
 	activityType api.ActivityType,
 ) (bool, error) {
-	return p.activityStore.Exists(ctx, string(activityType))
+	return p.activityStore.Exists(ctx, api.DefinitionKey(namespace, activityType.String()))
 }
 
 // StoreOrchestrationDefinition saves or updates an OrchestrationDefinition
@@ -203,9 +209,10 @@ func (p *PostgresDefinitionStore) StoreActivityDefinition(
 // DeleteOrchestrationDefinition removes an OrchestrationDefinition for the given type
 func (p *PostgresDefinitionStore) DeleteOrchestrationDefinition(
 	ctx context.Context,
+	namespace string,
 	orchestrationType model.OrchestrationType,
 ) (bool, error) {
-	err := p.orchestrationStore.Delete(ctx, string(orchestrationType))
+	err := p.orchestrationStore.Delete(ctx, api.DefinitionKey(namespace, orchestrationType.String()))
 	if err != nil {
 		if errors.Is(err, types.ErrNotFound) {
 			return false, nil
@@ -218,9 +225,10 @@ func (p *PostgresDefinitionStore) DeleteOrchestrationDefinition(
 // DeleteActivityDefinition removes an ActivityDefinition for the given type
 func (p *PostgresDefinitionStore) DeleteActivityDefinition(
 	ctx context.Context,
+	namespace string,
 	activityType api.ActivityType,
 ) (bool, error) {
-	err := p.activityStore.Delete(ctx, string(activityType))
+	err := p.activityStore.Delete(ctx, api.DefinitionKey(namespace, activityType.String()))
 	if err != nil {
 		if errors.Is(err, types.ErrNotFound) {
 			return false, nil
@@ -233,12 +241,13 @@ func (p *PostgresDefinitionStore) DeleteActivityDefinition(
 // ActivityDefinitionReferences returns references to an activity definition
 func (p *PostgresDefinitionStore) ActivityDefinitionReferences(
 	ctx context.Context,
+	namespace string,
 	activityType api.ActivityType,
 ) ([]string, error) {
 
 	var references []string
 
-	for ref, err := range p.orchestrationStore.FindByPredicate(ctx, query.Eq("activities.type", activityType.String())) {
+	for ref, err := range p.orchestrationStore.FindByPredicate(ctx, namespacePredicate(namespace, query.Eq("activities.type", activityType.String()))) {
 		if err != nil {
 			return nil, err
 		}
@@ -254,15 +263,27 @@ func (p *PostgresDefinitionStore) ActivityDefinitionReferences(
 // ListOrchestrationDefinitions returns all OrchestrationDefinition instances
 func (p *PostgresDefinitionStore) ListOrchestrationDefinitions(
 	ctx context.Context,
+	namespace string,
 ) ([]api.OrchestrationDefinition, error) {
-	return collection.CollectAllDeref(p.orchestrationStore.GetAll(ctx))
+	return collection.CollectAllDeref(p.orchestrationStore.FindByPredicate(ctx, namespacePredicate(namespace, nil)))
 }
 
 // ListActivityDefinitions returns all ActivityDefinition instances
 func (p *PostgresDefinitionStore) ListActivityDefinitions(
 	ctx context.Context,
+	namespace string,
 ) ([]api.ActivityDefinition, error) {
-	return collection.CollectAllDeref(p.activityStore.GetAll(ctx))
+	return collection.CollectAllDeref(p.activityStore.FindByPredicate(ctx, namespacePredicate(namespace, nil)))
+}
+
+// namespacePredicate restricts the predicate to the definitions of the namespace. A nil predicate matches every
+// definition of the namespace.
+func namespacePredicate(namespace string, predicate query.Predicate) query.Predicate {
+	namespaceEq := query.Eq("namespace", model.NamespaceOrDefault(namespace))
+	if predicate == nil {
+		return namespaceEq
+	}
+	return query.And(namespaceEq, predicate)
 }
 
 func orchestrationEntityToRecord(definition *api.OrchestrationDefinition) (*sqlstore.DatabaseRecord, error) {
@@ -270,7 +291,8 @@ func orchestrationEntityToRecord(definition *api.OrchestrationDefinition) (*sqls
 		Values: make(map[string]any),
 	}
 
-	record.Values["id"] = definition.Type
+	record.Values["id"] = definition.GetID()
+	record.Values["namespace"] = model.NamespaceOrDefault(definition.Namespace)
 	record.Values["type"] = definition.Type
 	record.Values["version"] = definition.Version
 	record.Values["description"] = definition.Description
@@ -303,6 +325,11 @@ func orchestrationEntityToRecord(definition *api.OrchestrationDefinition) (*sqls
 
 func recordToOrchestrationEntity(tx *sql.Tx, record *sqlstore.DatabaseRecord) (*api.OrchestrationDefinition, error) {
 	definition := &api.OrchestrationDefinition{}
+	if namespace, ok := record.Values["namespace"].(string); ok {
+		definition.Namespace = namespace
+	} else {
+		return nil, fmt.Errorf("invalid orchestration definition namespace reading record")
+	}
 	if otype, ok := record.Values["type"].(string); ok {
 		definition.Type = model.OrchestrationType(otype)
 	} else {
@@ -357,7 +384,8 @@ func activityEntityToRecord(definition *api.ActivityDefinition) (*sqlstore.Datab
 		Values: make(map[string]any),
 	}
 
-	record.Values["id"] = definition.Type
+	record.Values["id"] = definition.GetID()
+	record.Values["namespace"] = model.NamespaceOrDefault(definition.Namespace)
 	record.Values["type"] = definition.Type
 	record.Values["version"] = definition.Version
 	record.Values["description"] = definition.Description
@@ -383,6 +411,11 @@ func activityEntityToRecord(definition *api.ActivityDefinition) (*sqlstore.Datab
 
 func recordToActivityEntity(tx *sql.Tx, record *sqlstore.DatabaseRecord) (*api.ActivityDefinition, error) {
 	definition := &api.ActivityDefinition{}
+	if namespace, ok := record.Values["namespace"].(string); ok {
+		definition.Namespace = namespace
+	} else {
+		return nil, fmt.Errorf("invalid activity definition namespace reading record")
+	}
 	if otype, ok := record.Values["type"].(string); ok {
 		definition.Type = api.ActivityType(otype)
 	} else {

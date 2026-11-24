@@ -31,7 +31,7 @@ func TestFindOrchestrationDefinitionsByPredicate_EmptyStore(t *testing.T) {
 	predicate := query.Eq("Active", true)
 
 	results := make([]api.OrchestrationDefinition, 0)
-	for def, err := range store.FindOrchestrationDefinitionsByPredicate(ctx, predicate) {
+	for def, err := range store.FindOrchestrationDefinitionsByPredicate(ctx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		results = append(results, def)
 	}
@@ -63,7 +63,7 @@ func TestFindOrchestrationDefinitionsByPredicate_SingleMatch(t *testing.T) {
 	predicate := query.Eq("Active", true)
 
 	results := make([]api.OrchestrationDefinition, 0)
-	for def, err := range store.FindOrchestrationDefinitionsByPredicate(ctx, predicate) {
+	for def, err := range store.FindOrchestrationDefinitionsByPredicate(ctx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		results = append(results, def)
 	}
@@ -90,7 +90,7 @@ func TestFindOrchestrationDefinitionsByPredicate_MultipleMatches(t *testing.T) {
 	predicate := query.Eq("Active", true)
 
 	results := make([]api.OrchestrationDefinition, 0)
-	for def, err := range store.FindOrchestrationDefinitionsByPredicate(ctx, predicate) {
+	for def, err := range store.FindOrchestrationDefinitionsByPredicate(ctx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		results = append(results, def)
 	}
@@ -116,7 +116,7 @@ func TestFindOrchestrationDefinitionsByPredicate_NoMatches(t *testing.T) {
 	predicate := query.Eq("Active", true)
 
 	results := make([]api.OrchestrationDefinition, 0)
-	for def, err := range store.FindOrchestrationDefinitionsByPredicate(ctx, predicate) {
+	for def, err := range store.FindOrchestrationDefinitionsByPredicate(ctx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		results = append(results, def)
 	}
@@ -139,7 +139,7 @@ func TestFindOrchestrationDefinitionsByPredicate_DataIsolation(t *testing.T) {
 	predicate := query.IsNotNull("Type")
 
 	results := make([]api.OrchestrationDefinition, 0)
-	for def, err := range store.FindOrchestrationDefinitionsByPredicate(ctx, predicate) {
+	for def, err := range store.FindOrchestrationDefinitionsByPredicate(ctx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		results = append(results, def)
 	}
@@ -148,7 +148,7 @@ func TestFindOrchestrationDefinitionsByPredicate_DataIsolation(t *testing.T) {
 
 	results[0].Type = "modified-type"
 
-	storedDef, err := store.FindOrchestrationDefinition(ctx, oType)
+	storedDef, err := store.FindOrchestrationDefinition(ctx, model.DefaultNamespace, oType)
 	require.NoError(t, err)
 	assert.Equal(t, oType, storedDef.Type)
 }
@@ -161,7 +161,7 @@ func TestFindActivityDefinitionsByPredicate_EmptyStore(t *testing.T) {
 	predicate := query.IsNotNull("Type")
 
 	results := make([]api.ActivityDefinition, 0)
-	for def, err := range store.FindActivityDefinitionsByPredicate(ctx, predicate) {
+	for def, err := range store.FindActivityDefinitionsByPredicate(ctx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		results = append(results, def)
 	}
@@ -191,7 +191,7 @@ func TestFindActivityDefinitionsByPredicate_SingleMatch(t *testing.T) {
 	predicate := query.Contains("Description", "Deploy")
 
 	results := make([]api.ActivityDefinition, 0)
-	for def, err := range store.FindActivityDefinitionsByPredicate(ctx, predicate) {
+	for def, err := range store.FindActivityDefinitionsByPredicate(ctx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		results = append(results, def)
 	}
@@ -218,7 +218,7 @@ func TestFindActivityDefinitionsByPredicate_MultipleMatches(t *testing.T) {
 	predicate := query.IsNotNull("Type")
 
 	results := make([]api.ActivityDefinition, 0)
-	for def, err := range store.FindActivityDefinitionsByPredicate(ctx, predicate) {
+	for def, err := range store.FindActivityDefinitionsByPredicate(ctx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		results = append(results, def)
 	}
@@ -241,7 +241,7 @@ func TestFindActivityDefinitionsByPredicate_NoMatches(t *testing.T) {
 	predicate := query.Contains("Description", "NonExistent")
 
 	results := make([]api.ActivityDefinition, 0)
-	for def, err := range store.FindActivityDefinitionsByPredicate(ctx, predicate) {
+	for def, err := range store.FindActivityDefinitionsByPredicate(ctx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		results = append(results, def)
 	}
@@ -264,7 +264,7 @@ func TestFindActivityDefinitionsByPredicate_DataIsolation(t *testing.T) {
 	predicate := query.IsNotNull("Type")
 
 	results := make([]api.ActivityDefinition, 0)
-	for def, err := range store.FindActivityDefinitionsByPredicate(ctx, predicate) {
+	for def, err := range store.FindActivityDefinitionsByPredicate(ctx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		results = append(results, def)
 	}
@@ -273,7 +273,7 @@ func TestFindActivityDefinitionsByPredicate_DataIsolation(t *testing.T) {
 
 	results[0].Description = "modified-description"
 
-	storedDef, err := store.FindActivityDefinition(ctx, actType)
+	storedDef, err := store.FindActivityDefinition(ctx, model.DefaultNamespace, actType)
 	require.NoError(t, err)
 	assert.Equal(t, "Test Activity", storedDef.Description)
 }
@@ -310,7 +310,7 @@ func TestFindOrchestrationDefinitionsByPredicate_CompoundPredicate_AND(t *testin
 	)
 
 	results := make([]api.OrchestrationDefinition, 0)
-	for def, err := range store.FindOrchestrationDefinitionsByPredicate(ctx, predicate) {
+	for def, err := range store.FindOrchestrationDefinitionsByPredicate(ctx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		results = append(results, def)
 	}
@@ -354,7 +354,7 @@ func TestFindOrchestrationDefinitionsByPredicate_CompoundPredicate_OR(t *testing
 	)
 
 	results := make([]api.OrchestrationDefinition, 0)
-	for def, err := range store.FindOrchestrationDefinitionsByPredicate(ctx, predicate) {
+	for def, err := range store.FindOrchestrationDefinitionsByPredicate(ctx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		results = append(results, def)
 	}
@@ -392,7 +392,7 @@ func TestFindActivityDefinitionsByPredicate_CompoundPredicate_AND(t *testing.T) 
 	)
 
 	results := make([]api.ActivityDefinition, 0)
-	for def, err := range store.FindActivityDefinitionsByPredicate(ctx, predicate) {
+	for def, err := range store.FindActivityDefinitionsByPredicate(ctx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		results = append(results, def)
 	}
@@ -431,7 +431,7 @@ func TestFindActivityDefinitionsByPredicate_CompoundPredicate_OR(t *testing.T) {
 	)
 
 	results := make([]api.ActivityDefinition, 0)
-	for def, err := range store.FindActivityDefinitionsByPredicate(ctx, predicate) {
+	for def, err := range store.FindActivityDefinitionsByPredicate(ctx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		results = append(results, def)
 	}
@@ -458,7 +458,7 @@ func TestFindOrchestrationDefinitionsByPredicate_In(t *testing.T) {
 	)
 
 	results := make([]api.OrchestrationDefinition, 0)
-	for def, err := range store.FindOrchestrationDefinitionsByPredicate(ctx, predicate) {
+	for def, err := range store.FindOrchestrationDefinitionsByPredicate(ctx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		results = append(results, def)
 	}
@@ -483,7 +483,7 @@ func TestFindActivityDefinitionsByPredicate_StartsWith(t *testing.T) {
 	predicate := query.StartsWith("Type", "create")
 
 	results := make([]api.ActivityDefinition, 0)
-	for def, err := range store.FindActivityDefinitionsByPredicate(ctx, predicate) {
+	for def, err := range store.FindActivityDefinitionsByPredicate(ctx, model.DefaultNamespace, predicate) {
 		require.NoError(t, err)
 		results = append(results, def)
 	}

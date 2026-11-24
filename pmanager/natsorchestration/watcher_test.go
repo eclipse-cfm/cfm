@@ -157,7 +157,7 @@ func TestOnMessage_ErroredStateUpdate(t *testing.T) {
 	pManager := &mocks.MockProvisionManager{}
 	pManager.On("Start", mock.Anything, mock.Anything).Return(&api.Orchestration{}, nil)
 	manager := mocks.MockDefinitionManager{}
-	manager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{}, nil)
+	manager.On("QueryOrchestrationDefinitions", mock.Anything, model.DefaultNamespace, mock.Anything).Return([]api.OrchestrationDefinition{}, nil)
 	watcher := createTestWatcher(index, trxContext, pManager, &manager)
 
 	ctx := context.Background()
@@ -220,13 +220,61 @@ func TestOnMessage_CompensationUsesReplyToOfFailedOrchestration(t *testing.T) {
 	pManager.AssertExpectations(t)
 }
 
+// The compensation runs in the namespace of the failed orchestration, with the definitions of that namespace
+func TestOnMessage_CompensationUsesNamespaceOfFailedOrchestration(t *testing.T) {
+	index := createTestStore(t)
+	trxContext := &store.NoOpTransactionContext{}
+	pManager := &mocks.MockProvisionManager{}
+	pManager.On("Start", mock.Anything, mock.MatchedBy(func(manifest *model.OrchestrationManifest) bool {
+		return manifest.CompensatedManifestID == "orch-1" && manifest.Namespace == "second"
+	})).Return(&api.Orchestration{}, nil).Once()
+	manager := &mocks.MockDefinitionManager{}
+	manager.On("QueryOrchestrationDefinitions", mock.Anything, "second", mock.Anything).Return([]api.OrchestrationDefinition{
+		{Namespace: "second", Type: "TestType", TemplateRef: "template-1", CompensationType: "test.rollback"},
+	}, nil).Once()
+	manager.On("QueryOrchestrationDefinitions", mock.Anything, "second", mock.Anything).Return([]api.OrchestrationDefinition{
+		{Namespace: "second", Type: "test.rollback", TemplateRef: "template-1"},
+	}, nil).Once()
+	watcher := createTestWatcher(index, trxContext, pManager, manager)
+
+	orch := createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateRunning)
+	orch.Namespace = "second"
+	msg := failOrchestration(t, index, watcher, orch)
+
+	pManager.AssertExpectations(t)
+	manager.AssertExpectations(t)
+	assert.Equal(t, 1, msg.AckCalls)
+}
+
+// The index entry carries the namespace of the orchestration, and an orchestration without one is in the default
+// namespace
+func TestOnMessage_EntryNamespace(t *testing.T) {
+	index := createTestStore(t)
+	watcher := createTestWatcher(index, &store.NoOpTransactionContext{}, &mocks.MockProvisionManager{}, &mocks.MockDefinitionManager{})
+
+	second := createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateRunning)
+	second.Namespace = "second"
+	msg := createNatsMsg(t, second)
+	watcher.onMessage(msg.Data, msg)
+	legacy := createWatcherOrchestration("orch-2", "corr-1", api.OrchestrationStateRunning)
+	msg = createNatsMsg(t, legacy)
+	watcher.onMessage(msg.Data, msg)
+
+	entry, err := index.FindByID(context.Background(), "orch-1")
+	require.NoError(t, err)
+	assert.Equal(t, "second", entry.Namespace)
+	entry, err = index.FindByID(context.Background(), "orch-2")
+	require.NoError(t, err)
+	assert.Equal(t, model.DefaultNamespace, entry.Namespace)
+}
+
 // A failed orchestration whose definition declares no compensation type is not compensated
 func TestOnMessage_NoCompensationWithoutCompensationType(t *testing.T) {
 	index := createTestStore(t)
 	trxContext := &store.NoOpTransactionContext{}
 	pManager := &mocks.MockProvisionManager{}
 	manager := &mocks.MockDefinitionManager{}
-	manager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{
+	manager.On("QueryOrchestrationDefinitions", mock.Anything, model.DefaultNamespace, mock.Anything).Return([]api.OrchestrationDefinition{
 		{Type: "TestType", TemplateRef: "template-1"},
 	}, nil).Once()
 	watcher := createTestWatcher(index, trxContext, pManager, manager)
@@ -245,10 +293,10 @@ func TestOnMessage_NoCompensationWhenCompensationDefinitionMissing(t *testing.T)
 	trxContext := &store.NoOpTransactionContext{}
 	pManager := &mocks.MockProvisionManager{}
 	manager := &mocks.MockDefinitionManager{}
-	manager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{
+	manager.On("QueryOrchestrationDefinitions", mock.Anything, model.DefaultNamespace, mock.Anything).Return([]api.OrchestrationDefinition{
 		{Type: "TestType", TemplateRef: "template-1", CompensationType: "test.rollback"},
 	}, nil).Once()
-	manager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{}, nil).Once()
+	manager.On("QueryOrchestrationDefinitions", mock.Anything, model.DefaultNamespace, mock.Anything).Return([]api.OrchestrationDefinition{}, nil).Once()
 	watcher := createTestWatcher(index, trxContext, pManager, manager)
 
 	msg := failOrchestration(t, index, watcher, createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateRunning))
@@ -263,7 +311,7 @@ func TestOnMessage_FailedCompensationNotCompensatedWithoutCompensationType(t *te
 	trxContext := &store.NoOpTransactionContext{}
 	pManager := &mocks.MockProvisionManager{}
 	manager := &mocks.MockDefinitionManager{}
-	manager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{
+	manager.On("QueryOrchestrationDefinitions", mock.Anything, model.DefaultNamespace, mock.Anything).Return([]api.OrchestrationDefinition{
 		{Type: "test.rollback", TemplateRef: "template-1"},
 	}, nil).Once()
 	watcher := createTestWatcher(index, trxContext, pManager, manager)
@@ -305,7 +353,7 @@ func TestOnMessage_ErrorWhenTooManyCompensationOrchs(t *testing.T) {
 	pManager := &mocks.MockProvisionManager{}
 	pManager.On("Start", mock.Anything, mock.Anything).Return(&api.Orchestration{}, nil)
 	manager := mocks.MockDefinitionManager{}
-	manager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{
+	manager.On("QueryOrchestrationDefinitions", mock.Anything, model.DefaultNamespace, mock.Anything).Return([]api.OrchestrationDefinition{
 		{},
 		{},
 	}, nil)
@@ -563,10 +611,10 @@ func createWatcherOrchestration(id, correlationID string, state api.Orchestratio
 // orchestration, which declares the given compensation type, and then the compensation definition of the same template
 func definitionManagerWithCompensation(orchestrationType, compensationType model.OrchestrationType) *mocks.MockDefinitionManager {
 	manager := &mocks.MockDefinitionManager{}
-	manager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{
+	manager.On("QueryOrchestrationDefinitions", mock.Anything, model.DefaultNamespace, mock.Anything).Return([]api.OrchestrationDefinition{
 		{Type: orchestrationType, TemplateRef: "template-1", CompensationType: compensationType},
 	}, nil).Once()
-	manager.On("QueryOrchestrationDefinitions", mock.Anything, mock.Anything).Return([]api.OrchestrationDefinition{
+	manager.On("QueryOrchestrationDefinitions", mock.Anything, model.DefaultNamespace, mock.Anything).Return([]api.OrchestrationDefinition{
 		{Type: compensationType, TemplateRef: "template-1"},
 	}, nil).Once()
 	return manager

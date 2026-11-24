@@ -55,7 +55,11 @@ func (s OrchestrationState) String() string {
 type Orchestration struct {
 	ID            string `json:"id"`
 	CorrelationID string `json:"correlationId"`
-	// DefinitionID the unique ID of the orchestration definition that this orchestration is based on
+	// Namespace is the namespace of the manifest that started this orchestration. Its definition is in the same
+	// namespace. An orchestration stored without a namespace is in model.DefaultNamespace.
+	Namespace string `json:"namespace,omitempty"`
+	// DefinitionID is the type of the orchestration definition that this orchestration is based on. A definition type is
+	// unique within the namespace of the orchestration.
 	DefinitionID      string                  `json:"definitionId"`
 	State             OrchestrationState      `json:"state"`
 	StateTimestamp    time.Time               `json:"stateTimestamp"`
@@ -223,6 +227,9 @@ func (m *MappingEntry) UnmarshalJSON(data []byte) error {
 }
 
 type OrchestrationDefinition struct {
+	// Namespace is the namespace the definition belongs to. Together with Type it identifies the definition. An empty
+	// namespace is model.DefaultNamespace.
+	Namespace   string                  `json:"namespace,omitempty"`
 	Type        model.OrchestrationType `json:"type"`
 	TemplateRef string                  `json:"templateRef"`
 	Version     int64                   `json:"version"`
@@ -236,8 +243,9 @@ type OrchestrationDefinition struct {
 	CompensationType model.OrchestrationType `json:"compensationType,omitempty"`
 }
 
+// GetID returns the key of the definition, which is made of its namespace and its type, see DefinitionKey.
 func (o *OrchestrationDefinition) GetID() string {
-	return o.Type.String()
+	return DefinitionKey(o.Namespace, o.Type.String())
 }
 
 func (o *OrchestrationDefinition) GetVersion() int64 {
@@ -250,6 +258,9 @@ func (o *OrchestrationDefinition) IncrementVersion() {
 
 // ActivityDefinition represents a single activity in the orchestration
 type ActivityDefinition struct {
+	// Namespace is the namespace the definition belongs to. Together with Type it identifies the definition. Only
+	// orchestration definitions of the same namespace can use it. An empty namespace is model.DefaultNamespace.
+	Namespace    string         `json:"namespace,omitempty"`
 	Type         ActivityType   `json:"type"`
 	Version      int64          `json:"version"`
 	Description  string         `json:"description"`
@@ -257,8 +268,9 @@ type ActivityDefinition struct {
 	OutputSchema map[string]any `json:"outputSchema"`
 }
 
+// GetID returns the key of the definition, which is made of its namespace and its type, see DefinitionKey.
 func (o *ActivityDefinition) GetID() string {
-	return o.Type.String()
+	return DefinitionKey(o.Namespace, o.Type.String())
 }
 
 func (o *ActivityDefinition) GetVersion() int64 {
@@ -267,6 +279,16 @@ func (o *ActivityDefinition) GetVersion() int64 {
 
 func (o *ActivityDefinition) IncrementVersion() {
 	o.Version++
+}
+
+// definitionKeySeparator separates the namespace from the type in a definition key. Neither a namespace nor a type can
+// contain it, see model.ValidateNamespace and the modeltype validation.
+const definitionKeySeparator = "/"
+
+// DefinitionKey returns the key that identifies the orchestration or activity definition of the given type in the given
+// namespace. An empty namespace is model.DefaultNamespace.
+func DefinitionKey(namespace string, definitionType string) string {
+	return model.NamespaceOrDefault(namespace) + definitionKeySeparator + definitionType
 }
 
 // InstantiateOrchestration creates and returns an initialized Orchestration based on the provided definition and inputs.

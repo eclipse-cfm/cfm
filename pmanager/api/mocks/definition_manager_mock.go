@@ -143,17 +143,17 @@ func (_c *MockDefinitionManager_CreateOrchestrationDefinition_Call) RunAndReturn
 	return _c
 }
 
-// DeleteActivityDefinition provides a mock function with given fields: ctx, atype
-func (_m *MockDefinitionManager) DeleteActivityDefinition(ctx context.Context, atype api.ActivityType) error {
-	ret := _m.Called(ctx, atype)
+// DeleteActivityDefinition provides a mock function with given fields: ctx, namespace, atype
+func (_m *MockDefinitionManager) DeleteActivityDefinition(ctx context.Context, namespace string, atype api.ActivityType) error {
+	ret := _m.Called(ctx, namespace, atype)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteActivityDefinition")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, api.ActivityType) error); ok {
-		r0 = rf(ctx, atype)
+	if rf, ok := ret.Get(0).(func(context.Context, string, api.ActivityType) error); ok {
+		r0 = rf(ctx, namespace, atype)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -168,14 +168,15 @@ type MockDefinitionManager_DeleteActivityDefinition_Call struct {
 
 // DeleteActivityDefinition is a helper method to define mock.On call
 //   - ctx context.Context
+//   - namespace string
 //   - atype api.ActivityType
-func (_e *MockDefinitionManager_Expecter) DeleteActivityDefinition(ctx interface{}, atype interface{}) *MockDefinitionManager_DeleteActivityDefinition_Call {
-	return &MockDefinitionManager_DeleteActivityDefinition_Call{Call: _e.mock.On("DeleteActivityDefinition", ctx, atype)}
+func (_e *MockDefinitionManager_Expecter) DeleteActivityDefinition(ctx interface{}, namespace interface{}, atype interface{}) *MockDefinitionManager_DeleteActivityDefinition_Call {
+	return &MockDefinitionManager_DeleteActivityDefinition_Call{Call: _e.mock.On("DeleteActivityDefinition", ctx, namespace, atype)}
 }
 
-func (_c *MockDefinitionManager_DeleteActivityDefinition_Call) Run(run func(ctx context.Context, atype api.ActivityType)) *MockDefinitionManager_DeleteActivityDefinition_Call {
+func (_c *MockDefinitionManager_DeleteActivityDefinition_Call) Run(run func(ctx context.Context, namespace string, atype api.ActivityType)) *MockDefinitionManager_DeleteActivityDefinition_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(api.ActivityType))
+		run(args[0].(context.Context), args[1].(string), args[2].(api.ActivityType))
 	})
 	return _c
 }
@@ -185,22 +186,22 @@ func (_c *MockDefinitionManager_DeleteActivityDefinition_Call) Return(_a0 error)
 	return _c
 }
 
-func (_c *MockDefinitionManager_DeleteActivityDefinition_Call) RunAndReturn(run func(context.Context, api.ActivityType) error) *MockDefinitionManager_DeleteActivityDefinition_Call {
+func (_c *MockDefinitionManager_DeleteActivityDefinition_Call) RunAndReturn(run func(context.Context, string, api.ActivityType) error) *MockDefinitionManager_DeleteActivityDefinition_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// DeleteOrchestrationDefinition provides a mock function with given fields: ctx, templateRef
-func (_m *MockDefinitionManager) DeleteOrchestrationDefinition(ctx context.Context, templateRef string) error {
-	ret := _m.Called(ctx, templateRef)
+// DeleteOrchestrationDefinition provides a mock function with given fields: ctx, namespace, templateRef
+func (_m *MockDefinitionManager) DeleteOrchestrationDefinition(ctx context.Context, namespace string, templateRef string) error {
+	ret := _m.Called(ctx, namespace, templateRef)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteOrchestrationDefinition")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = rf(ctx, templateRef)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, namespace, templateRef)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -215,14 +216,15 @@ type MockDefinitionManager_DeleteOrchestrationDefinition_Call struct {
 
 // DeleteOrchestrationDefinition is a helper method to define mock.On call
 //   - ctx context.Context
+//   - namespace string
 //   - templateRef string
-func (_e *MockDefinitionManager_Expecter) DeleteOrchestrationDefinition(ctx interface{}, templateRef interface{}) *MockDefinitionManager_DeleteOrchestrationDefinition_Call {
-	return &MockDefinitionManager_DeleteOrchestrationDefinition_Call{Call: _e.mock.On("DeleteOrchestrationDefinition", ctx, templateRef)}
+func (_e *MockDefinitionManager_Expecter) DeleteOrchestrationDefinition(ctx interface{}, namespace interface{}, templateRef interface{}) *MockDefinitionManager_DeleteOrchestrationDefinition_Call {
+	return &MockDefinitionManager_DeleteOrchestrationDefinition_Call{Call: _e.mock.On("DeleteOrchestrationDefinition", ctx, namespace, templateRef)}
 }
 
-func (_c *MockDefinitionManager_DeleteOrchestrationDefinition_Call) Run(run func(ctx context.Context, templateRef string)) *MockDefinitionManager_DeleteOrchestrationDefinition_Call {
+func (_c *MockDefinitionManager_DeleteOrchestrationDefinition_Call) Run(run func(ctx context.Context, namespace string, templateRef string)) *MockDefinitionManager_DeleteOrchestrationDefinition_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -232,14 +234,14 @@ func (_c *MockDefinitionManager_DeleteOrchestrationDefinition_Call) Return(_a0 e
 	return _c
 }
 
-func (_c *MockDefinitionManager_DeleteOrchestrationDefinition_Call) RunAndReturn(run func(context.Context, string) error) *MockDefinitionManager_DeleteOrchestrationDefinition_Call {
+func (_c *MockDefinitionManager_DeleteOrchestrationDefinition_Call) RunAndReturn(run func(context.Context, string, string) error) *MockDefinitionManager_DeleteOrchestrationDefinition_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// GetActivityDefinitions provides a mock function with given fields: ctx
-func (_m *MockDefinitionManager) GetActivityDefinitions(ctx context.Context) ([]api.ActivityDefinition, error) {
-	ret := _m.Called(ctx)
+// GetActivityDefinitions provides a mock function with given fields: ctx, namespace
+func (_m *MockDefinitionManager) GetActivityDefinitions(ctx context.Context, namespace string) ([]api.ActivityDefinition, error) {
+	ret := _m.Called(ctx, namespace)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetActivityDefinitions")
@@ -247,19 +249,19 @@ func (_m *MockDefinitionManager) GetActivityDefinitions(ctx context.Context) ([]
 
 	var r0 []api.ActivityDefinition
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) ([]api.ActivityDefinition, error)); ok {
-		return rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]api.ActivityDefinition, error)); ok {
+		return rf(ctx, namespace)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) []api.ActivityDefinition); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, string) []api.ActivityDefinition); ok {
+		r0 = rf(ctx, namespace)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]api.ActivityDefinition)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, namespace)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -274,13 +276,14 @@ type MockDefinitionManager_GetActivityDefinitions_Call struct {
 
 // GetActivityDefinitions is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockDefinitionManager_Expecter) GetActivityDefinitions(ctx interface{}) *MockDefinitionManager_GetActivityDefinitions_Call {
-	return &MockDefinitionManager_GetActivityDefinitions_Call{Call: _e.mock.On("GetActivityDefinitions", ctx)}
+//   - namespace string
+func (_e *MockDefinitionManager_Expecter) GetActivityDefinitions(ctx interface{}, namespace interface{}) *MockDefinitionManager_GetActivityDefinitions_Call {
+	return &MockDefinitionManager_GetActivityDefinitions_Call{Call: _e.mock.On("GetActivityDefinitions", ctx, namespace)}
 }
 
-func (_c *MockDefinitionManager_GetActivityDefinitions_Call) Run(run func(ctx context.Context)) *MockDefinitionManager_GetActivityDefinitions_Call {
+func (_c *MockDefinitionManager_GetActivityDefinitions_Call) Run(run func(ctx context.Context, namespace string)) *MockDefinitionManager_GetActivityDefinitions_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
@@ -290,14 +293,14 @@ func (_c *MockDefinitionManager_GetActivityDefinitions_Call) Return(_a0 []api.Ac
 	return _c
 }
 
-func (_c *MockDefinitionManager_GetActivityDefinitions_Call) RunAndReturn(run func(context.Context) ([]api.ActivityDefinition, error)) *MockDefinitionManager_GetActivityDefinitions_Call {
+func (_c *MockDefinitionManager_GetActivityDefinitions_Call) RunAndReturn(run func(context.Context, string) ([]api.ActivityDefinition, error)) *MockDefinitionManager_GetActivityDefinitions_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// GetOrchestrationDefinitions provides a mock function with given fields: ctx
-func (_m *MockDefinitionManager) GetOrchestrationDefinitions(ctx context.Context) ([]api.OrchestrationDefinition, error) {
-	ret := _m.Called(ctx)
+// GetOrchestrationDefinitions provides a mock function with given fields: ctx, namespace
+func (_m *MockDefinitionManager) GetOrchestrationDefinitions(ctx context.Context, namespace string) ([]api.OrchestrationDefinition, error) {
+	ret := _m.Called(ctx, namespace)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetOrchestrationDefinitions")
@@ -305,19 +308,19 @@ func (_m *MockDefinitionManager) GetOrchestrationDefinitions(ctx context.Context
 
 	var r0 []api.OrchestrationDefinition
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) ([]api.OrchestrationDefinition, error)); ok {
-		return rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]api.OrchestrationDefinition, error)); ok {
+		return rf(ctx, namespace)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) []api.OrchestrationDefinition); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, string) []api.OrchestrationDefinition); ok {
+		r0 = rf(ctx, namespace)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]api.OrchestrationDefinition)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, namespace)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -332,13 +335,14 @@ type MockDefinitionManager_GetOrchestrationDefinitions_Call struct {
 
 // GetOrchestrationDefinitions is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockDefinitionManager_Expecter) GetOrchestrationDefinitions(ctx interface{}) *MockDefinitionManager_GetOrchestrationDefinitions_Call {
-	return &MockDefinitionManager_GetOrchestrationDefinitions_Call{Call: _e.mock.On("GetOrchestrationDefinitions", ctx)}
+//   - namespace string
+func (_e *MockDefinitionManager_Expecter) GetOrchestrationDefinitions(ctx interface{}, namespace interface{}) *MockDefinitionManager_GetOrchestrationDefinitions_Call {
+	return &MockDefinitionManager_GetOrchestrationDefinitions_Call{Call: _e.mock.On("GetOrchestrationDefinitions", ctx, namespace)}
 }
 
-func (_c *MockDefinitionManager_GetOrchestrationDefinitions_Call) Run(run func(ctx context.Context)) *MockDefinitionManager_GetOrchestrationDefinitions_Call {
+func (_c *MockDefinitionManager_GetOrchestrationDefinitions_Call) Run(run func(ctx context.Context, namespace string)) *MockDefinitionManager_GetOrchestrationDefinitions_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
@@ -348,14 +352,14 @@ func (_c *MockDefinitionManager_GetOrchestrationDefinitions_Call) Return(_a0 []a
 	return _c
 }
 
-func (_c *MockDefinitionManager_GetOrchestrationDefinitions_Call) RunAndReturn(run func(context.Context) ([]api.OrchestrationDefinition, error)) *MockDefinitionManager_GetOrchestrationDefinitions_Call {
+func (_c *MockDefinitionManager_GetOrchestrationDefinitions_Call) RunAndReturn(run func(context.Context, string) ([]api.OrchestrationDefinition, error)) *MockDefinitionManager_GetOrchestrationDefinitions_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// GetOrchestrationDefinitionsByTemplate provides a mock function with given fields: ctx, templateRef
-func (_m *MockDefinitionManager) GetOrchestrationDefinitionsByTemplate(ctx context.Context, templateRef string) ([]api.OrchestrationDefinition, error) {
-	ret := _m.Called(ctx, templateRef)
+// GetOrchestrationDefinitionsByTemplate provides a mock function with given fields: ctx, namespace, templateRef
+func (_m *MockDefinitionManager) GetOrchestrationDefinitionsByTemplate(ctx context.Context, namespace string, templateRef string) ([]api.OrchestrationDefinition, error) {
+	ret := _m.Called(ctx, namespace, templateRef)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetOrchestrationDefinitionsByTemplate")
@@ -363,19 +367,19 @@ func (_m *MockDefinitionManager) GetOrchestrationDefinitionsByTemplate(ctx conte
 
 	var r0 []api.OrchestrationDefinition
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) ([]api.OrchestrationDefinition, error)); ok {
-		return rf(ctx, templateRef)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) ([]api.OrchestrationDefinition, error)); ok {
+		return rf(ctx, namespace, templateRef)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) []api.OrchestrationDefinition); ok {
-		r0 = rf(ctx, templateRef)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) []api.OrchestrationDefinition); ok {
+		r0 = rf(ctx, namespace, templateRef)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]api.OrchestrationDefinition)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, templateRef)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, namespace, templateRef)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -390,14 +394,15 @@ type MockDefinitionManager_GetOrchestrationDefinitionsByTemplate_Call struct {
 
 // GetOrchestrationDefinitionsByTemplate is a helper method to define mock.On call
 //   - ctx context.Context
+//   - namespace string
 //   - templateRef string
-func (_e *MockDefinitionManager_Expecter) GetOrchestrationDefinitionsByTemplate(ctx interface{}, templateRef interface{}) *MockDefinitionManager_GetOrchestrationDefinitionsByTemplate_Call {
-	return &MockDefinitionManager_GetOrchestrationDefinitionsByTemplate_Call{Call: _e.mock.On("GetOrchestrationDefinitionsByTemplate", ctx, templateRef)}
+func (_e *MockDefinitionManager_Expecter) GetOrchestrationDefinitionsByTemplate(ctx interface{}, namespace interface{}, templateRef interface{}) *MockDefinitionManager_GetOrchestrationDefinitionsByTemplate_Call {
+	return &MockDefinitionManager_GetOrchestrationDefinitionsByTemplate_Call{Call: _e.mock.On("GetOrchestrationDefinitionsByTemplate", ctx, namespace, templateRef)}
 }
 
-func (_c *MockDefinitionManager_GetOrchestrationDefinitionsByTemplate_Call) Run(run func(ctx context.Context, templateRef string)) *MockDefinitionManager_GetOrchestrationDefinitionsByTemplate_Call {
+func (_c *MockDefinitionManager_GetOrchestrationDefinitionsByTemplate_Call) Run(run func(ctx context.Context, namespace string, templateRef string)) *MockDefinitionManager_GetOrchestrationDefinitionsByTemplate_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -407,14 +412,14 @@ func (_c *MockDefinitionManager_GetOrchestrationDefinitionsByTemplate_Call) Retu
 	return _c
 }
 
-func (_c *MockDefinitionManager_GetOrchestrationDefinitionsByTemplate_Call) RunAndReturn(run func(context.Context, string) ([]api.OrchestrationDefinition, error)) *MockDefinitionManager_GetOrchestrationDefinitionsByTemplate_Call {
+func (_c *MockDefinitionManager_GetOrchestrationDefinitionsByTemplate_Call) RunAndReturn(run func(context.Context, string, string) ([]api.OrchestrationDefinition, error)) *MockDefinitionManager_GetOrchestrationDefinitionsByTemplate_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// QueryOrchestrationDefinitions provides a mock function with given fields: ctx, predicate
-func (_m *MockDefinitionManager) QueryOrchestrationDefinitions(ctx context.Context, predicate query.Predicate) ([]api.OrchestrationDefinition, error) {
-	ret := _m.Called(ctx, predicate)
+// QueryOrchestrationDefinitions provides a mock function with given fields: ctx, namespace, predicate
+func (_m *MockDefinitionManager) QueryOrchestrationDefinitions(ctx context.Context, namespace string, predicate query.Predicate) ([]api.OrchestrationDefinition, error) {
+	ret := _m.Called(ctx, namespace, predicate)
 
 	if len(ret) == 0 {
 		panic("no return value specified for QueryOrchestrationDefinitions")
@@ -422,19 +427,19 @@ func (_m *MockDefinitionManager) QueryOrchestrationDefinitions(ctx context.Conte
 
 	var r0 []api.OrchestrationDefinition
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, query.Predicate) ([]api.OrchestrationDefinition, error)); ok {
-		return rf(ctx, predicate)
+	if rf, ok := ret.Get(0).(func(context.Context, string, query.Predicate) ([]api.OrchestrationDefinition, error)); ok {
+		return rf(ctx, namespace, predicate)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, query.Predicate) []api.OrchestrationDefinition); ok {
-		r0 = rf(ctx, predicate)
+	if rf, ok := ret.Get(0).(func(context.Context, string, query.Predicate) []api.OrchestrationDefinition); ok {
+		r0 = rf(ctx, namespace, predicate)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]api.OrchestrationDefinition)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, query.Predicate) error); ok {
-		r1 = rf(ctx, predicate)
+	if rf, ok := ret.Get(1).(func(context.Context, string, query.Predicate) error); ok {
+		r1 = rf(ctx, namespace, predicate)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -449,14 +454,15 @@ type MockDefinitionManager_QueryOrchestrationDefinitions_Call struct {
 
 // QueryOrchestrationDefinitions is a helper method to define mock.On call
 //   - ctx context.Context
+//   - namespace string
 //   - predicate query.Predicate
-func (_e *MockDefinitionManager_Expecter) QueryOrchestrationDefinitions(ctx interface{}, predicate interface{}) *MockDefinitionManager_QueryOrchestrationDefinitions_Call {
-	return &MockDefinitionManager_QueryOrchestrationDefinitions_Call{Call: _e.mock.On("QueryOrchestrationDefinitions", ctx, predicate)}
+func (_e *MockDefinitionManager_Expecter) QueryOrchestrationDefinitions(ctx interface{}, namespace interface{}, predicate interface{}) *MockDefinitionManager_QueryOrchestrationDefinitions_Call {
+	return &MockDefinitionManager_QueryOrchestrationDefinitions_Call{Call: _e.mock.On("QueryOrchestrationDefinitions", ctx, namespace, predicate)}
 }
 
-func (_c *MockDefinitionManager_QueryOrchestrationDefinitions_Call) Run(run func(ctx context.Context, predicate query.Predicate)) *MockDefinitionManager_QueryOrchestrationDefinitions_Call {
+func (_c *MockDefinitionManager_QueryOrchestrationDefinitions_Call) Run(run func(ctx context.Context, namespace string, predicate query.Predicate)) *MockDefinitionManager_QueryOrchestrationDefinitions_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(query.Predicate))
+		run(args[0].(context.Context), args[1].(string), args[2].(query.Predicate))
 	})
 	return _c
 }
@@ -466,7 +472,7 @@ func (_c *MockDefinitionManager_QueryOrchestrationDefinitions_Call) Return(_a0 [
 	return _c
 }
 
-func (_c *MockDefinitionManager_QueryOrchestrationDefinitions_Call) RunAndReturn(run func(context.Context, query.Predicate) ([]api.OrchestrationDefinition, error)) *MockDefinitionManager_QueryOrchestrationDefinitions_Call {
+func (_c *MockDefinitionManager_QueryOrchestrationDefinitions_Call) RunAndReturn(run func(context.Context, string, query.Predicate) ([]api.OrchestrationDefinition, error)) *MockDefinitionManager_QueryOrchestrationDefinitions_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -217,24 +217,24 @@ func (m *MockProvisionManager) Start(ctx context.Context, manifest *model.Orches
 	return args.Get(0).(*api.Orchestration), args.Error(1)
 }
 
-func (m *MockProvisionManager) Cancel(ctx context.Context, id string) error {
-	args := m.Called(ctx, id)
+func (m *MockProvisionManager) Cancel(ctx context.Context, namespace string, id string) error {
+	args := m.Called(ctx, namespace, id)
 	return args.Error(0)
 }
 
-func (m *MockProvisionManager) GetOrchestration(ctx context.Context, id string) (*api.Orchestration, error) {
-	args := m.Called(ctx, id)
+func (m *MockProvisionManager) GetOrchestration(ctx context.Context, namespace string, id string) (*api.Orchestration, error) {
+	args := m.Called(ctx, namespace, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*api.Orchestration), args.Error(1)
 }
 
-func (m *MockProvisionManager) QueryOrchestrations(ctx context.Context, predicate query.Predicate, options store.PaginationOptions) iter.Seq2[*api.OrchestrationEntry, error] {
+func (m *MockProvisionManager) QueryOrchestrations(ctx context.Context, namespace string, predicate query.Predicate, options store.PaginationOptions) iter.Seq2[*api.OrchestrationEntry, error] {
 	panic("not implemented")
 }
 
-func (m *MockProvisionManager) CountOrchestrations(ctx context.Context, predicate query.Predicate) (int64, error) {
+func (m *MockProvisionManager) CountOrchestrations(ctx context.Context, namespace string, predicate query.Predicate) (int64, error) {
 	panic("not implemented")
 }
 

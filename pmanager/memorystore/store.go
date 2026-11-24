@@ -42,11 +42,12 @@ func NewDefinitionStore() *MemoryDefinitionStore {
 
 func (d *MemoryDefinitionStore) FindOrchestrationDefinition(
 	_ context.Context,
+	namespace string,
 	orchestrationType model.OrchestrationType) (*api.OrchestrationDefinition, error) {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
 
-	definition, exists := d.orchestrationDefinitions[orchestrationType.String()]
+	definition, exists := d.orchestrationDefinitions[api.DefinitionKey(namespace, orchestrationType.String())]
 	if !exists {
 		return nil, types.ErrNotFound
 	}
@@ -58,24 +59,26 @@ func (d *MemoryDefinitionStore) FindOrchestrationDefinition(
 
 func (d *MemoryDefinitionStore) FindOrchestrationDefinitionsByPredicate(
 	_ context.Context,
+	namespace string,
 	predicate query.Predicate) iter.Seq2[api.OrchestrationDefinition, error] {
-	return findDefinitionsByPredicate(d, predicate, d.orchestrationDefinitions)
+	return findDefinitionsByPredicate(d, namespacePredicate(namespace, predicate), d.orchestrationDefinitions)
 }
 
 func (d *MemoryDefinitionStore) ExistsOrchestrationDefinition(
 	_ context.Context,
+	namespace string,
 	orchestrationType model.OrchestrationType) (bool, error) {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
-	_, exists := d.orchestrationDefinitions[orchestrationType.String()]
+	_, exists := d.orchestrationDefinitions[api.DefinitionKey(namespace, orchestrationType.String())]
 	return exists, nil
 }
 
-func (d *MemoryDefinitionStore) FindActivityDefinition(_ context.Context, activityType api.ActivityType) (*api.ActivityDefinition, error) {
+func (d *MemoryDefinitionStore) FindActivityDefinition(_ context.Context, namespace string, activityType api.ActivityType) (*api.ActivityDefinition, error) {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
 
-	definition, exists := d.activityDefinitions[activityType.String()]
+	definition, exists := d.activityDefinitions[api.DefinitionKey(namespace, activityType.String())]
 	if !exists {
 		return nil, types.ErrNotFound
 	}
@@ -87,14 +90,15 @@ func (d *MemoryDefinitionStore) FindActivityDefinition(_ context.Context, activi
 
 func (d *MemoryDefinitionStore) FindActivityDefinitionsByPredicate(
 	_ context.Context,
+	namespace string,
 	predicate query.Predicate) iter.Seq2[api.ActivityDefinition, error] {
-	return findDefinitionsByPredicate(d, predicate, d.activityDefinitions)
+	return findDefinitionsByPredicate(d, namespacePredicate(namespace, predicate), d.activityDefinitions)
 }
 
-func (d *MemoryDefinitionStore) ExistsActivityDefinition(_ context.Context, activityType api.ActivityType) (bool, error) {
+func (d *MemoryDefinitionStore) ExistsActivityDefinition(_ context.Context, namespace string, activityType api.ActivityType) (bool, error) {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
-	_, exists := d.activityDefinitions[activityType.String()]
+	_, exists := d.activityDefinitions[api.DefinitionKey(namespace, activityType.String())]
 	return exists, nil
 }
 
@@ -104,14 +108,16 @@ func (d *MemoryDefinitionStore) StoreOrchestrationDefinition(
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	if d.orchestrationDefinitions[definition.Type.String()] != nil {
+	if d.orchestrationDefinitions[definition.GetID()] != nil {
 		return nil, types.ErrConflict
 	}
 
 	// Store a copy to prevent external modifications
 	definitionCopy := *definition
-	d.orchestrationDefinitions[definitionCopy.Type.String()] = &definitionCopy
-	return definition, nil
+	definitionCopy.Namespace = model.NamespaceOrDefault(definition.Namespace)
+	d.orchestrationDefinitions[definitionCopy.GetID()] = &definitionCopy
+	result := definitionCopy
+	return &result, nil
 }
 
 func (d *MemoryDefinitionStore) StoreActivityDefinition(
@@ -120,33 +126,41 @@ func (d *MemoryDefinitionStore) StoreActivityDefinition(
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	if d.activityDefinitions[definition.Type.String()] != nil {
+	if d.activityDefinitions[definition.GetID()] != nil {
 		return nil, types.ErrConflict
 	}
 	// Store a copy to prevent external modifications
 	definitionCopy := *definition
-	d.activityDefinitions[definitionCopy.Type.String()] = &definitionCopy
-	return definition, nil
+	definitionCopy.Namespace = model.NamespaceOrDefault(definition.Namespace)
+	d.activityDefinitions[definitionCopy.GetID()] = &definitionCopy
+	result := definitionCopy
+	return &result, nil
 }
 
 func (d *MemoryDefinitionStore) DeleteOrchestrationDefinition(
 	_ context.Context,
+	namespace string,
 	orchestrationType model.OrchestrationType) (bool, error) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	_, exists := d.orchestrationDefinitions[orchestrationType.String()]
+	key := api.DefinitionKey(namespace, orchestrationType.String())
+	_, exists := d.orchestrationDefinitions[key]
 	if exists {
-		delete(d.orchestrationDefinitions, orchestrationType.String())
+		delete(d.orchestrationDefinitions, key)
 	}
 	return exists, nil
 }
 
-func (d *MemoryDefinitionStore) ActivityDefinitionReferences(_ context.Context, activityType api.ActivityType) ([]string, error) {
+func (d *MemoryDefinitionStore) ActivityDefinitionReferences(_ context.Context, namespace string, activityType api.ActivityType) ([]string, error) {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
+	namespace = model.NamespaceOrDefault(namespace)
 	results := make([]string, 0, len(d.orchestrationDefinitions))
 	for _, oDefinition := range d.orchestrationDefinitions {
+		if oDefinition.Namespace != namespace {
+			continue
+		}
 		for _, aDefinition := range oDefinition.Activities {
 			if aDefinition.Type == activityType {
 				results = append(results, oDefinition.Type.String())
@@ -157,29 +171,45 @@ func (d *MemoryDefinitionStore) ActivityDefinitionReferences(_ context.Context, 
 	return results, nil
 }
 
-func (d *MemoryDefinitionStore) DeleteActivityDefinition(_ context.Context, activityType api.ActivityType) (bool, error) {
+func (d *MemoryDefinitionStore) DeleteActivityDefinition(_ context.Context, namespace string, activityType api.ActivityType) (bool, error) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	_, exists := d.activityDefinitions[activityType.String()]
+	key := api.DefinitionKey(namespace, activityType.String())
+	_, exists := d.activityDefinitions[key]
 	if exists {
-		delete(d.activityDefinitions, activityType.String())
+		delete(d.activityDefinitions, key)
 	}
 	return exists, nil
 }
 
-func (d *MemoryDefinitionStore) ListOrchestrationDefinitions(_ context.Context) ([]api.OrchestrationDefinition, error) {
+func (d *MemoryDefinitionStore) ListOrchestrationDefinitions(_ context.Context, namespace string) ([]api.OrchestrationDefinition, error) {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
 
-	return listDefinitions[api.OrchestrationDefinition](d.orchestrationDefinitions)
+	namespace = model.NamespaceOrDefault(namespace)
+	return listDefinitions(d.orchestrationDefinitions, func(definition *api.OrchestrationDefinition) bool {
+		return definition.Namespace == namespace
+	})
 }
 
-func (d *MemoryDefinitionStore) ListActivityDefinitions(_ context.Context) ([]api.ActivityDefinition, error) {
+func (d *MemoryDefinitionStore) ListActivityDefinitions(_ context.Context, namespace string) ([]api.ActivityDefinition, error) {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
 
-	return listDefinitions[api.ActivityDefinition](d.activityDefinitions)
+	namespace = model.NamespaceOrDefault(namespace)
+	return listDefinitions(d.activityDefinitions, func(definition *api.ActivityDefinition) bool {
+		return definition.Namespace == namespace
+	})
+}
+
+// namespacePredicate restricts the predicate to the definitions of the namespace
+func namespacePredicate(namespace string, predicate query.Predicate) query.Predicate {
+	namespaceEq := query.Eq("namespace", model.NamespaceOrDefault(namespace))
+	if predicate == nil {
+		return namespaceEq
+	}
+	return query.And(namespaceEq, predicate)
 }
 
 // Clear removes all stored definitions
@@ -191,19 +221,17 @@ func (d *MemoryDefinitionStore) Clear() {
 	d.activityDefinitions = make(map[string]*api.ActivityDefinition)
 }
 
-// listDefinitions lists definitions with pagination
-func listDefinitions[T any](definitionMap map[string]*T) ([]T, error) {
-	// Get all definitions
-	allDefinitions := make([]T, 0, len(definitionMap))
+// listDefinitions lists the definitions that the filter accepts
+func listDefinitions[T any](definitionMap map[string]*T, filter func(*T) bool) ([]T, error) {
+	definitions := make([]T, 0, len(definitionMap))
 	for _, definition := range definitionMap {
+		if !filter(definition) {
+			continue
+		}
 		// Return a copy to prevent external modifications
-		definitionCopy := *definition
-		allDefinitions = append(allDefinitions, definitionCopy)
+		definitions = append(definitions, *definition)
 	}
-
-	total := len(allDefinitions)
-
-	return allDefinitions[0:total], nil
+	return definitions, nil
 }
 
 // findDefinitionsByPredicate is a generic helper that filters definitions by predicate

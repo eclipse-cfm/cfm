@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/eclipse-cfm/cfm/common/collection"
+	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/query"
 	"github.com/eclipse-cfm/cfm/common/store"
 	"github.com/eclipse-cfm/cfm/common/types"
@@ -33,16 +34,19 @@ type definitionManager struct {
 
 func (d definitionManager) CreateOrchestrationDefinition(ctx context.Context, definition *api.OrchestrationDefinition) (*api.OrchestrationDefinition, error) {
 	return store.Trx[api.OrchestrationDefinition](d.trxContext).AndReturn(ctx, func(ctx context.Context) (*api.OrchestrationDefinition, error) {
+		if err := normalizeNamespace(&definition.Namespace); err != nil {
+			return nil, err
+		}
 		var missingErrors []error
 
 		activityDefinitions := make(map[api.ActivityType]*api.ActivityDefinition)
 
 		// Verify that all referenced activities exist
 		for _, activity := range definition.Activities {
-			activityDefinition, err := d.store.FindActivityDefinition(ctx, activity.Type)
+			activityDefinition, err := d.store.FindActivityDefinition(ctx, definition.Namespace, activity.Type)
 			if err != nil {
 				if errors.Is(err, types.ErrNotFound) {
-					missingErrors = append(missingErrors, types.NewClientError("activity type '%s' not found", activity.Type))
+					missingErrors = append(missingErrors, types.NewClientError("activity type '%s' not found in namespace '%s'", activity.Type, definition.Namespace))
 					continue
 				}
 				return nil, err
@@ -66,12 +70,12 @@ func (d definitionManager) CreateOrchestrationDefinition(ctx context.Context, de
 	})
 }
 
-func (d definitionManager) DeleteOrchestrationDefinition(ctx context.Context, templateRef string) error {
+func (d definitionManager) DeleteOrchestrationDefinition(ctx context.Context, namespace string, templateRef string) error {
 
 	return d.trxContext.Execute(ctx, func(ctx context.Context) error {
 
 		templateRefPredicate := query.Eq("templateRef", templateRef)
-		defs, err := collection.CollectAll(d.store.FindOrchestrationDefinitionsByPredicate(ctx, templateRefPredicate))
+		defs, err := collection.CollectAll(d.store.FindOrchestrationDefinitionsByPredicate(ctx, namespace, templateRefPredicate))
 
 		if err != nil {
 			return types.NewRecoverableWrappedError(err, "failed to check orchestration definition for template-ref %s", templateRef)
@@ -82,7 +86,7 @@ func (d definitionManager) DeleteOrchestrationDefinition(ctx context.Context, te
 		for _, def := range defs {
 
 			// check if any orchestration-definition has ongoing orchestrations
-			orchestrationEntry, err := d.orchestrationStore.FindFirstByPredicate(ctx, query.Eq("DefinitionID", def.GetID()))
+			orchestrationEntry, err := d.orchestrationStore.FindFirstByPredicate(ctx, namespacePredicate(def.Namespace, query.Eq("DefinitionID", def.Type.String())))
 			if err != nil && !errors.Is(err, types.ErrNotFound) {
 				return types.NewRecoverableWrappedError(err, "failed to delete orchestration definition %s, because checking for ongoing orchestrations failed", def.GetID())
 			}
@@ -92,7 +96,7 @@ func (d definitionManager) DeleteOrchestrationDefinition(ctx context.Context, te
 			}
 
 			// execute deletion
-			deleted, err := d.store.DeleteOrchestrationDefinition(ctx, def.Type)
+			deleted, err := d.store.DeleteOrchestrationDefinition(ctx, def.Namespace, def.Type)
 			if err != nil {
 				return types.NewRecoverableWrappedError(err, "failed to delete orchestration definition for template-ref %s", templateRef)
 			}
@@ -104,14 +108,14 @@ func (d definitionManager) DeleteOrchestrationDefinition(ctx context.Context, te
 	})
 }
 
-func (d definitionManager) GetOrchestrationDefinitionsByTemplate(ctx context.Context, templateRef string) ([]api.OrchestrationDefinition, error) {
-	return d.QueryOrchestrationDefinitions(ctx, query.Eq("templateRef", templateRef))
+func (d definitionManager) GetOrchestrationDefinitionsByTemplate(ctx context.Context, namespace string, templateRef string) ([]api.OrchestrationDefinition, error) {
+	return d.QueryOrchestrationDefinitions(ctx, namespace, query.Eq("templateRef", templateRef))
 }
 
-func (d definitionManager) GetOrchestrationDefinitions(ctx context.Context) ([]api.OrchestrationDefinition, error) {
+func (d definitionManager) GetOrchestrationDefinitions(ctx context.Context, namespace string) ([]api.OrchestrationDefinition, error) {
 	var result []api.OrchestrationDefinition
 	err := d.trxContext.Execute(ctx, func(ctx context.Context) error {
-		definitions, err := d.store.ListOrchestrationDefinitions(ctx)
+		definitions, err := d.store.ListOrchestrationDefinitions(ctx, namespace)
 		if err != nil {
 			return err
 		}
@@ -121,11 +125,11 @@ func (d definitionManager) GetOrchestrationDefinitions(ctx context.Context) ([]a
 	return result, err
 }
 
-func (d definitionManager) QueryOrchestrationDefinitions(ctx context.Context, predicate query.Predicate) ([]api.OrchestrationDefinition, error) {
+func (d definitionManager) QueryOrchestrationDefinitions(ctx context.Context, namespace string, predicate query.Predicate) ([]api.OrchestrationDefinition, error) {
 	var result []api.OrchestrationDefinition
 
 	err := d.trxContext.Execute(ctx, func(ctx context.Context) error {
-		definitions, err := collection.CollectAll(d.store.FindOrchestrationDefinitionsByPredicate(ctx, predicate))
+		definitions, err := collection.CollectAll(d.store.FindOrchestrationDefinitionsByPredicate(ctx, namespace, predicate))
 		if err != nil {
 			return err
 		}
@@ -138,6 +142,9 @@ func (d definitionManager) QueryOrchestrationDefinitions(ctx context.Context, pr
 
 func (d definitionManager) CreateActivityDefinition(ctx context.Context, definition *api.ActivityDefinition) (*api.ActivityDefinition, error) {
 	return store.Trx[api.ActivityDefinition](d.trxContext).AndReturn(ctx, func(ctx context.Context) (*api.ActivityDefinition, error) {
+		if err := normalizeNamespace(&definition.Namespace); err != nil {
+			return nil, err
+		}
 		definition, err := d.store.StoreActivityDefinition(ctx, definition)
 		if err != nil {
 			return nil, err
@@ -146,16 +153,16 @@ func (d definitionManager) CreateActivityDefinition(ctx context.Context, definit
 	})
 }
 
-func (d definitionManager) DeleteActivityDefinition(ctx context.Context, atype api.ActivityType) error {
+func (d definitionManager) DeleteActivityDefinition(ctx context.Context, namespace string, atype api.ActivityType) error {
 	return d.trxContext.Execute(ctx, func(ctx context.Context) error {
-		exists, err := d.store.ExistsActivityDefinition(ctx, atype)
+		exists, err := d.store.ExistsActivityDefinition(ctx, namespace, atype)
 		if err != nil {
 			return types.NewRecoverableWrappedError(err, "failed to check activity definition for type %s", atype)
 		}
 		if !exists {
 			return types.ErrNotFound
 		}
-		referenced, err := d.store.ActivityDefinitionReferences(ctx, atype)
+		referenced, err := d.store.ActivityDefinitionReferences(ctx, namespace, atype)
 
 		if err != nil {
 			return types.NewRecoverableWrappedError(err, "failed to check activity definition references for type %s", atype)
@@ -164,7 +171,7 @@ func (d definitionManager) DeleteActivityDefinition(ctx context.Context, atype a
 			return types.NewClientError("activity type '%s' is referenced by an orchestration definition: %s", atype, strings.Join(referenced, ", "))
 		}
 
-		deleted, err := d.store.DeleteActivityDefinition(ctx, atype)
+		deleted, err := d.store.DeleteActivityDefinition(ctx, namespace, atype)
 		if err != nil {
 			return types.NewRecoverableWrappedError(err, "failed to check activity definition references for type %s", atype)
 		}
@@ -175,10 +182,10 @@ func (d definitionManager) DeleteActivityDefinition(ctx context.Context, atype a
 	})
 }
 
-func (d definitionManager) GetActivityDefinitions(ctx context.Context) ([]api.ActivityDefinition, error) {
+func (d definitionManager) GetActivityDefinitions(ctx context.Context, namespace string) ([]api.ActivityDefinition, error) {
 	var result []api.ActivityDefinition
 	err := d.trxContext.Execute(ctx, func(ctx context.Context) error {
-		definitions, err := d.store.ListActivityDefinitions(ctx)
+		definitions, err := d.store.ListActivityDefinitions(ctx, namespace)
 		if err != nil {
 			return err
 		}
@@ -186,6 +193,19 @@ func (d definitionManager) GetActivityDefinitions(ctx context.Context) ([]api.Ac
 		return nil
 	})
 	return result, err
+}
+
+// normalizeNamespace sets an empty namespace to model.DefaultNamespace and returns a client error if the namespace is not
+// valid.
+func normalizeNamespace(namespace *string) error {
+	if *namespace == "" {
+		*namespace = model.DefaultNamespace
+		return nil
+	}
+	if err := model.ValidateNamespace(*namespace); err != nil {
+		return types.NewClientError("%s", err.Error())
+	}
+	return nil
 }
 
 // validateActivitySchema verifies that the input of every activity is provided either by the orchestration schema or by

@@ -31,17 +31,17 @@ func (_m *MockProvisionManager) EXPECT() *MockProvisionManager_Expecter {
 	return &MockProvisionManager_Expecter{mock: &_m.Mock}
 }
 
-// Cancel provides a mock function with given fields: ctx, orchestrationID
-func (_m *MockProvisionManager) Cancel(ctx context.Context, orchestrationID string) error {
-	ret := _m.Called(ctx, orchestrationID)
+// Cancel provides a mock function with given fields: ctx, namespace, orchestrationID
+func (_m *MockProvisionManager) Cancel(ctx context.Context, namespace string, orchestrationID string) error {
+	ret := _m.Called(ctx, namespace, orchestrationID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Cancel")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = rf(ctx, orchestrationID)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, namespace, orchestrationID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -56,14 +56,15 @@ type MockProvisionManager_Cancel_Call struct {
 
 // Cancel is a helper method to define mock.On call
 //   - ctx context.Context
+//   - namespace string
 //   - orchestrationID string
-func (_e *MockProvisionManager_Expecter) Cancel(ctx interface{}, orchestrationID interface{}) *MockProvisionManager_Cancel_Call {
-	return &MockProvisionManager_Cancel_Call{Call: _e.mock.On("Cancel", ctx, orchestrationID)}
+func (_e *MockProvisionManager_Expecter) Cancel(ctx interface{}, namespace interface{}, orchestrationID interface{}) *MockProvisionManager_Cancel_Call {
+	return &MockProvisionManager_Cancel_Call{Call: _e.mock.On("Cancel", ctx, namespace, orchestrationID)}
 }
 
-func (_c *MockProvisionManager_Cancel_Call) Run(run func(ctx context.Context, orchestrationID string)) *MockProvisionManager_Cancel_Call {
+func (_c *MockProvisionManager_Cancel_Call) Run(run func(ctx context.Context, namespace string, orchestrationID string)) *MockProvisionManager_Cancel_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -73,14 +74,14 @@ func (_c *MockProvisionManager_Cancel_Call) Return(_a0 error) *MockProvisionMana
 	return _c
 }
 
-func (_c *MockProvisionManager_Cancel_Call) RunAndReturn(run func(context.Context, string) error) *MockProvisionManager_Cancel_Call {
+func (_c *MockProvisionManager_Cancel_Call) RunAndReturn(run func(context.Context, string, string) error) *MockProvisionManager_Cancel_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// CountOrchestrations provides a mock function with given fields: ctx, predicate
-func (_m *MockProvisionManager) CountOrchestrations(ctx context.Context, predicate query.Predicate) (int64, error) {
-	ret := _m.Called(ctx, predicate)
+// CountOrchestrations provides a mock function with given fields: ctx, namespace, predicate
+func (_m *MockProvisionManager) CountOrchestrations(ctx context.Context, namespace string, predicate query.Predicate) (int64, error) {
+	ret := _m.Called(ctx, namespace, predicate)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CountOrchestrations")
@@ -88,17 +89,17 @@ func (_m *MockProvisionManager) CountOrchestrations(ctx context.Context, predica
 
 	var r0 int64
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, query.Predicate) (int64, error)); ok {
-		return rf(ctx, predicate)
+	if rf, ok := ret.Get(0).(func(context.Context, string, query.Predicate) (int64, error)); ok {
+		return rf(ctx, namespace, predicate)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, query.Predicate) int64); ok {
-		r0 = rf(ctx, predicate)
+	if rf, ok := ret.Get(0).(func(context.Context, string, query.Predicate) int64); ok {
+		r0 = rf(ctx, namespace, predicate)
 	} else {
 		r0 = ret.Get(0).(int64)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, query.Predicate) error); ok {
-		r1 = rf(ctx, predicate)
+	if rf, ok := ret.Get(1).(func(context.Context, string, query.Predicate) error); ok {
+		r1 = rf(ctx, namespace, predicate)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -113,14 +114,15 @@ type MockProvisionManager_CountOrchestrations_Call struct {
 
 // CountOrchestrations is a helper method to define mock.On call
 //   - ctx context.Context
+//   - namespace string
 //   - predicate query.Predicate
-func (_e *MockProvisionManager_Expecter) CountOrchestrations(ctx interface{}, predicate interface{}) *MockProvisionManager_CountOrchestrations_Call {
-	return &MockProvisionManager_CountOrchestrations_Call{Call: _e.mock.On("CountOrchestrations", ctx, predicate)}
+func (_e *MockProvisionManager_Expecter) CountOrchestrations(ctx interface{}, namespace interface{}, predicate interface{}) *MockProvisionManager_CountOrchestrations_Call {
+	return &MockProvisionManager_CountOrchestrations_Call{Call: _e.mock.On("CountOrchestrations", ctx, namespace, predicate)}
 }
 
-func (_c *MockProvisionManager_CountOrchestrations_Call) Run(run func(ctx context.Context, predicate query.Predicate)) *MockProvisionManager_CountOrchestrations_Call {
+func (_c *MockProvisionManager_CountOrchestrations_Call) Run(run func(ctx context.Context, namespace string, predicate query.Predicate)) *MockProvisionManager_CountOrchestrations_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(query.Predicate))
+		run(args[0].(context.Context), args[1].(string), args[2].(query.Predicate))
 	})
 	return _c
 }
@@ -130,14 +132,14 @@ func (_c *MockProvisionManager_CountOrchestrations_Call) Return(_a0 int64, _a1 e
 	return _c
 }
 
-func (_c *MockProvisionManager_CountOrchestrations_Call) RunAndReturn(run func(context.Context, query.Predicate) (int64, error)) *MockProvisionManager_CountOrchestrations_Call {
+func (_c *MockProvisionManager_CountOrchestrations_Call) RunAndReturn(run func(context.Context, string, query.Predicate) (int64, error)) *MockProvisionManager_CountOrchestrations_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// GetOrchestration provides a mock function with given fields: ctx, orchestrationID
-func (_m *MockProvisionManager) GetOrchestration(ctx context.Context, orchestrationID string) (*api.Orchestration, error) {
-	ret := _m.Called(ctx, orchestrationID)
+// GetOrchestration provides a mock function with given fields: ctx, namespace, orchestrationID
+func (_m *MockProvisionManager) GetOrchestration(ctx context.Context, namespace string, orchestrationID string) (*api.Orchestration, error) {
+	ret := _m.Called(ctx, namespace, orchestrationID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetOrchestration")
@@ -145,19 +147,19 @@ func (_m *MockProvisionManager) GetOrchestration(ctx context.Context, orchestrat
 
 	var r0 *api.Orchestration
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*api.Orchestration, error)); ok {
-		return rf(ctx, orchestrationID)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*api.Orchestration, error)); ok {
+		return rf(ctx, namespace, orchestrationID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *api.Orchestration); ok {
-		r0 = rf(ctx, orchestrationID)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *api.Orchestration); ok {
+		r0 = rf(ctx, namespace, orchestrationID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*api.Orchestration)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, orchestrationID)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, namespace, orchestrationID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -172,14 +174,15 @@ type MockProvisionManager_GetOrchestration_Call struct {
 
 // GetOrchestration is a helper method to define mock.On call
 //   - ctx context.Context
+//   - namespace string
 //   - orchestrationID string
-func (_e *MockProvisionManager_Expecter) GetOrchestration(ctx interface{}, orchestrationID interface{}) *MockProvisionManager_GetOrchestration_Call {
-	return &MockProvisionManager_GetOrchestration_Call{Call: _e.mock.On("GetOrchestration", ctx, orchestrationID)}
+func (_e *MockProvisionManager_Expecter) GetOrchestration(ctx interface{}, namespace interface{}, orchestrationID interface{}) *MockProvisionManager_GetOrchestration_Call {
+	return &MockProvisionManager_GetOrchestration_Call{Call: _e.mock.On("GetOrchestration", ctx, namespace, orchestrationID)}
 }
 
-func (_c *MockProvisionManager_GetOrchestration_Call) Run(run func(ctx context.Context, orchestrationID string)) *MockProvisionManager_GetOrchestration_Call {
+func (_c *MockProvisionManager_GetOrchestration_Call) Run(run func(ctx context.Context, namespace string, orchestrationID string)) *MockProvisionManager_GetOrchestration_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -189,22 +192,22 @@ func (_c *MockProvisionManager_GetOrchestration_Call) Return(_a0 *api.Orchestrat
 	return _c
 }
 
-func (_c *MockProvisionManager_GetOrchestration_Call) RunAndReturn(run func(context.Context, string) (*api.Orchestration, error)) *MockProvisionManager_GetOrchestration_Call {
+func (_c *MockProvisionManager_GetOrchestration_Call) RunAndReturn(run func(context.Context, string, string) (*api.Orchestration, error)) *MockProvisionManager_GetOrchestration_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// QueryOrchestrations provides a mock function with given fields: ctx, predicate, options
-func (_m *MockProvisionManager) QueryOrchestrations(ctx context.Context, predicate query.Predicate, options store.PaginationOptions) iter.Seq2[*api.OrchestrationEntry, error] {
-	ret := _m.Called(ctx, predicate, options)
+// QueryOrchestrations provides a mock function with given fields: ctx, namespace, predicate, options
+func (_m *MockProvisionManager) QueryOrchestrations(ctx context.Context, namespace string, predicate query.Predicate, options store.PaginationOptions) iter.Seq2[*api.OrchestrationEntry, error] {
+	ret := _m.Called(ctx, namespace, predicate, options)
 
 	if len(ret) == 0 {
 		panic("no return value specified for QueryOrchestrations")
 	}
 
 	var r0 iter.Seq2[*api.OrchestrationEntry, error]
-	if rf, ok := ret.Get(0).(func(context.Context, query.Predicate, store.PaginationOptions) iter.Seq2[*api.OrchestrationEntry, error]); ok {
-		r0 = rf(ctx, predicate, options)
+	if rf, ok := ret.Get(0).(func(context.Context, string, query.Predicate, store.PaginationOptions) iter.Seq2[*api.OrchestrationEntry, error]); ok {
+		r0 = rf(ctx, namespace, predicate, options)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(iter.Seq2[*api.OrchestrationEntry, error])
@@ -221,15 +224,16 @@ type MockProvisionManager_QueryOrchestrations_Call struct {
 
 // QueryOrchestrations is a helper method to define mock.On call
 //   - ctx context.Context
+//   - namespace string
 //   - predicate query.Predicate
 //   - options store.PaginationOptions
-func (_e *MockProvisionManager_Expecter) QueryOrchestrations(ctx interface{}, predicate interface{}, options interface{}) *MockProvisionManager_QueryOrchestrations_Call {
-	return &MockProvisionManager_QueryOrchestrations_Call{Call: _e.mock.On("QueryOrchestrations", ctx, predicate, options)}
+func (_e *MockProvisionManager_Expecter) QueryOrchestrations(ctx interface{}, namespace interface{}, predicate interface{}, options interface{}) *MockProvisionManager_QueryOrchestrations_Call {
+	return &MockProvisionManager_QueryOrchestrations_Call{Call: _e.mock.On("QueryOrchestrations", ctx, namespace, predicate, options)}
 }
 
-func (_c *MockProvisionManager_QueryOrchestrations_Call) Run(run func(ctx context.Context, predicate query.Predicate, options store.PaginationOptions)) *MockProvisionManager_QueryOrchestrations_Call {
+func (_c *MockProvisionManager_QueryOrchestrations_Call) Run(run func(ctx context.Context, namespace string, predicate query.Predicate, options store.PaginationOptions)) *MockProvisionManager_QueryOrchestrations_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(query.Predicate), args[2].(store.PaginationOptions))
+		run(args[0].(context.Context), args[1].(string), args[2].(query.Predicate), args[3].(store.PaginationOptions))
 	})
 	return _c
 }
@@ -239,7 +243,7 @@ func (_c *MockProvisionManager_QueryOrchestrations_Call) Return(_a0 iter.Seq2[*a
 	return _c
 }
 
-func (_c *MockProvisionManager_QueryOrchestrations_Call) RunAndReturn(run func(context.Context, query.Predicate, store.PaginationOptions) iter.Seq2[*api.OrchestrationEntry, error]) *MockProvisionManager_QueryOrchestrations_Call {
+func (_c *MockProvisionManager_QueryOrchestrations_Call) RunAndReturn(run func(context.Context, string, query.Predicate, store.PaginationOptions) iter.Seq2[*api.OrchestrationEntry, error]) *MockProvisionManager_QueryOrchestrations_Call {
 	_c.Call.Return(run)
 	return _c
 }

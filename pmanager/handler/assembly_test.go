@@ -47,7 +47,7 @@ func newClaimsRouter(handler *PMHandler, claims *cfmauth.Claims) chi.Router {
 			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), cfmauth.ContextKey{}, claims)))
 		})
 	})
-	(&HandlerServiceAssembly{}).registerV1Alpha1(router, handler)
+	(&HandlerServiceAssembly{}).registerNamespaced(router, handler)
 	return router
 }
 

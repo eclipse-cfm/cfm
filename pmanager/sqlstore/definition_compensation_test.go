@@ -51,19 +51,19 @@ func TestPostgresDefinitionStore_CompensationTypeRoundTrip(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	deploy, err := store.FindOrchestrationDefinition(txCtx, "test.deploy")
+	deploy, err := store.FindOrchestrationDefinition(txCtx, model.DefaultNamespace, "test.deploy")
 	require.NoError(t, err)
 	assert.Equal(t, model.OrchestrationType("test.rollback"), deploy.CompensationType)
 
-	rollback, err := store.FindOrchestrationDefinition(txCtx, "test.rollback")
+	rollback, err := store.FindOrchestrationDefinition(txCtx, model.DefaultNamespace, "test.rollback")
 	require.NoError(t, err)
 	assert.Empty(t, rollback.CompensationType)
 
 	var column sql.NullString
-	require.NoError(t, tx.QueryRow("SELECT compensation_type FROM orchestration_definitions WHERE id = 'test.rollback'").Scan(&column))
+	require.NoError(t, tx.QueryRow("SELECT compensation_type FROM orchestration_definitions WHERE id = 'default/test.rollback'").Scan(&column))
 	assert.False(t, column.Valid, "a definition without compensation stores NULL")
 
-	found, err := collection.CollectAll(store.FindOrchestrationDefinitionsByPredicate(txCtx, query.Eq("compensationType", "test.rollback")))
+	found, err := collection.CollectAll(store.FindOrchestrationDefinitionsByPredicate(txCtx, model.DefaultNamespace, query.Eq("compensationType", "test.rollback")))
 	require.NoError(t, err)
 	require.Len(t, found, 1)
 	assert.Equal(t, model.OrchestrationType("test.deploy"), found[0].Type)

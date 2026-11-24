@@ -16,14 +16,44 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/pmanager/model/v1alpha1"
 	"github.com/oaswrap/spec"
+	"github.com/oaswrap/spec/openapi"
 	"github.com/oaswrap/spec/option"
 )
 
 const docsDir = "docs"
+
+const apiPrefix = "/api/v1alpha1/"
+
+// addNamespacedPaths adds every path of the API again under /namespaces/{namespace}. The paths without it are in the
+// default namespace.
+func addNamespacedPaths(doc *openapi.Document) {
+	namespace := &openapi.Parameter{
+		Name:     "namespace",
+		In:       string(openapi.ParameterInPath),
+		Required: true,
+		Description: "The namespace the request reads and writes. It needs the scope `provision-manager-api:<namespace>:<permission>`. " +
+			"The paths without a namespace are in the `default` namespace.",
+		Schema: &openapi.Schema{Type: "string", Pattern: "^[a-zA-Z0-9_-]+$"},
+	}
+	namespacedPaths := map[string]*openapi.PathItem{}
+	for path, item := range doc.Paths {
+		rest, found := strings.CutPrefix(path, apiPrefix)
+		if !found {
+			continue
+		}
+		namespaced := *item
+		namespaced.Parameters = append([]*openapi.Parameter{namespace}, item.Parameters...)
+		namespacedPaths[apiPrefix+"namespaces/{namespace}/"+rest] = &namespaced
+	}
+	for path, item := range namespacedPaths {
+		doc.Paths[path] = item
+	}
+}
 
 func main() {
 	r := spec.NewRouter(
@@ -33,6 +63,7 @@ func main() {
 		option.WithServer("http://localhost:8080", option.ServerDescription("Development server")),
 		// Request DTOs declare required fields with the validate tag that ReadPayload enforces
 		option.WithReflectorConfig(option.RequiredPropByValidateTag()),
+		option.WithDocument(addNamespacedPaths),
 	)
 
 	generateOrchestrationEndpoints(r)
