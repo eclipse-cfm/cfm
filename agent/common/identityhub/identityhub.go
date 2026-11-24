@@ -9,6 +9,7 @@
  *
  *  Contributors:
  *       Metaform Systems, Inc. - initial API and implementation
+ *       Airbus SAS - accept all 2xx responses
  *
  */
 
@@ -73,10 +74,10 @@ func (a HttpIdentityAPIClient) DeleteParticipantContext(ctx context.Context, par
 	}
 	defer httpx.DrainAndClose(resp)
 
-	switch resp.StatusCode {
-	case http.StatusNotFound:
+	switch {
+	case resp.StatusCode == http.StatusNotFound:
 		return fmt.Errorf("participant context %s not found in Identity", participantContextID)
-	case http.StatusOK:
+	case httpx.IsSuccessCode(resp.StatusCode):
 		return nil
 	default:
 		return fmt.Errorf("failed to delete participant context on IdentityHub: received status code %d, body: %s", resp.StatusCode, httpx.ReadErrorBody(resp))
@@ -273,7 +274,7 @@ func (a HttpIdentityAPIClient) CreateParticipantContext(ctx context.Context, man
 	}
 	defer httpx.DrainAndClose(resp)
 
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= 300 {
+	if !httpx.IsSuccessCode(resp.StatusCode) {
 		return fmt.Errorf("failed to create participant context on IdentityHub: received status code %d, body: %s", resp.StatusCode, httpx.ReadErrorBody(resp))
 	}
 

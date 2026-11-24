@@ -9,6 +9,7 @@
  *
  *  Contributors:
  *       Metaform Systems, Inc. - initial API and implementation
+ *       Airbus SAS - accept all 2xx responses
  *
  */
 
@@ -395,4 +396,28 @@ func TestHttpApiClient_RevokeCredential_EscapesPathSegments(t *testing.T) {
 	}
 
 	require.NoError(t, client.RevokeCredential(t.Context(), "a/b"))
+}
+
+func TestHttpApiClient_RevokeCredential_NoContent(t *testing.T) {
+	credentialID := "test-credential-id"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/participants/test-issuer/credentials/"+credentialID+"/revoke" && r.Method == http.MethodPost {
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	tp := mocks.NewMockTokenProvider(t)
+	tp.On("GetToken", mock.Anything, ScopeCredentialsWrite, "test-issuer").Return("test token", nil)
+	client := HttpApiClient{
+		BaseURL:       server.URL,
+		TokenProvider: tp,
+		IssuerID:      "test-issuer",
+		HttpClient:    &http.Client{},
+	}
+
+	err := client.RevokeCredential(t.Context(), credentialID)
+	require.NoError(t, err, "the IssuerService answers a revocation with 204")
 }

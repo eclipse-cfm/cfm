@@ -9,6 +9,7 @@
  *
  *  Contributors:
  *       Metaform Systems, Inc. - initial API and implementation
+ *       Airbus SAS - accept all 2xx responses
  *
  */
 
@@ -73,4 +74,21 @@ func TestReadErrorBody(t *testing.T) {
 	// A multibyte character split by the limit is dropped rather than kept as an invalid byte
 	split := read(strings.Repeat("x", maxErrorBodyBytes-1) + "é")
 	assert.Equal(t, strings.Repeat("x", maxErrorBodyBytes-1)+" (truncated)", split)
+}
+
+func TestIsSuccessCode(t *testing.T) {
+	for status, success := range map[int]bool{
+		http.StatusOK:                  true,
+		http.StatusCreated:             true,
+		http.StatusAccepted:            true,
+		http.StatusNoContent:           true,
+		299:                            true,
+		199:                            false,
+		http.StatusMultipleChoices:     false,
+		http.StatusBadRequest:          false,
+		http.StatusNotFound:            false,
+		http.StatusInternalServerError: false,
+	} {
+		assert.Equal(t, success, IsSuccessCode(status), "status %d", status)
+	}
 }
