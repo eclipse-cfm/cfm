@@ -43,7 +43,7 @@ func (f *fakeProvisionManager) Start(context.Context, *model.OrchestrationManife
 	return f.orchestration, f.err
 }
 
-func (f *fakeProvisionManager) GetOrchestration(context.Context, string) (*api.Orchestration, error) {
+func (f *fakeProvisionManager) GetOrchestration(context.Context, string, string) (*api.Orchestration, error) {
 	return f.orchestration, f.err
 }
 

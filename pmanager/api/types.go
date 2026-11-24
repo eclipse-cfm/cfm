@@ -243,8 +243,9 @@ type OrchestrationDefinition struct {
 	CompensationType model.OrchestrationType `json:"compensationType,omitempty"`
 }
 
+// GetID returns the key of the definition, which is made of its namespace and its type, see DefinitionKey.
 func (o *OrchestrationDefinition) GetID() string {
-	return o.Type.String()
+	return DefinitionKey(o.Namespace, o.Type.String())
 }
 
 func (o *OrchestrationDefinition) GetVersion() int64 {
@@ -267,8 +268,9 @@ type ActivityDefinition struct {
 	OutputSchema map[string]any `json:"outputSchema"`
 }
 
+// GetID returns the key of the definition, which is made of its namespace and its type, see DefinitionKey.
 func (o *ActivityDefinition) GetID() string {
-	return o.Type.String()
+	return DefinitionKey(o.Namespace, o.Type.String())
 }
 
 func (o *ActivityDefinition) GetVersion() int64 {
@@ -277,6 +279,16 @@ func (o *ActivityDefinition) GetVersion() int64 {
 
 func (o *ActivityDefinition) IncrementVersion() {
 	o.Version++
+}
+
+// definitionKeySeparator separates the namespace from the type in a definition key. Neither a namespace nor a type can
+// contain it, see model.ValidateNamespace and the modeltype validation.
+const definitionKeySeparator = "/"
+
+// DefinitionKey returns the key that identifies the orchestration or activity definition of the given type in the given
+// namespace. An empty namespace is model.DefaultNamespace.
+func DefinitionKey(namespace string, definitionType string) string {
+	return model.NamespaceOrDefault(namespace) + definitionKeySeparator + definitionType
 }
 
 // InstantiateOrchestration creates and returns an initialized Orchestration based on the provided definition and inputs.

@@ -44,7 +44,7 @@ func TestDefinitionStore_OrchestrationDefinition_StoreAndFind(t *testing.T) {
 
 	_, _ = definitionStore.StoreOrchestrationDefinition(ctx, definition)
 
-	result, err := definitionStore.FindOrchestrationDefinition(ctx, oType)
+	result, err := definitionStore.FindOrchestrationDefinition(ctx, model.DefaultNamespace, oType)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
@@ -58,7 +58,7 @@ func TestDefinitionStore_OrchestrationDefinition_FindNotFound(t *testing.T) {
 	definitionStore := NewDefinitionStore()
 	ctx := context.Background()
 
-	result, err := definitionStore.FindOrchestrationDefinition(ctx, "non-existent")
+	result, err := definitionStore.FindOrchestrationDefinition(ctx, model.DefaultNamespace, "non-existent")
 
 	assert.Error(t, err)
 	assert.Equal(t, types.ErrNotFound, err)
@@ -77,7 +77,7 @@ func TestDefinitionStore_ActivityDefinition_StoreAndFind(t *testing.T) {
 
 	_, _ = definitionStore.StoreActivityDefinition(ctx, definition)
 
-	result, err := definitionStore.FindActivityDefinition(ctx, activityType)
+	result, err := definitionStore.FindActivityDefinition(ctx, model.DefaultNamespace, activityType)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
@@ -92,7 +92,7 @@ func TestDefinitionStore_ActivityDefinition_FindNotFound(t *testing.T) {
 	definitionStore := NewDefinitionStore()
 	ctx := context.Background()
 
-	result, err := definitionStore.FindActivityDefinition(ctx, "non-existent")
+	result, err := definitionStore.FindActivityDefinition(ctx, model.DefaultNamespace, "non-existent")
 
 	assert.Error(t, err)
 	assert.Equal(t, types.ErrNotFound, err)
@@ -107,17 +107,17 @@ func TestDefinitionStore_OrchestrationDefinition_Delete(t *testing.T) {
 	definition := &api.OrchestrationDefinition{Type: oType}
 	_, _ = definitionStore.StoreOrchestrationDefinition(ctx, definition)
 
-	_, err := definitionStore.FindOrchestrationDefinition(ctx, oType)
+	_, err := definitionStore.FindOrchestrationDefinition(ctx, model.DefaultNamespace, oType)
 	assert.NoError(t, err)
 
-	deleted, err := definitionStore.DeleteOrchestrationDefinition(ctx, oType)
+	deleted, err := definitionStore.DeleteOrchestrationDefinition(ctx, model.DefaultNamespace, oType)
 	assert.Nil(t, err)
 	assert.True(t, deleted)
 
-	_, err = definitionStore.FindOrchestrationDefinition(ctx, oType)
+	_, err = definitionStore.FindOrchestrationDefinition(ctx, model.DefaultNamespace, oType)
 	assert.Equal(t, types.ErrNotFound, err)
 
-	deleted, err = definitionStore.DeleteOrchestrationDefinition(ctx, oType)
+	deleted, err = definitionStore.DeleteOrchestrationDefinition(ctx, model.DefaultNamespace, oType)
 	assert.Nil(t, err)
 	assert.False(t, deleted)
 }
@@ -130,17 +130,17 @@ func TestDefinitionStore_ActivityDefinition_Delete(t *testing.T) {
 	definition := &api.ActivityDefinition{Type: activityType}
 	_, _ = definitionStore.StoreActivityDefinition(ctx, definition)
 
-	_, err := definitionStore.FindActivityDefinition(ctx, activityType)
+	_, err := definitionStore.FindActivityDefinition(ctx, model.DefaultNamespace, activityType)
 	assert.NoError(t, err)
 
-	deleted, err := definitionStore.DeleteActivityDefinition(ctx, activityType)
+	deleted, err := definitionStore.DeleteActivityDefinition(ctx, model.DefaultNamespace, activityType)
 	assert.Nil(t, err)
 	assert.True(t, deleted)
 
-	_, err = definitionStore.FindActivityDefinition(ctx, activityType)
+	_, err = definitionStore.FindActivityDefinition(ctx, model.DefaultNamespace, activityType)
 	assert.Equal(t, types.ErrNotFound, err)
 
-	deleted, err = definitionStore.DeleteActivityDefinition(ctx, activityType)
+	deleted, err = definitionStore.DeleteActivityDefinition(ctx, model.DefaultNamespace, activityType)
 	assert.Nil(t, err)
 	assert.False(t, deleted)
 }
@@ -157,7 +157,7 @@ func TestDefinitionStore_DataIsolation(t *testing.T) {
 
 	originalDef.Type = "modified-type"
 
-	retrievedDef, err := definitionStore.FindOrchestrationDefinition(ctx, originalType)
+	retrievedDef, err := definitionStore.FindOrchestrationDefinition(ctx, model.DefaultNamespace, originalType)
 	require.NoError(t, err)
 
 	assert.Equal(t, originalType, retrievedDef.Type)
@@ -165,7 +165,7 @@ func TestDefinitionStore_DataIsolation(t *testing.T) {
 
 	retrievedDef.Type = "retrieved-modified"
 
-	retrievedDef2, err := definitionStore.FindOrchestrationDefinition(ctx, originalType)
+	retrievedDef2, err := definitionStore.FindOrchestrationDefinition(ctx, model.DefaultNamespace, originalType)
 	require.NoError(t, err)
 	assert.Equal(t, originalType, retrievedDef2.Type)
 }
@@ -189,12 +189,12 @@ func TestDefinitionStore_StoreOverwrite(t *testing.T) {
 	_, _ = definitionStore.StoreOrchestrationDefinition(ctx, definition2)
 
 	// Verify the second definition is stored
-	result, err := definitionStore.FindOrchestrationDefinition(ctx, dType)
+	result, err := definitionStore.FindOrchestrationDefinition(ctx, model.DefaultNamespace, dType)
 	require.NoError(t, err)
 	assert.Equal(t, dType, result.Type)
 
 	// Verify only one definition exists
-	defintions, err := definitionStore.ListOrchestrationDefinitions(ctx)
+	defintions, err := definitionStore.ListOrchestrationDefinitions(ctx, model.DefaultNamespace)
 	assert.Equal(t, 1, len(defintions))
 }
 
@@ -203,14 +203,14 @@ func TestDefinitionStore_ListOrchestrationDefinitions(t *testing.T) {
 	ctx := context.Background()
 
 	// Test empty store
-	definitions, err := definitionStore.ListOrchestrationDefinitions(ctx)
+	definitions, err := definitionStore.ListOrchestrationDefinitions(ctx, model.DefaultNamespace)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(definitions))
 
 	// Add test data
 	_, _ = definitionStore.StoreOrchestrationDefinition(ctx, &api.OrchestrationDefinition{Type: "type1"})
 
-	definitions, err = definitionStore.ListOrchestrationDefinitions(ctx)
+	definitions, err = definitionStore.ListOrchestrationDefinitions(ctx, model.DefaultNamespace)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(definitions))
 
@@ -224,7 +224,7 @@ func TestDefinitionStore_ListOrchestrationDefinitions_DataIsolation(t *testing.T
 	originalDef := &api.OrchestrationDefinition{Type: originalType}
 	_, _ = definitionStore.StoreOrchestrationDefinition(ctx, originalDef)
 
-	definitions, err := definitionStore.ListOrchestrationDefinitions(ctx)
+	definitions, err := definitionStore.ListOrchestrationDefinitions(ctx, model.DefaultNamespace)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(definitions))
 
@@ -238,7 +238,7 @@ func TestDefinitionStore_ListOrchestrationDefinitions_DataIsolation(t *testing.T
 	definitions[0].Type = "returned-modified"
 
 	// Verify stored definition is not affected
-	storedDef, err := definitionStore.FindOrchestrationDefinition(ctx, originalType)
+	storedDef, err := definitionStore.FindOrchestrationDefinition(ctx, model.DefaultNamespace, originalType)
 	assert.NoError(t, err)
 	assert.Equal(t, originalType, storedDef.Type)
 }
@@ -248,13 +248,13 @@ func TestDefinitionStore_ListActivityDefinitions(t *testing.T) {
 	ctx := context.Background()
 
 	// Test empty store
-	definitions, err := definitionStore.ListActivityDefinitions(ctx)
+	definitions, err := definitionStore.ListActivityDefinitions(ctx, model.DefaultNamespace)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(definitions))
 
 	_, _ = definitionStore.StoreActivityDefinition(ctx, &api.ActivityDefinition{Type: "type1", Description: "desc1"})
 
-	definitions, err = definitionStore.ListActivityDefinitions(ctx)
+	definitions, err = definitionStore.ListActivityDefinitions(ctx, model.DefaultNamespace)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(definitions))
 }
@@ -267,7 +267,7 @@ func TestDefinitionStore_ListActivityDefinitions_DataIsolation(t *testing.T) {
 	originalDef := &api.ActivityDefinition{Type: originalType, Description: "desc1"}
 	_, _ = definitionStore.StoreActivityDefinition(ctx, originalDef)
 
-	definitions, err := definitionStore.ListActivityDefinitions(ctx)
+	definitions, err := definitionStore.ListActivityDefinitions(ctx, model.DefaultNamespace)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(definitions))
 
@@ -281,7 +281,7 @@ func TestDefinitionStore_ListActivityDefinitions_DataIsolation(t *testing.T) {
 	definitions[0].Type = "returned-modified"
 
 	// Verify stored definition is not affected
-	storedDef, err := definitionStore.FindActivityDefinition(ctx, originalType)
+	storedDef, err := definitionStore.FindActivityDefinition(ctx, model.DefaultNamespace, originalType)
 	assert.NoError(t, err)
 	assert.Equal(t, originalType, storedDef.Type)
 }
@@ -294,7 +294,7 @@ func TestDefinitionStore_ExistsOrchestrationDefinition_Found(t *testing.T) {
 	definition := &api.OrchestrationDefinition{Type: oType}
 	_, _ = definitionStore.StoreOrchestrationDefinition(ctx, definition)
 
-	exists, err := definitionStore.ExistsOrchestrationDefinition(ctx, oType)
+	exists, err := definitionStore.ExistsOrchestrationDefinition(ctx, model.DefaultNamespace, oType)
 
 	assert.NoError(t, err)
 	assert.True(t, exists)
@@ -304,7 +304,7 @@ func TestDefinitionStore_ExistsOrchestrationDefinition_NotFound(t *testing.T) {
 	definitionStore := NewDefinitionStore()
 	ctx := context.Background()
 
-	exists, err := definitionStore.ExistsOrchestrationDefinition(ctx, "non-existent-orchestration")
+	exists, err := definitionStore.ExistsOrchestrationDefinition(ctx, model.DefaultNamespace, "non-existent-orchestration")
 
 	assert.NoError(t, err)
 	assert.False(t, exists)
@@ -318,7 +318,7 @@ func TestDefinitionStore_ExistsActivityDefinition_Found(t *testing.T) {
 	definition := &api.ActivityDefinition{Type: activityType}
 	_, _ = definitionStore.StoreActivityDefinition(ctx, definition)
 
-	exists, err := definitionStore.ExistsActivityDefinition(ctx, activityType)
+	exists, err := definitionStore.ExistsActivityDefinition(ctx, model.DefaultNamespace, activityType)
 
 	assert.NoError(t, err)
 	assert.True(t, exists)
@@ -328,7 +328,7 @@ func TestDefinitionStore_ExistsActivityDefinition_NotFound(t *testing.T) {
 	definitionStore := NewDefinitionStore()
 	ctx := context.Background()
 
-	exists, err := definitionStore.ExistsActivityDefinition(ctx, "non-existent-activity")
+	exists, err := definitionStore.ExistsActivityDefinition(ctx, model.DefaultNamespace, "non-existent-activity")
 
 	assert.NoError(t, err)
 	assert.False(t, exists)
@@ -361,7 +361,7 @@ func TestDefinitionStore_ActivityDefinitionReferenced_Found(t *testing.T) {
 	}
 	_, _ = definitionStore.StoreOrchestrationDefinition(ctx, orchestrationDef)
 
-	referenced, err := definitionStore.ActivityDefinitionReferences(ctx, "deploy-activity")
+	referenced, err := definitionStore.ActivityDefinitionReferences(ctx, model.DefaultNamespace, "deploy-activity")
 
 	assert.NoError(t, err)
 	assert.ElementsMatch(t, referenced, []string{"deploy-orchestration"})
@@ -379,7 +379,7 @@ func TestDefinitionStore_ActivityDefinitionReferenced_NotFound(t *testing.T) {
 	_, _ = definitionStore.StoreOrchestrationDefinition(ctx, orchestrationDef)
 
 	// Verify activity is not referenced
-	referenced, err := definitionStore.ActivityDefinitionReferences(ctx, "non-existent-activity")
+	referenced, err := definitionStore.ActivityDefinitionReferences(ctx, model.DefaultNamespace, "non-existent-activity")
 
 	assert.NoError(t, err)
 	assert.Empty(t, referenced)

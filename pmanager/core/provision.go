@@ -47,6 +47,13 @@ func (p provisionManager) Start(ctx context.Context, manifest *model.Orchestrati
 		return nil, types.NewClientError("Missing required field: orchestrationType")
 	}
 
+	if manifest.Namespace == "" {
+		manifest.Namespace = model.DefaultNamespace
+	} else if err := model.ValidateNamespace(manifest.Namespace); err != nil {
+		return nil, types.NewClientError("%s", err.Error())
+	}
+	namespace := manifest.Namespace
+
 	if manifest.ReplyTo != "" {
 		if err := model.ValidateReplyTo(manifest.ReplyTo); err != nil {
 			return nil, types.NewClientError("%s", err.Error())
@@ -58,11 +65,11 @@ func (p provisionManager) Start(ctx context.Context, manifest *model.Orchestrati
 
 	var orchestration *api.Orchestration
 	err := p.trxContext.Execute(ctx, func(ctx context.Context) error {
-		definition, err := p.store.FindOrchestrationDefinition(ctx, manifest.OrchestrationType)
+		definition, err := p.store.FindOrchestrationDefinition(ctx, namespace, manifest.OrchestrationType)
 		if err != nil {
 			if errors.Is(err, types.ErrNotFound) {
 				// Not found is a client error
-				return types.NewClientError("orchestration type '%s' not found", manifest.OrchestrationType)
+				return types.NewClientError("orchestration type '%s' not found in namespace '%s'", manifest.OrchestrationType, namespace)
 			}
 			return types.NewFatalWrappedError(err, "unable to find orchestration definition for manifest %s", manifestID)
 		}
@@ -76,8 +83,8 @@ func (p provisionManager) Start(ctx context.Context, manifest *model.Orchestrati
 		if orch != nil {
 			// The same manifest may be submitted again, for example when a start is retried. A different manifest that
 			// reuses the ID is refused, so that it can neither read nor resume another caller's orchestration.
-			if orch.OrchestrationType != manifest.OrchestrationType || orch.CorrelationID != manifest.CorrelationID {
-				return fmt.Errorf("orchestration %s already exists with a different type or correlation ID: %w", manifestID, types.ErrConflict)
+			if model.NamespaceOrDefault(orch.Namespace) != namespace || orch.OrchestrationType != manifest.OrchestrationType || orch.CorrelationID != manifest.CorrelationID {
+				return fmt.Errorf("orchestration %s already exists with a different namespace, type or correlation ID: %w", manifestID, types.ErrConflict)
 			}
 			// Already exists, return its representation
 			orchestration = orch
@@ -93,10 +100,11 @@ func (p provisionManager) Start(ctx context.Context, manifest *model.Orchestrati
 		}
 
 		// Does not exist, create the orchestration
-		orch, err = api.InstantiateOrchestration(manifest.ID, manifest.CorrelationID, manifest.OrchestrationType, definition.GetID(), definition.Activities, manifest.Payload)
+		orch, err = api.InstantiateOrchestration(manifest.ID, manifest.CorrelationID, manifest.OrchestrationType, definition.Type.String(), definition.Activities, manifest.Payload)
 		if err != nil {
 			return types.NewFatalWrappedError(err, "error instantiating orchestration for %s", manifestID)
 		}
+		orch.Namespace = namespace
 		orch.CompensatedOrchestrationID = manifest.CompensatedManifestID
 		orch.ReplyTo = manifest.ReplyTo
 		err = p.orchestrator.Execute(ctx, orch)
@@ -121,19 +129,30 @@ func executionError(err error, orchestrationID string, manifestID string) error 
 	return types.NewFatalWrappedError(err, "error executing orchestration %s for %s", orchestrationID, manifestID)
 }
 
-func (p provisionManager) Cancel(ctx context.Context, orchestrationID string) error {
+func (p provisionManager) Cancel(ctx context.Context, namespace string, orchestrationID string) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (p provisionManager) GetOrchestration(ctx context.Context, orchestrationID string) (*api.Orchestration, error) {
-	return p.orchestrator.GetOrchestration(ctx, orchestrationID)
+// GetOrchestration returns the orchestration if it belongs to the namespace. An orchestration of another namespace is
+// reported as not found, so that its existence is not disclosed.
+func (p provisionManager) GetOrchestration(ctx context.Context, namespace string, orchestrationID string) (*api.Orchestration, error) {
+	orchestration, err := p.orchestrator.GetOrchestration(ctx, orchestrationID)
+	if err != nil || orchestration == nil {
+		return orchestration, err
+	}
+	if model.NamespaceOrDefault(orchestration.Namespace) != model.NamespaceOrDefault(namespace) {
+		return nil, nil
+	}
+	return orchestration, nil
 }
 
 func (p provisionManager) QueryOrchestrations(
 	ctx context.Context,
+	namespace string,
 	predicate query.Predicate,
 	options store.PaginationOptions) iter.Seq2[*api.OrchestrationEntry, error] {
+	predicate = namespacePredicate(namespace, predicate)
 	return func(yield func(*api.OrchestrationEntry, error) bool) {
 		err := p.trxContext.Execute(ctx, func(ctx context.Context) error {
 			for entry, err := range p.index.FindByPredicatePaginated(ctx, predicate, options) {
@@ -149,7 +168,8 @@ func (p provisionManager) QueryOrchestrations(
 	}
 }
 
-func (p provisionManager) CountOrchestrations(ctx context.Context, predicate query.Predicate) (int64, error) {
+func (p provisionManager) CountOrchestrations(ctx context.Context, namespace string, predicate query.Predicate) (int64, error) {
+	predicate = namespacePredicate(namespace, predicate)
 	var count int64
 	err := p.trxContext.Execute(ctx, func(ctx context.Context) error {
 		c, err := p.index.CountByPredicate(ctx, predicate)
@@ -157,4 +177,14 @@ func (p provisionManager) CountOrchestrations(ctx context.Context, predicate que
 		return err
 	})
 	return count, err
+}
+
+// namespacePredicate restricts the predicate to the entities of the namespace. A nil predicate matches every entity of
+// the namespace.
+func namespacePredicate(namespace string, predicate query.Predicate) query.Predicate {
+	namespaceEq := query.Eq("namespace", model.NamespaceOrDefault(namespace))
+	if predicate == nil {
+		return namespaceEq
+	}
+	return query.And(namespaceEq, predicate)
 }

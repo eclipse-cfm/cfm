@@ -139,7 +139,7 @@ func TestProvisionManager_Start(t *testing.T) {
 				}
 				orch.EXPECT().GetOrchestration(mock.Anything, "test-orchestration-8").Return(existingOrch, nil)
 			},
-			expectedError: "already exists with a different type or correlation ID",
+			expectedError: "already exists with a different namespace, type or correlation ID",
 		},
 		{
 			name: "deduplication - existing orchestration with a different correlation ID is a conflict",
@@ -158,7 +158,7 @@ func TestProvisionManager_Start(t *testing.T) {
 				}
 				orch.EXPECT().GetOrchestration(mock.Anything, "test-orchestration-9").Return(existingOrch, nil)
 			},
-			expectedError: "already exists with a different type or correlation ID",
+			expectedError: "already exists with a different namespace, type or correlation ID",
 		},
 		{
 			name: "orchestration definition not found",
@@ -418,7 +418,7 @@ func TestCountOrchestrations_WithEmptyResult(t *testing.T) {
 	mockEntityStore := cmocks.NewMockEntityStore[*api.OrchestrationEntry](t)
 	trxContext := store.NoOpTransactionContext{}
 
-	mockEntityStore.On("CountByPredicate", ctx, &query.AtomicPredicate{}).
+	mockEntityStore.On("CountByPredicate", ctx, namespacePredicate(model.DefaultNamespace, &query.AtomicPredicate{})).
 		Return(int64(0), nil)
 
 	pm := &provisionManager{
@@ -427,7 +427,7 @@ func TestCountOrchestrations_WithEmptyResult(t *testing.T) {
 		trxContext: trxContext,
 	}
 
-	count, err := pm.CountOrchestrations(ctx, &query.AtomicPredicate{})
+	count, err := pm.CountOrchestrations(ctx, model.DefaultNamespace, &query.AtomicPredicate{})
 
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), count)
@@ -441,7 +441,7 @@ func TestCountOrchestrations_WithResults(t *testing.T) {
 	trxContext := store.NoOpTransactionContext{}
 
 	predicate := &query.AtomicPredicate{}
-	mockEntityStore.On("CountByPredicate", ctx, predicate).
+	mockEntityStore.On("CountByPredicate", ctx, namespacePredicate(model.DefaultNamespace, predicate)).
 		Return(int64(5), nil)
 
 	pm := &provisionManager{
@@ -450,7 +450,7 @@ func TestCountOrchestrations_WithResults(t *testing.T) {
 		trxContext: trxContext,
 	}
 
-	count, err := pm.CountOrchestrations(ctx, predicate)
+	count, err := pm.CountOrchestrations(ctx, model.DefaultNamespace, predicate)
 
 	require.NoError(t, err)
 	assert.Equal(t, int64(5), count)
@@ -465,7 +465,7 @@ func TestCountOrchestrations_WithStorageError(t *testing.T) {
 
 	expectedErr := types.ErrNotFound
 
-	mockEntityStore.On("CountByPredicate", ctx, &query.AtomicPredicate{}).
+	mockEntityStore.On("CountByPredicate", ctx, namespacePredicate(model.DefaultNamespace, &query.AtomicPredicate{})).
 		Return(int64(0), expectedErr)
 
 	pm := &provisionManager{
@@ -474,7 +474,7 @@ func TestCountOrchestrations_WithStorageError(t *testing.T) {
 		trxContext: trxContext,
 	}
 
-	count, err := pm.CountOrchestrations(ctx, &query.AtomicPredicate{})
+	count, err := pm.CountOrchestrations(ctx, model.DefaultNamespace, &query.AtomicPredicate{})
 
 	require.Error(t, err)
 	assert.Equal(t, expectedErr, err)
@@ -488,7 +488,7 @@ func TestQueryOrchestrations_WithEmptyResult(t *testing.T) {
 	mockEntityStore := cmocks.NewMockEntityStore[*api.OrchestrationEntry](t)
 	trxContext := store.NoOpTransactionContext{}
 
-	mockEntityStore.On("FindByPredicatePaginated", ctx, &query.AtomicPredicate{}, store.PaginationOptions{}).
+	mockEntityStore.On("FindByPredicatePaginated", ctx, namespacePredicate(model.DefaultNamespace, &query.AtomicPredicate{}), store.PaginationOptions{}).
 		Return(func(ctx context.Context, predicate query.Predicate, options store.PaginationOptions) iter.Seq2[*api.OrchestrationEntry, error] {
 			return func(yield func(*api.OrchestrationEntry, error) bool) {
 				// Return empty sequence
@@ -507,7 +507,7 @@ func TestQueryOrchestrations_WithEmptyResult(t *testing.T) {
 	var results []api.OrchestrationEntry
 	var errs []error
 
-	for entry, err := range pm.QueryOrchestrations(ctx, predicate, options) {
+	for entry, err := range pm.QueryOrchestrations(ctx, model.DefaultNamespace, predicate, options) {
 		results = append(results, *entry)
 		if err != nil {
 			errs = append(errs, err)
@@ -538,7 +538,7 @@ func TestQueryOrchestrations_WithResults(t *testing.T) {
 		},
 	}
 
-	mockEntityStore.On("FindByPredicatePaginated", ctx, &query.AtomicPredicate{}, store.PaginationOptions{}).
+	mockEntityStore.On("FindByPredicatePaginated", ctx, namespacePredicate(model.DefaultNamespace, &query.AtomicPredicate{}), store.PaginationOptions{}).
 		Return(func(ctx context.Context, predicate query.Predicate, options store.PaginationOptions) iter.Seq2[*api.OrchestrationEntry, error] {
 			return func(yield func(*api.OrchestrationEntry, error) bool) {
 				for _, entry := range expectedEntries {
@@ -560,7 +560,7 @@ func TestQueryOrchestrations_WithResults(t *testing.T) {
 
 	var results []api.OrchestrationEntry
 
-	for entry, err := range pm.QueryOrchestrations(ctx, predicate, options) {
+	for entry, err := range pm.QueryOrchestrations(ctx, model.DefaultNamespace, predicate, options) {
 		require.NoError(t, err)
 		results = append(results, *entry)
 	}
@@ -579,7 +579,7 @@ func TestQueryOrchestrations_WithStorageError(t *testing.T) {
 
 	expectedErr := types.ErrNotFound
 
-	mockEntityStore.On("FindByPredicatePaginated", ctx, &query.AtomicPredicate{}, store.PaginationOptions{}).
+	mockEntityStore.On("FindByPredicatePaginated", ctx, namespacePredicate(model.DefaultNamespace, &query.AtomicPredicate{}), store.PaginationOptions{}).
 		Return(func(ctx context.Context, predicate query.Predicate, options store.PaginationOptions) iter.Seq2[*api.OrchestrationEntry, error] {
 			return func(yield func(*api.OrchestrationEntry, error) bool) {
 				yield(&api.OrchestrationEntry{}, expectedErr)
@@ -597,7 +597,7 @@ func TestQueryOrchestrations_WithStorageError(t *testing.T) {
 
 	var errorCount int
 
-	for _, err := range pm.QueryOrchestrations(ctx, predicate, options) {
+	for _, err := range pm.QueryOrchestrations(ctx, model.DefaultNamespace, predicate, options) {
 		if err != nil {
 			errorCount++
 			require.Equal(t, expectedErr, err)
@@ -632,7 +632,7 @@ func TestQueryOrchestrations_WithPagination(t *testing.T) {
 		Offset: 0,
 	}
 
-	mockEntityStore.On("FindByPredicatePaginated", ctx, &query.AtomicPredicate{}, paginationOptions).
+	mockEntityStore.On("FindByPredicatePaginated", ctx, namespacePredicate(model.DefaultNamespace, &query.AtomicPredicate{}), paginationOptions).
 		Return(func(ctx context.Context, predicate query.Predicate, options store.PaginationOptions) iter.Seq2[*api.OrchestrationEntry, error] {
 			return func(yield func(*api.OrchestrationEntry, error) bool) {
 				for _, entry := range expectedEntries {
@@ -653,7 +653,7 @@ func TestQueryOrchestrations_WithPagination(t *testing.T) {
 
 	var results []api.OrchestrationEntry
 
-	for entry, err := range pm.QueryOrchestrations(ctx, predicate, paginationOptions) {
+	for entry, err := range pm.QueryOrchestrations(ctx, model.DefaultNamespace, predicate, paginationOptions) {
 		require.NoError(t, err)
 		results = append(results, *entry)
 	}
@@ -686,7 +686,7 @@ func TestQueryOrchestrations_ContextCancellation(t *testing.T) {
 		},
 	}
 
-	mockEntityStore.On("FindByPredicatePaginated", ctx, &query.AtomicPredicate{}, store.PaginationOptions{}).
+	mockEntityStore.On("FindByPredicatePaginated", ctx, namespacePredicate(model.DefaultNamespace, &query.AtomicPredicate{}), store.PaginationOptions{}).
 		Return(func(ctx context.Context, predicate query.Predicate, options store.PaginationOptions) iter.Seq2[*api.OrchestrationEntry, error] {
 			return func(yield func(*api.OrchestrationEntry, error) bool) {
 				for _, entry := range expectedEntries {
@@ -709,7 +709,7 @@ func TestQueryOrchestrations_ContextCancellation(t *testing.T) {
 	var results []api.OrchestrationEntry
 	count := 0
 
-	for entry, err := range pm.QueryOrchestrations(ctx, predicate, options) {
+	for entry, err := range pm.QueryOrchestrations(ctx, model.DefaultNamespace, predicate, options) {
 		require.NoError(t, err)
 		results = append(results, *entry)
 		count++
@@ -745,7 +745,7 @@ func TestQueryOrchestrations_ComplexPredicate(t *testing.T) {
 		},
 	}
 
-	mockEntityStore.On("FindByPredicatePaginated", ctx, complexPredicate, store.PaginationOptions{}).
+	mockEntityStore.On("FindByPredicatePaginated", ctx, namespacePredicate(model.DefaultNamespace, complexPredicate), store.PaginationOptions{}).
 		Return(func(ctx context.Context, predicate query.Predicate, options store.PaginationOptions) iter.Seq2[*api.OrchestrationEntry, error] {
 			return func(yield func(*api.OrchestrationEntry, error) bool) {
 				for _, entry := range expectedEntries {
@@ -764,7 +764,7 @@ func TestQueryOrchestrations_ComplexPredicate(t *testing.T) {
 
 	var results []api.OrchestrationEntry
 
-	for entry, err := range pm.QueryOrchestrations(ctx, complexPredicate, store.PaginationOptions{}) {
+	for entry, err := range pm.QueryOrchestrations(ctx, model.DefaultNamespace, complexPredicate, store.PaginationOptions{}) {
 		require.NoError(t, err)
 		results = append(results, *entry)
 	}

@@ -24,7 +24,7 @@ import (
 )
 
 func newOrchestrationEntryStore() store.EntityStore[*api.OrchestrationEntry] {
-	columnNames := []string{"id", "version", "correlation_id", "definition_id", "state", "state_timestamp", "created_timestamp", "orchestration_type"}
+	columnNames := []string{"id", "namespace", "version", "correlation_id", "definition_id", "state", "state_timestamp", "created_timestamp", "orchestration_type"}
 	builder := sqlstore.NewPostgresJSONBBuilder().
 		WithFieldMappings(map[string]string{"correlationId": "correlation_id",
 			"DefinitionID":      "definition_id",
@@ -49,6 +49,12 @@ func recordToOrchestrationEntry(tx *sql.Tx, record *sqlstore.DatabaseRecord) (*a
 		entry.ID = id
 	} else {
 		return nil, fmt.Errorf("invalid orchestration entry id reading record")
+	}
+
+	if namespace, ok := record.Values["namespace"].(string); ok {
+		entry.Namespace = namespace
+	} else {
+		return nil, fmt.Errorf("invalid orchestration entry namespace reading record")
 	}
 
 	if version, ok := record.Values["version"].(int64); ok {
@@ -103,6 +109,7 @@ func orchestrationEntryToRecord(orchestrationEntry *api.OrchestrationEntry) (*sq
 	}
 
 	record.Values["id"] = orchestrationEntry.ID
+	record.Values["namespace"] = model.NamespaceOrDefault(orchestrationEntry.Namespace)
 	record.Values["version"] = orchestrationEntry.Version
 	record.Values["correlation_id"] = orchestrationEntry.CorrelationID
 	record.Values["state"] = orchestrationEntry.State

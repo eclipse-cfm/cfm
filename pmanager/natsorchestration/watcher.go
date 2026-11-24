@@ -122,7 +122,8 @@ func CompensationID(orchestrationID string) string {
 // definition does not contain a definition of that type. An error is returned if the definitions cannot be read or the
 // compensation cannot be started. De-duplication is handled by the ProvisionManager.
 func (w *OrchestrationIndexWatcher) startCompensationOrchestration(ctx context.Context, orchestration api.Orchestration) error {
-	definition, err := w.findOrchestrationDefinition(ctx, orchestration.DefinitionID)
+	namespace := model.NamespaceOrDefault(orchestration.Namespace)
+	definition, err := w.findOrchestrationDefinition(ctx, namespace, orchestration.DefinitionID)
 	if err != nil {
 		return err
 	}
@@ -132,7 +133,7 @@ func (w *OrchestrationIndexWatcher) startCompensationOrchestration(ctx context.C
 		return nil
 	}
 
-	exists, err := w.existsCompensationOrchestration(ctx, compensationType, definition.TemplateRef)
+	exists, err := w.existsCompensationOrchestration(ctx, namespace, compensationType, definition.TemplateRef)
 	if err != nil {
 		return err
 	}
@@ -163,8 +164,9 @@ func (w *OrchestrationIndexWatcher) startCompensationOrchestration(ctx context.C
 		OrchestrationType:     compensationType,
 		Payload:               pData,
 		CompensatedManifestID: orchestration.ID,
-		// The compensation reports to the initiator of the failed orchestration
-		ReplyTo: orchestration.ReplyTo,
+		// The compensation runs in the namespace of the failed orchestration and reports to its initiator
+		Namespace: namespace,
+		ReplyTo:   orchestration.ReplyTo,
 	}
 	compensation, err := w.provisionManager.Start(ctx, &manifest)
 	if err != nil {
@@ -174,24 +176,24 @@ func (w *OrchestrationIndexWatcher) startCompensationOrchestration(ctx context.C
 	return nil
 }
 
-// findOrchestrationDefinition returns the orchestration definition with the given ID
-func (w *OrchestrationIndexWatcher) findOrchestrationDefinition(ctx context.Context, orchestrationDefinitionID string) (*api.OrchestrationDefinition, error) {
+// findOrchestrationDefinition returns the orchestration definition of the namespace with the given ID
+func (w *OrchestrationIndexWatcher) findOrchestrationDefinition(ctx context.Context, namespace string, orchestrationDefinitionID string) (*api.OrchestrationDefinition, error) {
 	idPredicate := query.Eq("type", orchestrationDefinitionID)
-	definitions, err := w.definitionManager.QueryOrchestrationDefinitions(ctx, idPredicate)
+	definitions, err := w.definitionManager.QueryOrchestrationDefinitions(ctx, namespace, idPredicate)
 	if err != nil {
 		return nil, err
 	}
 	if len(definitions) != 1 {
-		return nil, types.NewFatalError("expected exactly one orchestration definition with ID %s, found %d", orchestrationDefinitionID, len(definitions))
+		return nil, types.NewFatalError("expected exactly one orchestration definition with ID %s in namespace %s, found %d", orchestrationDefinitionID, namespace, len(definitions))
 	}
 	return &definitions[0], nil
 }
 
 // existsCompensationOrchestration verifies that an orchestration definition of the desired orchestration type exists
 // that was generated based on the given template
-func (w *OrchestrationIndexWatcher) existsCompensationOrchestration(ctx context.Context, orchestrationType model.OrchestrationType, templateRef string) (bool, error) {
+func (w *OrchestrationIndexWatcher) existsCompensationOrchestration(ctx context.Context, namespace string, orchestrationType model.OrchestrationType, templateRef string) (bool, error) {
 	templateRefPredicate := query.And(query.Eq("templateRef", templateRef), query.Eq("type", orchestrationType.String()))
-	compensationDefinitions, err := w.definitionManager.QueryOrchestrationDefinitions(ctx, templateRefPredicate)
+	compensationDefinitions, err := w.definitionManager.QueryOrchestrationDefinitions(ctx, namespace, templateRefPredicate)
 
 	return len(compensationDefinitions) == 1, err
 }
@@ -199,6 +201,7 @@ func (w *OrchestrationIndexWatcher) existsCompensationOrchestration(ctx context.
 func convertToEntry(orchestration api.Orchestration) *api.OrchestrationEntry {
 	entry := &api.OrchestrationEntry{
 		ID:                orchestration.ID,
+		Namespace:         model.NamespaceOrDefault(orchestration.Namespace),
 		OrchestrationType: orchestration.OrchestrationType,
 		CorrelationID:     orchestration.CorrelationID,
 		DefinitionID:      orchestration.DefinitionID,
