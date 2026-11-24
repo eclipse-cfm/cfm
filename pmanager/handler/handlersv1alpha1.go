@@ -59,6 +59,11 @@ func (h *PMHandler) createActivityDefinition(w http.ResponseWriter, req *http.Re
 	if !h.ReadPayload(w, req, &definition) {
 		return
 	}
+	namespace, ok := h.payloadNamespace(w, req, definition.Namespace)
+	if !ok {
+		return
+	}
+	definition.Namespace = namespace
 
 	_, err := h.definitionManager.CreateActivityDefinition(req.Context(), v1alpha1.ToActivityDefinition(&definition))
 	if err != nil {
@@ -80,8 +85,13 @@ func (h *PMHandler) createOrchestrationDefinition(w http.ResponseWriter, req *ht
 	if !h.ReadPayload(w, req, &orchestrationTemplate) {
 		return
 	}
+	namespace, ok := h.payloadNamespace(w, req, orchestrationTemplate.Namespace)
+	if !ok {
+		return
+	}
+	orchestrationTemplate.Namespace = namespace
 
-	span.SetAttributes(attribute.String("orchestration.template_id", orchestrationTemplate.ID))
+	span.SetAttributes(attribute.String("orchestration.template_id", orchestrationTemplate.ID), attribute.String("orchestration.namespace", namespace))
 	span.AddEvent("Payload read successfully")
 	if err := orchestrationTemplate.ValidateCompensation(); err != nil {
 		span.RecordError(err)
@@ -116,6 +126,11 @@ func (h *PMHandler) createOrchestration(w http.ResponseWriter, req *http.Request
 	if !h.ReadPayload(w, req, &manifest) {
 		return
 	}
+	namespace, ok := h.payloadNamespace(w, req, manifest.Namespace)
+	if !ok {
+		return
+	}
+	manifest.Namespace = namespace
 
 	orchestration, err := h.provisionManager.Start(req.Context(), &manifest)
 	if err != nil {
@@ -135,7 +150,8 @@ func (h *PMHandler) deleteOrchestrationDefinition(w http.ResponseWriter, req *ht
 		return
 	}
 
-	err := h.definitionManager.DeleteOrchestrationDefinition(req.Context(), model.DefaultNamespace, templateRef)
+	namespace := requestNamespace(req)
+	err := h.definitionManager.DeleteOrchestrationDefinition(req.Context(), namespace, templateRef)
 	if err != nil {
 		h.HandleError(w, err)
 		return
@@ -149,7 +165,8 @@ func (h *PMHandler) deleteActivityDefinition(w http.ResponseWriter, req *http.Re
 		return
 	}
 
-	err := h.definitionManager.DeleteActivityDefinition(req.Context(), model.DefaultNamespace, api.ActivityType(aType))
+	namespace := requestNamespace(req)
+	err := h.definitionManager.DeleteActivityDefinition(req.Context(), namespace, api.ActivityType(aType))
 	if err != nil {
 		h.HandleError(w, err)
 		return
@@ -159,16 +176,17 @@ func (h *PMHandler) deleteActivityDefinition(w http.ResponseWriter, req *http.Re
 }
 
 func (h *PMHandler) queryOrchestrations(w http.ResponseWriter, req *http.Request, path string) {
+	namespace := requestNamespace(req)
 	handler.QueryEntities[*api.OrchestrationEntry](
 		&h.HttpHandler,
 		w,
 		req,
 		path,
 		func(ctx context.Context, predicate query.Predicate) (int64, error) {
-			return h.provisionManager.CountOrchestrations(ctx, model.DefaultNamespace, predicate)
+			return h.provisionManager.CountOrchestrations(ctx, namespace, predicate)
 		},
 		func(ctx context.Context, predicate query.Predicate, options store.PaginationOptions) iter.Seq2[*api.OrchestrationEntry, error] {
-			return h.provisionManager.QueryOrchestrations(ctx, model.DefaultNamespace, predicate, options)
+			return h.provisionManager.QueryOrchestrations(ctx, namespace, predicate, options)
 		},
 		func(entry *api.OrchestrationEntry) any {
 			return v1alpha1.ToOrchestrationEntry(entry)
@@ -180,7 +198,8 @@ func (h *PMHandler) getOrchestration(w http.ResponseWriter, req *http.Request, i
 	if h.InvalidMethod(w, req, http.MethodGet) {
 		return
 	}
-	orchestration, err := h.provisionManager.GetOrchestration(req.Context(), model.DefaultNamespace, id)
+	namespace := requestNamespace(req)
+	orchestration, err := h.provisionManager.GetOrchestration(req.Context(), namespace, id)
 	if err != nil {
 		h.HandleError(w, err)
 		return
@@ -203,14 +222,15 @@ func (h *PMHandler) toOrchestrationResponse(req *http.Request, orchestration *ap
 func canSeeOrchestrationData(req *http.Request) bool {
 	// When authentication is disabled, the anonymous claims grant the admin scope.
 	claims, ok := cfmauth.ClaimsFromContext(req.Context())
-	return ok && claims != nil && claims.HasScope(scopePmAdmin)
+	return ok && claims != nil && hasPermission(claims, requestNamespace(req), permissionAdmin)
 }
 
 func (h *PMHandler) getActivityDefinitions(w http.ResponseWriter, req *http.Request) {
 	if h.InvalidMethod(w, req, http.MethodGet) {
 		return
 	}
-	definitions, err := h.definitionManager.GetActivityDefinitions(req.Context(), model.DefaultNamespace)
+	namespace := requestNamespace(req)
+	definitions, err := h.definitionManager.GetActivityDefinitions(req.Context(), namespace)
 	if err != nil {
 		h.HandleError(w, err)
 		return
@@ -227,7 +247,8 @@ func (h *PMHandler) getOrchestrationDefinitions(w http.ResponseWriter, req *http
 	if h.InvalidMethod(w, req, http.MethodGet) {
 		return
 	}
-	definitions, err := h.definitionManager.GetOrchestrationDefinitions(req.Context(), model.DefaultNamespace)
+	namespace := requestNamespace(req)
+	definitions, err := h.definitionManager.GetOrchestrationDefinitions(req.Context(), namespace)
 	if err != nil {
 		h.HandleError(w, err)
 		return
@@ -245,7 +266,8 @@ func (h *PMHandler) getOrchestrationDefinitionsByTemplate(w http.ResponseWriter,
 		return
 	}
 
-	defs, err := h.definitionManager.GetOrchestrationDefinitionsByTemplate(req.Context(), model.DefaultNamespace, templateRef)
+	namespace := requestNamespace(req)
+	defs, err := h.definitionManager.GetOrchestrationDefinitionsByTemplate(req.Context(), namespace, templateRef)
 	if err != nil {
 		h.HandleError(w, err)
 		return

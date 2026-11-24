@@ -23,6 +23,7 @@ func ToActivityDefinitionDto(definition *api.ActivityDefinition) *ActivityDefini
 		return &ActivityDefinitionDto{}
 	}
 	return &ActivityDefinitionDto{
+		Namespace:    definition.Namespace,
 		Type:         string(definition.Type),
 		Description:  definition.Description,
 		InputSchema:  definition.InputSchema,
@@ -35,6 +36,7 @@ func ToActivityDefinition(definition *ActivityDefinitionDto) *api.ActivityDefini
 		return &api.ActivityDefinition{}
 	}
 	return &api.ActivityDefinition{
+		Namespace:    definition.Namespace,
 		Type:         api.ActivityType(definition.Type),
 		Description:  definition.Description,
 		InputSchema:  definition.InputSchema,
@@ -59,6 +61,7 @@ func ToOrchestrationDefinition(template *OrchestrationTemplate) (string, []*api.
 
 	if template.Activities != nil && len(template.Activities) == 0 {
 		convertedOrchestrationDefs = append(convertedOrchestrationDefs, &api.OrchestrationDefinition{
+			Namespace:   template.Namespace,
 			Description: template.Description,
 			Active:      true,
 			Schema:      template.Schema,
@@ -84,6 +87,7 @@ func ToOrchestrationDefinition(template *OrchestrationTemplate) (string, []*api.
 
 		// create orchestration template
 		orchestrationDef := api.OrchestrationDefinition{
+			Namespace:   template.Namespace,
 			Type:        model.OrchestrationType(orchType),
 			Description: template.Description,
 			Active:      true,
@@ -116,6 +120,7 @@ func ToOrchestrationDefinitionDto(definition *api.OrchestrationDefinition) *Orch
 	}
 
 	return &OrchestrationDefinitionDto{
+		Namespace:   definition.Namespace,
 		Description: definition.Description,
 		Schema:      definition.Schema,
 		Activities:  convertedActivities,
@@ -128,6 +133,7 @@ func ToOrchestrationDefinitionDto(definition *api.OrchestrationDefinition) *Orch
 func ToOrchestrationEntry(entry *api.OrchestrationEntry) OrchestrationEntry {
 	return OrchestrationEntry{
 		ID:                entry.ID,
+		Namespace:         model.NamespaceOrDefault(entry.Namespace),
 		CorrelationID:     entry.CorrelationID,
 		DefinitionID:      entry.DefinitionID,
 		State:             int(entry.State),
@@ -140,6 +146,7 @@ func ToOrchestrationEntry(entry *api.OrchestrationEntry) OrchestrationEntry {
 func ToOrchestration(orchestration *api.Orchestration) Orchestration {
 	return Orchestration{
 		ID:                orchestration.ID,
+		Namespace:         model.NamespaceOrDefault(orchestration.Namespace),
 		CorrelationID:     orchestration.CorrelationID,
 		DefinitionID:      orchestration.DefinitionID,
 		State:             int(orchestration.State),

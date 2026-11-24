@@ -24,6 +24,9 @@ const (
 )
 
 type ActivityDefinitionDto struct {
+	// Namespace is the namespace of the caller. It may be omitted, and must be the namespace of the caller's token if it
+	// is given.
+	Namespace    string         `json:"namespace,omitempty" validate:"omitempty,namespace"`
 	Type         string         `json:"type" validate:"required,modeltype"`
 	Description  string         `json:"description,omitempty"`
 	InputSchema  map[string]any `json:"inputSchema,omitempty"`
@@ -37,6 +40,8 @@ type ActivityDto struct {
 }
 
 type OrchestrationDefinitionDto struct {
+	// Namespace is the namespace the definition belongs to
+	Namespace   string                   `json:"namespace,omitempty"`
 	Description string                   `json:"description,omitempty"`
 	Schema      map[string]any           `json:"schema,omitempty"`
 	Activities  map[string][]ActivityDto `json:"activities" validate:"required,min=1,dive,dive"`
@@ -51,6 +56,9 @@ type IDResponse struct {
 }
 
 type OrchestrationTemplate struct {
+	// Namespace is the namespace of the caller. It may be omitted, and must be the namespace of the caller's token if it
+	// is given.
+	Namespace   string                   `json:"namespace,omitempty" validate:"omitempty,namespace"`
 	Description string                   `json:"description,omitempty"`
 	Schema      map[string]any           `json:"schema,omitempty"`
 	ID          string                   `json:"id"`
@@ -87,6 +95,7 @@ func (t *OrchestrationTemplate) ValidateCompensation() error {
 
 type OrchestrationEntry struct {
 	ID                string                  `json:"id"`
+	Namespace         string                  `json:"namespace"`
 	CorrelationID     string                  `json:"correlationId"`
 	State             int                     `json:"state"`
 	StateTimestamp    time.Time               `json:"stateTimestamp"`
@@ -97,6 +106,7 @@ type OrchestrationEntry struct {
 
 type Orchestration struct {
 	ID                string                  `json:"id"`
+	Namespace         string                  `json:"namespace"`
 	CorrelationID     string                  `json:"correlationId"`
 	DefinitionID      string                  `json:"definitionId"`
 	State             int                     `json:"state"`
