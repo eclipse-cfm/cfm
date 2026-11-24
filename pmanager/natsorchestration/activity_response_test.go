@@ -60,8 +60,8 @@ func runReplyToResponseTest(t *testing.T, processor api.ActivityProcessor, engin
 
 	var responses []model.OrchestrationResponse
 	mockClient := mocks.NewMockMsgClient(t)
-	mockClient.EXPECT().Get(mock.Anything, "test-response").Return(panicTestEntry{value: orchestrationBytes}, nil)
-	mockClient.EXPECT().Update(mock.Anything, "test-response", mock.Anything, mock.Anything).
+	mockClient.EXPECT().Get(mock.Anything, "default.test-response").Return(panicTestEntry{value: orchestrationBytes}, nil)
+	mockClient.EXPECT().Update(mock.Anything, "default.test-response", mock.Anything, mock.Anything).
 		RunAndReturn(func(_ context.Context, _ string, _ []byte, revision uint64) (uint64, error) {
 			if updateErr != nil {
 				return 0, updateErr
@@ -153,7 +153,7 @@ func TestProcessMessage_SuccessResponseHasNoErrorDetail(t *testing.T) {
 func TestProcessMessage_SuccessResponseIsPublishedToReplyTo(t *testing.T) {
 	processor := &resultTestProcessor{result: api.ActivityResult{Result: api.ActivityResultComplete}}
 
-	responses := runReplyToResponseTest(t, processor, api.EngineState{}, nil, "second-manager-response", "event.second-manager-response")
+	responses := runReplyToResponseTest(t, processor, api.EngineState{}, nil, "second-manager-response", "event.default.second-manager-response")
 
 	require.Len(t, responses, 1)
 	assert.True(t, responses[0].Success)
@@ -163,7 +163,7 @@ func TestProcessMessage_SuccessResponseIsPublishedToReplyTo(t *testing.T) {
 func TestProcessMessage_ErrorResponseIsPublishedToReplyTo(t *testing.T) {
 	processor := &resultTestProcessor{result: api.ActivityResult{Result: api.ActivityResultFatalError, Error: errors.New("activity failed")}}
 
-	responses := runReplyToResponseTest(t, processor, api.EngineState{}, nil, "second-manager-response", "event.second-manager-response")
+	responses := runReplyToResponseTest(t, processor, api.EngineState{}, nil, "second-manager-response", "event.default.second-manager-response")
 
 	require.Len(t, responses, 1)
 	assert.False(t, responses[0].Success)

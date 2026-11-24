@@ -68,7 +68,8 @@ func (w *OrchestrationIndexWatcher) onMessage(data []byte, msg MessageAck) {
 	}
 
 	err = w.trxContext.Execute(ctx, func(ctx context.Context) error {
-		currentEntry, err := w.index.FindByID(ctx, orchestration.ID)
+		// entries are keyed by namespace and ID, see api.OrchestrationEntry.GetID
+		currentEntry, err := w.index.FindByID(ctx, api.OrchestrationKey(orchestration.Namespace, orchestration.ID))
 		if err != nil && !errors.Is(err, types.ErrNotFound) {
 			return fmt.Errorf("failed to look up orchestration entry: %w", err)
 		}

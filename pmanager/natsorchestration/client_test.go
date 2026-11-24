@@ -18,6 +18,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/common/model"
+
 	"github.com/eclipse-cfm/cfm/common/mocks"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
@@ -50,7 +52,7 @@ func TestUpdateOrchestration_ReturnsNonConflictErrors(t *testing.T) {
 	orchestration, _ := clientTestOrchestration(t, "test-update")
 
 	mockClient := mocks.NewMockMsgClient(t)
-	mockClient.EXPECT().Update(mock.Anything, "test-update", mock.Anything, uint64(1)).
+	mockClient.EXPECT().Update(mock.Anything, "default.test-update", mock.Anything, uint64(1)).
 		Return(uint64(0), errors.New("maximum bytes exceeded")).Once()
 
 	_, _, err := UpdateOrchestration(t.Context(), orchestration, 1, mockClient, func(*api.Orchestration) {})
@@ -62,10 +64,10 @@ func TestUpdateOrchestration_RetriesConflicts(t *testing.T) {
 	orchestration, serialized := clientTestOrchestration(t, "test-update")
 
 	mockClient := mocks.NewMockMsgClient(t)
-	mockClient.EXPECT().Update(mock.Anything, "test-update", mock.Anything, uint64(1)).
+	mockClient.EXPECT().Update(mock.Anything, "default.test-update", mock.Anything, uint64(1)).
 		Return(uint64(0), revisionConflict).Once()
-	mockClient.EXPECT().Get(mock.Anything, "test-update").Return(panicTestEntry{value: serialized}, nil).Once()
-	mockClient.EXPECT().Update(mock.Anything, "test-update", mock.Anything, uint64(1)).
+	mockClient.EXPECT().Get(mock.Anything, "default.test-update").Return(panicTestEntry{value: serialized}, nil).Once()
+	mockClient.EXPECT().Update(mock.Anything, "default.test-update", mock.Anything, uint64(1)).
 		Return(uint64(2), nil).Once()
 
 	calls := 0
@@ -84,9 +86,9 @@ func TestUpdateOrchestration_GivesUpAfterRepeatedConflicts(t *testing.T) {
 	orchestration, serialized := clientTestOrchestration(t, "test-update")
 
 	mockClient := mocks.NewMockMsgClient(t)
-	mockClient.EXPECT().Update(mock.Anything, "test-update", mock.Anything, uint64(1)).
+	mockClient.EXPECT().Update(mock.Anything, "default.test-update", mock.Anything, uint64(1)).
 		Return(uint64(0), revisionConflict).Times(maxUpdateConflicts)
-	mockClient.EXPECT().Get(mock.Anything, "test-update").Return(panicTestEntry{value: serialized}, nil).
+	mockClient.EXPECT().Get(mock.Anything, "default.test-update").Return(panicTestEntry{value: serialized}, nil).
 		Times(maxUpdateConflicts - 1)
 
 	_, _, err := UpdateOrchestration(t.Context(), orchestration, 1, mockClient, func(*api.Orchestration) {})
@@ -108,8 +110,8 @@ func TestProcessMessage_PersistFailureRedeliversMessage(t *testing.T) {
 			_, serialized := clientTestOrchestration(t, "test-persist")
 
 			mockClient := mocks.NewMockMsgClient(t)
-			mockClient.EXPECT().Get(mock.Anything, "test-persist").Return(panicTestEntry{value: serialized}, nil)
-			mockClient.EXPECT().Update(mock.Anything, "test-persist", mock.Anything, uint64(1)).
+			mockClient.EXPECT().Get(mock.Anything, "default.test-persist").Return(panicTestEntry{value: serialized}, nil)
+			mockClient.EXPECT().Update(mock.Anything, "default.test-persist", mock.Anything, uint64(1)).
 				Return(uint64(0), errors.New("maximum bytes exceeded"))
 
 			executor := &NatsActivityExecutor{
@@ -173,11 +175,11 @@ func TestProcessMessage_CompletedActivityIsNotRunAgain(t *testing.T) {
 			require.NoError(t, err)
 
 			mockClient := mocks.NewMockMsgClient(t)
-			mockClient.EXPECT().Get(mock.Anything, "test-completed").Return(panicTestEntry{value: serialized}, nil)
+			mockClient.EXPECT().Get(mock.Anything, "default.test-completed").Return(panicTestEntry{value: serialized}, nil)
 			if tt.expectNextRun {
-				mockClient.EXPECT().Update(mock.Anything, "test-completed", mock.Anything, uint64(1)).Return(uint64(2), nil)
+				mockClient.EXPECT().Update(mock.Anything, "default.test-completed", mock.Anything, uint64(1)).Return(uint64(2), nil)
 				mockClient.EXPECT().PublishMsg(mock.Anything, mock.MatchedBy(func(msg *nats.Msg) bool {
-					return msg.Header.Get(jetstream.MsgIDHeader) == ActivityMessageID("test-completed", "A2")
+					return msg.Header.Get(jetstream.MsgIDHeader) == ActivityMessageID(model.DefaultNamespace, "test-completed", "A2")
 				})).Return(&jetstream.PubAck{}, nil).Once()
 			}
 

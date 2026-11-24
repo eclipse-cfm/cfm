@@ -33,7 +33,7 @@ func TestNewJetStreamPubSub(t *testing.T) {
 
 	consumer := SetupTestConsumer(t, ctx, stream, "foo")
 
-	_, err = nt.Client.JetStream.Publish(ctx, "event.foo", []byte("Test message"))
+	_, err = nt.Client.JetStream.Publish(ctx, "event.default.foo", []byte("Test message"))
 	require.NoError(t, err)
 
 	msg, err := consumer.Next(jetstream.FetchMaxWait(100 * time.Millisecond))

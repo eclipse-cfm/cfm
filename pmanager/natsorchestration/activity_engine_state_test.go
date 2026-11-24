@@ -118,8 +118,8 @@ func runEngineStateTestWith(t *testing.T, processor api.ActivityProcessor, engin
 
 	var written []api.Orchestration
 	mockClient := mocks.NewMockMsgClient(t)
-	mockClient.EXPECT().Get(mock.Anything, "test-engine-state").Return(panicTestEntry{value: orchestrationBytes}, nil)
-	mockClient.EXPECT().Update(mock.Anything, "test-engine-state", mock.Anything, mock.Anything).
+	mockClient.EXPECT().Get(mock.Anything, "default.test-engine-state").Return(panicTestEntry{value: orchestrationBytes}, nil)
+	mockClient.EXPECT().Update(mock.Anything, "default.test-engine-state", mock.Anything, mock.Anything).
 		RunAndReturn(func(ctx context.Context, _ string, value []byte, revision uint64) (uint64, error) {
 			require.NoError(t, ctx.Err(), "orchestration updates must not use an expired context")
 			var o api.Orchestration
@@ -345,7 +345,7 @@ func TestProcessMessage_FinalDeliveryMarksOrchestrationErrored(t *testing.T) {
 
 func TestProcessMessage_FinalDeliveryWithoutOrchestrationTerminatesMessage(t *testing.T) {
 	mockClient := mocks.NewMockMsgClient(t)
-	mockClient.EXPECT().Get(mock.Anything, "missing").Return(nil, errors.New("kv unavailable"))
+	mockClient.EXPECT().Get(mock.Anything, "default.missing").Return(nil, errors.New("kv unavailable"))
 	executor := &NatsActivityExecutor{Client: mockClient, ActivityType: panicTestActivityType, Monitor: system.NoopMonitor{}}
 
 	messageBytes, err := json.Marshal(api.ActivityMessage{OrchestrationID: "missing", Activity: api.Activity{ID: "A1", Type: panicTestActivityType}})

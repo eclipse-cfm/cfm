@@ -19,6 +19,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/common/model"
+
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/natsfixtures"
 	"github.com/eclipse-cfm/cfm/common/system"
@@ -129,7 +131,7 @@ outerLoop:
 		case <-timeout:
 			t.Fatalf("Timeout waiting for activity A2 to complete after 3 seconds")
 		default:
-			finalOrchestration, _, err = ReadOrchestration(ctx, orchestration.ID, adapter)
+			finalOrchestration, _, err = ReadOrchestration(ctx, model.DefaultNamespace, orchestration.ID, adapter)
 			require.NoError(t, err)
 			if _, found := finalOrchestration.Completed["A2"]; found {
 				break outerLoop
@@ -139,7 +141,7 @@ outerLoop:
 
 	// A2 may record its completion before A1 records the failure, since nothing orders the two updates
 	assert.Eventually(t, func() bool {
-		finalOrchestration, _, err = ReadOrchestration(ctx, orchestration.ID, adapter)
+		finalOrchestration, _, err = ReadOrchestration(ctx, model.DefaultNamespace, orchestration.ID, adapter)
 		return err == nil && finalOrchestration.State == api.OrchestrationStateErrored
 	}, 3*time.Second, 10*time.Millisecond, "Orchestration should be in error state after activity failure")
 	_, a2Completed := finalOrchestration.Completed["A2"]

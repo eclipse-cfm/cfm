@@ -30,7 +30,9 @@ const (
 
 // agentServiceAssembly provides common functionality for NATS-based agents
 type agentServiceAssembly struct {
-	agentName        string
+	agentName string
+	// namespace is the namespace of the activities the agent executes
+	namespace        string
 	activityType     string
 	clientConfig     natsclient.ClientConfig
 	streamName       string
@@ -71,6 +73,7 @@ func (a *agentServiceAssembly) Start(startCtx *system.StartContext) error {
 	executor := &natsorchestration.NatsActivityExecutor{
 		Client:            natsclient.NewMsgClient(a.natsClient),
 		StreamName:        a.streamName,
+		Namespace:         a.namespace,
 		ActivityType:      a.activityType,
 		ActivityProcessor: a.newProcessor(actx),
 		Monitor:           startCtx.LogMonitor,
@@ -78,7 +81,7 @@ func (a *agentServiceAssembly) Start(startCtx *system.StartContext) error {
 
 	health.RegisterOptional(startCtx.Registry, func(r *health.Registry) {
 		r.AddReadiness("nats", health.NatsConnectionCheck(a.natsClient.Connection))
-		r.AddConsumerLoop("consumer:"+a.activityType, &executor.Loop)
+		r.AddConsumerLoop("consumer:"+natsclient.ConsumerName(a.namespace, a.activityType), &executor.Loop)
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -108,7 +111,7 @@ func (a *agentServiceAssembly) setupConsumer(natsClient *natsclient.NatsClient) 
 		return fmt.Errorf("error setting up agent stream: %w", err)
 	}
 
-	_, err = natsclient.SetupActivityConsumer(ctx, stream, a.activityType)
+	_, err = natsclient.SetupActivityConsumer(ctx, stream, a.namespace, a.activityType)
 
 	if err != nil {
 		return fmt.Errorf("error setting up agent consumer: %w", err)

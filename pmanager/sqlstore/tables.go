@@ -44,6 +44,22 @@ func createOrchestrationEntriesTable(db sqlstore.Executor) error {
 		ALTER TABLE %[1]s ADD COLUMN IF NOT EXISTS namespace VARCHAR(255) NOT NULL DEFAULT '%[2]s';
 		CREATE INDEX IF NOT EXISTS idx_orchestration_entries_namespace ON %[1]s(namespace)
 	`, cfmOrchestrationEntriesTable, model.DefaultNamespace))
+	if err != nil {
+		return err
+	}
+	return migrateOrchestrationEntryKeys(db)
+}
+
+// migrateOrchestrationEntryKeys keys the orchestration entries by namespace and orchestration ID, see
+// api.OrchestrationKey. The orchestration ID moves to its own column. The entries that were stored before have no
+// orchestration ID yet, which marks them as not migrated, so the migration can run on every start.
+func migrateOrchestrationEntryKeys(db sqlstore.Executor) error {
+	_, err := db.Exec(fmt.Sprintf(`
+		ALTER TABLE %[1]s ADD COLUMN IF NOT EXISTS orchestration_id VARCHAR(255);
+		UPDATE %[1]s SET orchestration_id = id, id = namespace || '.' || id WHERE orchestration_id IS NULL;
+		ALTER TABLE %[1]s ALTER COLUMN orchestration_id SET NOT NULL;
+		CREATE INDEX IF NOT EXISTS idx_orchestration_entries_namespace_orchestration_id ON %[1]s(namespace, orchestration_id)
+	`, cfmOrchestrationEntriesTable))
 	return err
 }
 

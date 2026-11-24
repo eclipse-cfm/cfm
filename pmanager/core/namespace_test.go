@@ -56,7 +56,7 @@ func namespacedDefinition(namespace string, activityType api.ActivityType) *api.
 
 func TestProvisionManager_Start_UsesDefinitionOfNamespace(t *testing.T) {
 	mockOrch := mocks.NewMockOrchestrator(t)
-	mockOrch.EXPECT().GetOrchestration(mock.Anything, "deployment").Return(nil, nil)
+	mockOrch.EXPECT().GetOrchestration(mock.Anything, "second", "deployment").Return(nil, nil)
 	mockOrch.EXPECT().Execute(mock.Anything, mock.MatchedBy(func(orch *api.Orchestration) bool {
 		return orch.Namespace == "second" && orch.DefinitionID == "test-type" && orch.Steps[0].Activities[0].Type == "second-activity"
 	})).Return(nil)
@@ -70,7 +70,7 @@ func TestProvisionManager_Start_UsesDefinitionOfNamespace(t *testing.T) {
 
 func TestProvisionManager_Start_DefaultNamespace(t *testing.T) {
 	mockOrch := mocks.NewMockOrchestrator(t)
-	mockOrch.EXPECT().GetOrchestration(mock.Anything, "deployment").Return(nil, nil)
+	mockOrch.EXPECT().GetOrchestration(mock.Anything, model.DefaultNamespace, "deployment").Return(nil, nil)
 	mockOrch.EXPECT().Execute(mock.Anything, mock.MatchedBy(func(orch *api.Orchestration) bool {
 		return orch.Namespace == model.DefaultNamespace && orch.Steps[0].Activities[0].Type == "default-activity"
 	})).Return(nil)
@@ -103,24 +103,26 @@ func TestProvisionManager_Start_RejectsInvalidNamespace(t *testing.T) {
 	assert.True(t, types.IsClientError(err))
 }
 
-func TestProvisionManager_Start_ExistingOrchestrationOfOtherNamespaceIsConflict(t *testing.T) {
+func TestProvisionManager_Start_DeduplicatesWithinNamespace(t *testing.T) {
+	// an orchestration of the default namespace with the same ID does not keep the second namespace from starting one,
+	// because de-duplication only looks up the orchestration of the manifest's namespace
 	mockOrch := mocks.NewMockOrchestrator(t)
-	mockOrch.EXPECT().GetOrchestration(mock.Anything, "deployment").Return(&api.Orchestration{
-		ID: "deployment", Namespace: model.DefaultNamespace, OrchestrationType: "test-type",
-	}, nil)
+	mockOrch.EXPECT().GetOrchestration(mock.Anything, "second", "deployment").Return(nil, nil)
+	mockOrch.EXPECT().Execute(mock.Anything, mock.MatchedBy(func(orch *api.Orchestration) bool {
+		return orch.ID == "deployment" && orch.Namespace == "second"
+	})).Return(nil)
 	pm := newNamespaceProvisionManager(t, mockOrch, namespacedDefinition("second", "second-activity"))
 
 	_, err := pm.Start(context.Background(), &model.OrchestrationManifest{ID: "deployment", OrchestrationType: "test-type", Namespace: "second"})
 
-	require.ErrorIs(t, err, types.ErrConflict)
+	require.NoError(t, err)
 }
 
 func TestProvisionManager_GetOrchestration_OnlyInNamespace(t *testing.T) {
 	stored := &api.Orchestration{ID: "o1", Namespace: "second"}
-	legacy := &api.Orchestration{ID: "o2"}
 	mockOrch := mocks.NewMockOrchestrator(t)
-	mockOrch.EXPECT().GetOrchestration(mock.Anything, "o1").Return(stored, nil)
-	mockOrch.EXPECT().GetOrchestration(mock.Anything, "o2").Return(legacy, nil)
+	mockOrch.EXPECT().GetOrchestration(mock.Anything, "second", "o1").Return(stored, nil)
+	mockOrch.EXPECT().GetOrchestration(mock.Anything, model.DefaultNamespace, "o1").Return(nil, nil)
 	pm := newNamespaceProvisionManager(t, mockOrch)
 	ctx := context.Background()
 
@@ -131,13 +133,15 @@ func TestProvisionManager_GetOrchestration_OnlyInNamespace(t *testing.T) {
 	found, err = pm.GetOrchestration(ctx, model.DefaultNamespace, "o1")
 	require.NoError(t, err)
 	assert.Nil(t, found)
+}
 
-	// an orchestration stored without a namespace is in the default namespace
-	found, err = pm.GetOrchestration(ctx, model.DefaultNamespace, "o2")
-	require.NoError(t, err)
-	assert.Same(t, legacy, found)
+func TestProvisionManager_GetOrchestration_IgnoresStateOfOtherNamespace(t *testing.T) {
+	// state under the key of a namespace that names another namespace was not written by the engine
+	mockOrch := mocks.NewMockOrchestrator(t)
+	mockOrch.EXPECT().GetOrchestration(mock.Anything, "second", "o1").Return(&api.Orchestration{ID: "o1", Namespace: "third"}, nil)
+	pm := newNamespaceProvisionManager(t, mockOrch)
 
-	found, err = pm.GetOrchestration(ctx, "second", "o2")
+	found, err := pm.GetOrchestration(context.Background(), "second", "o1")
 	require.NoError(t, err)
 	assert.Nil(t, found)
 }

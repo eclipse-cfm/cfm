@@ -47,25 +47,29 @@ also enforces TLS against the system trust store.
 Authentication alone still lets every component publish anything. Give each component its own NATS user (or JWT user)
 restricted to the subjects it needs. [`least-privilege.conf`](least-privilege.conf) is a complete authorization block
 for a NATS server configuration that does this for the TM, the PM, an orchestration agent, the key management lifecycle
-agent and IdentityHub. The end-to-end tests `Test_VerifyE2E_LeastPrivilegeNatsUsers` and
-`Test_VerifyLeastPrivilegeNatsUsers_KeyManagementEvents` run the deploy, dispose and key event flows against exactly
-this file, so it stays in sync with the subjects the code uses.
+agent and IdentityHub, and for a second manager and its agent in their own namespace (see
+[Namespaces](../namespaces.md)). The end-to-end tests `Test_VerifyE2E_LeastPrivilegeNatsUsers`,
+`Test_VerifyLeastPrivilegeNatsUsers_KeyManagementEvents` and `Test_VerifyLeastPrivilegeNatsUsers_NamespacesAreSeparated`
+run the deploy, dispose and key event flows and the namespace checks against exactly this file, so it stays in sync with
+the subjects the code uses.
 
 What the permissions enforce:
 
-| Subject                              | Published by                          | Consumed by        |
-|--------------------------------------|---------------------------------------|--------------------|
-| `event.cfm-orchestration`            | TM only                               | PM                 |
-| `event.cfm-orchestration-response`   | PM and orchestration agents           | TM                 |
-| `event.<activity-type>`              | PM and orchestration agents           | Agent for the type |
-| `$KV.<bucket>.>` (orchestration state) | PM and orchestration agents         | PM (index watcher) |
-| `events.keypair.>`                   | IdentityHub only                      | Key management agent |
+| Subject                                        | Published by                                        | Consumed by                         |
+|------------------------------------------------|-----------------------------------------------------|-------------------------------------|
+| `event.<namespace>.cfm-orchestration`          | The manager of the namespace only (TM for `default`) | PM                                  |
+| `event.<namespace>.cfm-orchestration-response` | PM and the orchestration agents of the namespace    | The manager of the namespace        |
+| `event.<namespace>.<activity-type>`            | PM and the orchestration agents of the namespace    | Agent for the type in the namespace |
+| `$KV.<bucket>.<namespace>.>` (orchestration state) | PM and the orchestration agents of the namespace | PM (index watcher)                  |
+| `events.keypair.>`                             | IdentityHub only                                    | Key management agent                |
 
 Adapting the file to a deployment:
 
 - Replace `cfm-stream`, `cfm-bucket` and `cfm-events` with the configured stream and bucket names.
-- Add one orchestration agent user per activity type, replacing `test-activity` in its consumer subjects. The durable
-  consumer name is the activity type with `.` replaced by `-`.
+- Add one manager user per namespace, and one orchestration agent user per namespace and activity type, replacing
+  `second` and `test-activity` in their subjects. The durable consumer name is `<namespace>~<activity-type>` with `.`
+  replaced by `-` in the activity type, and the durable consumer of a manager's responses is
+  `<namespace>~cfm-orchestration-response`. An agent reads its namespace from the configuration key `namespace`.
 - Add one lifecycle agent user per agent. Its durable consumer name is the lower-cased agent name with spaces, `.`, `/`,
   `*` and `>` replaced by `-`. Grant `$JS.API.STREAM.UPDATE.<events-stream>` only if the agent is configured to create
   the event stream itself.
@@ -78,13 +82,14 @@ Adapting the file to a deployment:
 The permissions narrow what a compromised component can do, but some trust remains by design:
 
 - **Orchestration agents can publish responses and write orchestration state.** The executor that completes an
-  orchestration runs inside the agent, so every agent may publish `event.cfm-orchestration-response` and update the KV
-  bucket. The TM mitigates forged or replayed responses by only applying a response whose `manifestId` matches the
+  orchestration runs inside the agent, so every agent may publish the responses of its namespace and update the
+  orchestration state of its namespace. The TM mitigates forged or replayed responses by only applying a response whose `manifestId` matches the
   orchestration it started for that profile (or the PM's auto-compensation of it), but an agent can still forge the
   outcome of an in-flight orchestration. Signing envelopes would close this gap.
 - **All components may create the KV bucket.** The shared client setup creates the bucket on start when it is missing,
   so even the TM and lifecycle agents need `$JS.API.STREAM.CREATE.KV_<bucket>` unless the bucket is provisioned out of
-  band. No component needs to update an existing bucket or the orchestration stream.
+  band. No component needs to update an existing bucket, and only a stream created before namespaces were introduced
+  needs to be updated once, see [Namespaces](../namespaces.md#upgrading).
 - **Replies share the `_INBOX.>` namespace.** Components can subscribe to each other's request replies. NATS supports
   per-user inbox prefixes, but CFM does not configure them yet.
 
@@ -93,8 +98,9 @@ The permissions narrow what a compromised component can do, but some trust remai
 CFM keeps orchestration messages in the orchestration stream (`<prefix>_STREAM`), orchestration state in the KV bucket
 (`<prefix>_BUCKET`, backed by the stream `KV_<bucket>`) and lifecycle events in the event stream. A component creates the
 orchestration stream and the bucket when they are missing, and a lifecycle agent creates the event stream only with
-`createStream=true`. Existing streams and buckets are never changed, so their configuration is whatever they were created
-with.
+`createStream=true`. Existing streams and buckets are not changed, so their configuration is whatever they were created
+with. The one exception is an orchestration stream created before namespaces were introduced: its subjects are widened
+from `event.*` to `event.>`.
 
 When a component creates one of them, it uses file storage and these settings:
 
@@ -118,6 +124,6 @@ Keep these in mind when setting limits:
 
 For production deployments, prefer provisioning the streams and the bucket out of band, for example with
 [NACK](https://github.com/nats-io/nack) or a Helm job, so their configuration is under version control. Create them
-with the same name, subjects and retention policy that CFM uses: a work queue stream on `event.*` for orchestrations, a
+with the same name, subjects and retention policy that CFM uses: a work queue stream on `event.>` for orchestrations, a
 KV bucket with history 1, and an interest-based stream on the lifecycle event subjects. Changing replicas or limits
 later is then done on the server, for example with `nats stream edit`.

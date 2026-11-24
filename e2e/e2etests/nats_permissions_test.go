@@ -22,6 +22,7 @@ import (
 
 	"github.com/eclipse-cfm/cfm/common/fixtures"
 	"github.com/eclipse-cfm/cfm/common/lifecycleagent"
+	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/natsfixtures"
 	"github.com/eclipse-cfm/cfm/common/sqlstore"
@@ -142,8 +143,8 @@ func Test_VerifyLeastPrivilegeNatsUsers_KeyManagementEvents(t *testing.T) {
 		{"tmanager", "events.keypair.revoked"},
 		{"test-activity-agent", "events.keypair.revoked"},
 		{"tmanager", natsclient.CFMOrchestrationResponseSubject},
-		{"tmanager", "$KV." + cfmBucket + ".some-orchestration"},
-		{"keymanagement-agent", "$KV." + cfmBucket + ".some-orchestration"},
+		{"tmanager", "$KV." + cfmBucket + ".default.some-orchestration"},
+		{"keymanagement-agent", "$KV." + cfmBucket + ".default.some-orchestration"},
 	}
 	for _, d := range denied {
 		t.Run(fmt.Sprintf("%s cannot publish %s", d.user, d.subject), func(t *testing.T) {
@@ -153,6 +154,96 @@ func Test_VerifyLeastPrivilegeNatsUsers_KeyManagementEvents(t *testing.T) {
 			assert.Error(t, err)
 		})
 	}
+}
+
+// Test_VerifyLeastPrivilegeNatsUsers_NamespacesAreSeparated verifies that the documented permissions keep the managers
+// and agents of two namespaces that share the Provision Manager apart: neither can publish to the subjects of the other
+// namespace, nor read or write its orchestration state, nor consume its activities.
+func Test_VerifyLeastPrivilegeNatsUsers_NamespacesAreSeparated(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	defer cancel()
+
+	// An unrestricted admin user stands in for the out-of-band provisioning of the stream and the orchestration state
+	nt, err := natsfixtures.SetupNatsContainerWithConfig(ctx, cfmBucket, readLeastPrivilegeConfig(t, true), nil,
+		natsclient.ClientConfig{Auth: natsclient.UserInfoAuth{Username: "admin", Password: "admin-secret"}})
+	require.NoError(t, err)
+	defer natsfixtures.TeardownNatsContainer(ctx, nt)
+
+	stream, err := natsclient.SetupStream(ctx, nt.Client, streamName)
+	require.NoError(t, err)
+	for _, key := range []string{"default.orchestration-1", "second.orchestration-1"} {
+		_, err = nt.Client.KVStore.Put(ctx, key, []byte("{}"))
+		require.NoError(t, err)
+	}
+
+	publish := func(user string, subject string) error {
+		publishCtx, cancelPublish := context.WithTimeout(ctx, 2*time.Second)
+		defer cancelPublish()
+		_, err := connectAs(t, nt.URI, user).Publish(publishCtx, subject, []byte("{}"))
+		return err
+	}
+	readState := func(user string, key string) error {
+		readCtx, cancelRead := context.WithTimeout(ctx, 2*time.Second)
+		defer cancelRead()
+		kv, err := connectAs(t, nt.URI, user).KeyValue(readCtx, cfmBucket)
+		if err != nil {
+			return err
+		}
+		_, err = kv.Get(readCtx, key)
+		return err
+	}
+
+	allowed := []struct{ user, subject string }{
+		{"second-manager", natsclient.Subject("second", natsclient.CFMOrchestration)},
+		{"second-test-activity-agent", natsclient.Subject("second", "test-activity")},
+		{"second-test-activity-agent", natsclient.ResponseSubject("second", "")},
+		{"second-test-activity-agent", "$KV." + cfmBucket + ".second.orchestration-2"},
+		{"pmanager", natsclient.Subject("second", "test-activity")},
+		{"pmanager", natsclient.ResponseSubject("second", "")},
+	}
+	for _, a := range allowed {
+		t.Run(fmt.Sprintf("%s can publish %s", a.user, a.subject), func(t *testing.T) {
+			assert.NoError(t, publish(a.user, a.subject))
+		})
+	}
+
+	denied := []struct{ user, subject string }{
+		{"second-manager", natsclient.CFMOrchestrationSubject},
+		{"second-manager", natsclient.Subject("second", "test-activity")},
+		{"second-test-activity-agent", natsclient.Subject(model.DefaultNamespace, "test-activity")},
+		{"second-test-activity-agent", natsclient.CFMOrchestrationResponseSubject},
+		{"second-test-activity-agent", natsclient.Subject("second", natsclient.CFMOrchestration)},
+		{"second-test-activity-agent", "$KV." + cfmBucket + ".default.orchestration-1"},
+		{"test-activity-agent", natsclient.Subject("second", "test-activity")},
+		{"test-activity-agent", natsclient.ResponseSubject("second", "")},
+		{"test-activity-agent", "$KV." + cfmBucket + ".second.orchestration-1"},
+		{"tmanager", natsclient.Subject("second", natsclient.CFMOrchestration)},
+		{"pmanager", natsclient.Subject("second", natsclient.CFMOrchestration)},
+	}
+	for _, d := range denied {
+		t.Run(fmt.Sprintf("%s cannot publish %s", d.user, d.subject), func(t *testing.T) {
+			assert.Error(t, publish(d.user, d.subject))
+		})
+	}
+
+	t.Run("an agent reads the orchestration state of its namespace only", func(t *testing.T) {
+		assert.NoError(t, readState("second-test-activity-agent", "second.orchestration-1"))
+		assert.Error(t, readState("second-test-activity-agent", "default.orchestration-1"))
+		assert.NoError(t, readState("test-activity-agent", "default.orchestration-1"))
+		assert.Error(t, readState("test-activity-agent", "second.orchestration-1"))
+	})
+
+	t.Run("an agent consumes the activities of its namespace only", func(t *testing.T) {
+		agentStream, err := connectAs(t, nt.URI, "second-test-activity-agent").Stream(ctx, stream.CachedInfo().Config.Name)
+		require.NoError(t, err)
+		_, err = natsclient.SetupActivityConsumer(ctx, agentStream, "second", "test-activity")
+		assert.NoError(t, err)
+
+		consumerCtx, cancelConsumer := context.WithTimeout(ctx, 2*time.Second)
+		defer cancelConsumer()
+		_, err = natsclient.SetupActivityConsumer(consumerCtx, agentStream, model.DefaultNamespace, "test-activity")
+		assert.Error(t, err)
+	})
 }
 
 // readLeastPrivilegeConfig returns the documented authorization block, optionally with an extra unrestricted admin user

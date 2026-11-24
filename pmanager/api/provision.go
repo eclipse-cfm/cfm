@@ -71,8 +71,8 @@ type Orchestrator interface {
 	// Execute starts the execution of the specified orchestration, processing its steps and activities.
 	Execute(ctx context.Context, orchestration *Orchestration) error
 
-	// GetOrchestration retrieves an Orchestration by its ID or nil if not found.
-	GetOrchestration(ctx context.Context, id string) (*Orchestration, error)
+	// GetOrchestration retrieves the Orchestration of the namespace with the given ID or nil if not found.
+	GetOrchestration(ctx context.Context, namespace string, id string) (*Orchestration, error)
 }
 
 // ActivityProcessor processes the activities of an orchestration that an agent is responsible for.

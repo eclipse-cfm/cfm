@@ -191,6 +191,9 @@ type Activity struct {
 }
 
 // ActivityMessage used to enqueue an activity for processing.
+// ActivityMessage asks the agent of an activity type to execute an activity of an orchestration. It is published to the
+// subject of the activity type in the namespace of the orchestration, so the namespace of the agent that receives it
+// is the namespace of the orchestration.
 type ActivityMessage struct {
 	OrchestrationID string   `json:"orchestrationID"`
 	Activity        Activity `json:"activity"`
@@ -289,6 +292,14 @@ const definitionKeySeparator = "/"
 // namespace. An empty namespace is model.DefaultNamespace.
 func DefinitionKey(namespace string, definitionType string) string {
 	return model.NamespaceOrDefault(namespace) + definitionKeySeparator + definitionType
+}
+
+// OrchestrationKey returns the key of the orchestration with the given ID in the given namespace, under which its state
+// is stored in the JetStream key-value store and its entry in the orchestration index: namespace + "." + ID. An empty
+// namespace is model.DefaultNamespace. A namespace does not contain a dot, so the keys of different namespaces never
+// collide, and "<bucket>.<namespace>.>" are exactly the keys of a namespace, also in NATS permissions.
+func OrchestrationKey(namespace string, id string) string {
+	return model.NamespaceOrDefault(namespace) + "." + id
 }
 
 // InstantiateOrchestration creates and returns an initialized Orchestration based on the provided definition and inputs.

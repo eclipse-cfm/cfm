@@ -54,7 +54,8 @@ func TestNewOrchestrationEntryStore_FindByID_Success(t *testing.T) {
 	}
 
 	_, err := testDB.Exec(
-		"INSERT INTO orchestration_entries (id, version, correlation_id, definition_id, state, state_timestamp, created_timestamp, orchestration_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+		"INSERT INTO orchestration_entries (id, orchestration_id, version, correlation_id, definition_id, state, state_timestamp, created_timestamp, orchestration_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+		entry.GetID(),
 		entry.ID,
 		entry.Version,
 		entry.CorrelationID,
@@ -75,7 +76,7 @@ func TestNewOrchestrationEntryStore_FindByID_Success(t *testing.T) {
 
 	txCtx := context.WithValue(ctx, sqlstore.SQLTransactionKey, tx)
 
-	retrieved, err := estore.FindByID(txCtx, "orch-entry-1")
+	retrieved, err := estore.FindByID(txCtx, entry.GetID())
 	require.NoError(t, err)
 	assert.NotNil(t, retrieved)
 	assert.Equal(t, "orch-entry-1", retrieved.ID)
@@ -180,7 +181,8 @@ func TestNewOrchestrationEntryStore_SearchByStatePredicate(t *testing.T) {
 
 	for _, entry := range entries {
 		_, err := testDB.Exec(
-			"INSERT INTO orchestration_entries (id, version, correlation_id, definition_id, state, state_timestamp, created_timestamp, orchestration_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+			"INSERT INTO orchestration_entries (id, orchestration_id, version, correlation_id, definition_id, state, state_timestamp, created_timestamp, orchestration_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+			entry.GetID(),
 			entry.ID,
 			entry.Version,
 			entry.CorrelationID,
@@ -266,7 +268,8 @@ func TestNewOrchestrationEntryStore_SearchByCorrelationIDPredicate(t *testing.T)
 
 	for _, entry := range entries {
 		_, err := testDB.Exec(
-			"INSERT INTO orchestration_entries (id, version, correlation_id, definition_id, state, state_timestamp, created_timestamp, orchestration_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+			"INSERT INTO orchestration_entries (id, orchestration_id, version, correlation_id, definition_id, state, state_timestamp, created_timestamp, orchestration_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+			entry.GetID(),
 			entry.ID,
 			entry.Version,
 			entry.CorrelationID,
@@ -352,7 +355,8 @@ func TestNewOrchestrationEntryStore_SearchByStateAndCorrelationIDPredicate(t *te
 
 	for _, entry := range entries {
 		_, err := testDB.Exec(
-			"INSERT INTO orchestration_entries (id, version, correlation_id, definition_id, state, created_timestamp, state_timestamp, orchestration_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+			"INSERT INTO orchestration_entries (id, orchestration_id, version, correlation_id, definition_id, state, created_timestamp, state_timestamp, orchestration_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+			entry.GetID(),
 			entry.ID,
 			entry.Version,
 			entry.CorrelationID,

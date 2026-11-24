@@ -65,8 +65,10 @@ func NewNatsOrchestrator(
 	return &NatsOrchestrator{Client: client, monitor: monitor}
 }
 
-func (o *NatsOrchestrator) GetOrchestration(ctx context.Context, id string) (*api.Orchestration, error) {
-	orchestration, _, err := ReadOrchestration(ctx, id, o.Client)
+// GetOrchestration returns the orchestration of the namespace with the given ID, or nil if it does not exist. The
+// orchestrations of other namespaces are stored under other keys, see api.OrchestrationKey.
+func (o *NatsOrchestrator) GetOrchestration(ctx context.Context, namespace string, id string) (*api.Orchestration, error) {
+	orchestration, _, err := ReadOrchestration(ctx, namespace, id, o.Client)
 	if err != nil {
 		if errors.Is(err, jetstream.ErrKeyNotFound) {
 			// Doesn't exist return nil
@@ -114,13 +116,13 @@ func (o *NatsOrchestrator) Execute(ctx context.Context, orchestration *api.Orche
 	}
 
 	// Revision 0 only succeeds if the orchestration does not exist yet
-	revision, err := o.Client.Update(ctx, orchestration.ID, serializedOrchestration, 0)
+	revision, err := o.Client.Update(ctx, api.OrchestrationKey(orchestration.Namespace, orchestration.ID), serializedOrchestration, 0)
 	if err != nil {
 		if !isRevisionConflict(err) {
 			return fmt.Errorf("error storing orchestration: %w", err)
 		}
 		// The orchestration already exists. Resume it if it was stored but its start did not complete.
-		existing, existingRevision, err := ReadOrchestration(ctx, orchestration.ID, o.Client)
+		existing, existingRevision, err := ReadOrchestration(ctx, orchestration.Namespace, orchestration.ID, o.Client)
 		if err != nil {
 			return types.NewRecoverableWrappedError(err, "error reading existing orchestration %s", orchestration.ID)
 		}
@@ -142,7 +144,7 @@ func (o *NatsOrchestrator) Execute(ctx context.Context, orchestration *api.Orche
 // start publishes the messages for the orchestration's first activities and then marks the orchestration running.
 func (o *NatsOrchestrator) start(ctx context.Context, orchestration api.Orchestration, revision uint64) error {
 	activities := getInitialActivities(&orchestration)
-	if err := EnqueueActivityMessages(ctx, orchestration.ID, activities, o.Client); err != nil {
+	if err := EnqueueActivityMessages(ctx, orchestration.Namespace, orchestration.ID, activities, o.Client); err != nil {
 		return types.NewRecoverableWrappedError(err, "error enqueueing activities of orchestration %s", orchestration.ID)
 	}
 	trace.SpanFromContext(ctx).AddEvent("Activity messages enqueued")

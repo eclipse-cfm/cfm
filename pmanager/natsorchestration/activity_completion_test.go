@@ -66,7 +66,7 @@ func TestNatsActivityExecutor_OrchestrationResponsePublished(t *testing.T) {
 	serializedOrchestration, err := json.Marshal(orchestration)
 	require.NoError(t, err)
 
-	_, err = msgClient.Update(ctx, orchestration.ID, serializedOrchestration, 0)
+	_, err = msgClient.Update(ctx, api.OrchestrationKey(orchestration.Namespace, orchestration.ID), serializedOrchestration, 0)
 	require.NoError(t, err)
 
 	// Setup message capture for orchestration response
@@ -112,7 +112,7 @@ func TestNatsActivityExecutor_OrchestrationResponsePublished(t *testing.T) {
 	msgData, err := json.Marshal(activityMessage)
 	require.NoError(t, err)
 
-	subject := natsclient.CFMSubjectPrefix + ".test-response-activity"
+	subject := natsclient.Subject(model.DefaultNamespace, "test-response-activity")
 	_, err = msgClient.Publish(ctx, subject, msgData)
 	require.NoError(t, err)
 
@@ -169,7 +169,7 @@ func TestNatsActivityExecutor_OrchestrationResponsePublishedOnError(t *testing.T
 	serializedOrchestration, err := json.Marshal(orchestration)
 	require.NoError(t, err)
 
-	_, err = adapter.Update(ctx, orchestration.ID, serializedOrchestration, 0)
+	_, err = adapter.Update(ctx, api.OrchestrationKey(orchestration.Namespace, orchestration.ID), serializedOrchestration, 0)
 	require.NoError(t, err)
 
 	// Setup message capture for orchestration response
@@ -205,7 +205,7 @@ func TestNatsActivityExecutor_OrchestrationResponsePublishedOnError(t *testing.T
 	msgData, err := json.Marshal(activityMessage)
 	require.NoError(t, err)
 
-	subject := natsclient.CFMSubjectPrefix + ".test-error-activity"
+	subject := natsclient.Subject(model.DefaultNamespace, "test-error-activity")
 	_, err = adapter.Publish(ctx, subject, msgData)
 	require.NoError(t, err)
 
@@ -219,7 +219,7 @@ func TestNatsActivityExecutor_OrchestrationResponsePublishedOnError(t *testing.T
 	}
 
 	// Verify orchestration is marked as errored
-	updatedOrchestration, _, err := ReadOrchestration(ctx, orchestration.ID, adapter)
+	updatedOrchestration, _, err := ReadOrchestration(ctx, model.DefaultNamespace, orchestration.ID, adapter)
 	require.NoError(t, err)
 	assert.Equal(t, api.OrchestrationStateErrored, updatedOrchestration.State, "Orchestration should be in error state")
 }
@@ -259,7 +259,7 @@ func TestNatsActivityExecutor_RescheduleWithCounter(t *testing.T) {
 	serializedOrchestration, err := json.Marshal(orchestration)
 	require.NoError(t, err)
 
-	_, err = msgClient.Update(ctx, orchestration.ID, serializedOrchestration, 0)
+	_, err = msgClient.Update(ctx, api.OrchestrationKey(orchestration.Namespace, orchestration.ID), serializedOrchestration, 0)
 	require.NoError(t, err)
 
 	// Setup message capture for orchestration response
@@ -305,7 +305,7 @@ func TestNatsActivityExecutor_RescheduleWithCounter(t *testing.T) {
 	msgData, err := json.Marshal(activityMessage)
 	require.NoError(t, err)
 
-	subject := natsclient.CFMSubjectPrefix + ".test-reschedule-activity"
+	subject := natsclient.Subject(model.DefaultNamespace, "test-reschedule-activity")
 	_, err = msgClient.Publish(ctx, subject, msgData)
 	require.NoError(t, err)
 
@@ -328,7 +328,7 @@ func TestNatsActivityExecutor_RescheduleWithCounter(t *testing.T) {
 	responseMutex.Unlock()
 
 	// Verify the orchestration completed successfully
-	updatedOrchestration, _, err := ReadOrchestration(ctx, orchestration.ID, msgClient)
+	updatedOrchestration, _, err := ReadOrchestration(ctx, model.DefaultNamespace, orchestration.ID, msgClient)
 	require.NoError(t, err)
 	assert.Equal(t, api.OrchestrationStateCompleted, updatedOrchestration.State, "Orchestration should be completed")
 

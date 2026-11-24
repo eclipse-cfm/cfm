@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/natsfixtures"
 	"github.com/eclipse-cfm/cfm/common/system"
@@ -66,7 +67,7 @@ func TestFetchLoop_RecoversFromDeletedConsumer(t *testing.T) {
 	}()
 
 	publish := func() {
-		_, err := nt.Client.JetStream.Publish(ctx, natsclient.CFMSubjectPrefix+"."+subject, []byte("{}"))
+		_, err := nt.Client.JetStream.Publish(ctx, natsclient.Subject(model.DefaultNamespace, subject), []byte("{}"))
 		require.NoError(t, err)
 	}
 
@@ -102,7 +103,7 @@ func TestFetchLoop_HeartbeatPreventsRedelivery(t *testing.T) {
 		Durable:       subject,
 		AckPolicy:     jetstream.AckExplicitPolicy,
 		AckWait:       ackWait,
-		FilterSubject: natsclient.CFMSubjectPrefix + "." + subject,
+		FilterSubject: natsclient.Subject(model.DefaultNamespace, subject),
 	})
 	require.NoError(t, err)
 
@@ -121,7 +122,7 @@ func TestFetchLoop_HeartbeatPreventsRedelivery(t *testing.T) {
 		})
 	}()
 
-	_, err = nt.Client.JetStream.Publish(ctx, natsclient.CFMSubjectPrefix+"."+subject, []byte("{}"))
+	_, err = nt.Client.JetStream.Publish(ctx, natsclient.Subject(model.DefaultNamespace, subject), []byte("{}"))
 	require.NoError(t, err)
 	require.Eventually(t, handled.Load, 10*time.Second, 50*time.Millisecond)
 

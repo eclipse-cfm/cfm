@@ -70,9 +70,9 @@ func (_c *MockOrchestrator_Execute_Call) RunAndReturn(run func(context.Context, 
 	return _c
 }
 
-// GetOrchestration provides a mock function with given fields: ctx, id
-func (_m *MockOrchestrator) GetOrchestration(ctx context.Context, id string) (*api.Orchestration, error) {
-	ret := _m.Called(ctx, id)
+// GetOrchestration provides a mock function with given fields: ctx, namespace, id
+func (_m *MockOrchestrator) GetOrchestration(ctx context.Context, namespace string, id string) (*api.Orchestration, error) {
+	ret := _m.Called(ctx, namespace, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetOrchestration")
@@ -80,19 +80,19 @@ func (_m *MockOrchestrator) GetOrchestration(ctx context.Context, id string) (*a
 
 	var r0 *api.Orchestration
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*api.Orchestration, error)); ok {
-		return rf(ctx, id)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*api.Orchestration, error)); ok {
+		return rf(ctx, namespace, id)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *api.Orchestration); ok {
-		r0 = rf(ctx, id)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *api.Orchestration); ok {
+		r0 = rf(ctx, namespace, id)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*api.Orchestration)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, id)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, namespace, id)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -107,14 +107,15 @@ type MockOrchestrator_GetOrchestration_Call struct {
 
 // GetOrchestration is a helper method to define mock.On call
 //   - ctx context.Context
+//   - namespace string
 //   - id string
-func (_e *MockOrchestrator_Expecter) GetOrchestration(ctx interface{}, id interface{}) *MockOrchestrator_GetOrchestration_Call {
-	return &MockOrchestrator_GetOrchestration_Call{Call: _e.mock.On("GetOrchestration", ctx, id)}
+func (_e *MockOrchestrator_Expecter) GetOrchestration(ctx interface{}, namespace interface{}, id interface{}) *MockOrchestrator_GetOrchestration_Call {
+	return &MockOrchestrator_GetOrchestration_Call{Call: _e.mock.On("GetOrchestration", ctx, namespace, id)}
 }
 
-func (_c *MockOrchestrator_GetOrchestration_Call) Run(run func(ctx context.Context, id string)) *MockOrchestrator_GetOrchestration_Call {
+func (_c *MockOrchestrator_GetOrchestration_Call) Run(run func(ctx context.Context, namespace string, id string)) *MockOrchestrator_GetOrchestration_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -124,7 +125,7 @@ func (_c *MockOrchestrator_GetOrchestration_Call) Return(_a0 *api.Orchestration,
 	return _c
 }
 
-func (_c *MockOrchestrator_GetOrchestration_Call) RunAndReturn(run func(context.Context, string) (*api.Orchestration, error)) *MockOrchestrator_GetOrchestration_Call {
+func (_c *MockOrchestrator_GetOrchestration_Call) RunAndReturn(run func(context.Context, string, string) (*api.Orchestration, error)) *MockOrchestrator_GetOrchestration_Call {
 	_c.Call.Return(run)
 	return _c
 }

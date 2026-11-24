@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/natsfixtures"
 	"github.com/nats-io/nats.go/jetstream"
@@ -195,7 +196,7 @@ func TestSetupConsumers_BoundDelivery(t *testing.T) {
 
 	// a consumer as older versions created it, without any delivery limit
 	_, err = stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
-		Durable:       "cfm-orchestration",
+		Durable:       natsclient.ConsumerName(model.DefaultNamespace, natsclient.CFMOrchestration),
 		AckPolicy:     jetstream.AckExplicitPolicy,
 		FilterSubject: natsclient.CFMOrchestrationSubject,
 	})
@@ -208,7 +209,7 @@ func TestSetupConsumers_BoundDelivery(t *testing.T) {
 	assert.Equal(t, natsclient.DefaultMaxDeliver, info.Config.MaxDeliver)
 	assert.Equal(t, natsclient.DefaultAckWait, info.Config.AckWait)
 
-	activityConsumer, err := natsclient.SetupActivityConsumer(ctx, stream, "test.activity")
+	activityConsumer, err := natsclient.SetupActivityConsumer(ctx, stream, model.DefaultNamespace, "test.activity")
 	require.NoError(t, err)
 	info, err = activityConsumer.Info(ctx)
 	require.NoError(t, err)
@@ -235,7 +236,7 @@ func TestNakWithBackoff_DelaysEveryRedelivery(t *testing.T) {
 	require.NoError(t, err)
 	consumer, err := natsclient.SetupConsumer(ctx, stream, "test.retry")
 	require.NoError(t, err)
-	_, err = natsclient.NewMsgClient(nt.Client).Publish(ctx, natsclient.CFMSubjectPrefix+".test-retry", []byte(`{}`))
+	_, err = natsclient.NewMsgClient(nt.Client).Publish(ctx, natsclient.Subject(model.DefaultNamespace, "test-retry"), []byte(`{}`))
 	require.NoError(t, err)
 
 	// the first two retries wait 1s and 2s
@@ -257,4 +258,72 @@ func TestNakWithBackoff_DelaysEveryRedelivery(t *testing.T) {
 	require.Len(t, gaps, 2)
 	assert.GreaterOrEqual(t, gaps[0], 900*time.Millisecond)
 	assert.GreaterOrEqual(t, gaps[1], 1900*time.Millisecond)
+}
+
+func TestNamespaceSubjects_AreKeptApart(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), streamTestTimeout)
+	defer cancel()
+
+	nt, err := natsfixtures.SetupNatsContainer(ctx, "cfm-bucket")
+	require.NoError(t, err)
+	defer natsfixtures.TeardownNatsContainer(ctx, nt)
+
+	stream, err := natsclient.SetupStream(ctx, nt.Client, "cfm-stream")
+	require.NoError(t, err)
+	assert.Equal(t, []string{natsclient.CFMStreamSubjects}, stream.CachedInfo().Config.Subjects)
+
+	defaultConsumer, err := natsclient.SetupActivityConsumer(ctx, stream, model.DefaultNamespace, "test.activity")
+	require.NoError(t, err)
+	secondConsumer, err := natsclient.SetupActivityConsumer(ctx, stream, "second", "test.activity")
+	require.NoError(t, err)
+	manifestConsumer, err := natsclient.SetupOrchestrationConsumer(ctx, stream)
+	require.NoError(t, err)
+
+	client := natsclient.NewMsgClient(nt.Client)
+	for _, subject := range []string{
+		natsclient.Subject(model.DefaultNamespace, "test-activity"),
+		natsclient.Subject("second", "test-activity"),
+		natsclient.Subject("second", natsclient.CFMOrchestration),
+		natsclient.CFMOrchestrationSubject,
+	} {
+		_, err = client.Publish(ctx, subject, []byte(`{}`))
+		require.NoError(t, err)
+	}
+
+	for consumer, expected := range map[jetstream.Consumer][]string{
+		defaultConsumer:  {"event.default.test-activity"},
+		secondConsumer:   {"event.second.test-activity"},
+		manifestConsumer: {"event.second.cfm-orchestration", natsclient.CFMOrchestrationSubject},
+	} {
+		batch, err := consumer.Fetch(3, jetstream.FetchMaxWait(time.Second))
+		require.NoError(t, err)
+		var subjects []string
+		for msg := range batch.Messages() {
+			subjects = append(subjects, msg.Subject())
+			require.NoError(t, msg.Ack())
+		}
+		assert.Equal(t, expected, subjects)
+	}
+}
+
+func TestSetupStream_WidensStreamOfOlderVersions(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), streamTestTimeout)
+	defer cancel()
+
+	nt, err := natsfixtures.SetupNatsContainer(ctx, "cfm-bucket")
+	require.NoError(t, err)
+	defer natsfixtures.TeardownNatsContainer(ctx, nt)
+
+	// a stream as versions before namespaces created it
+	provisionStream(t, ctx, nt, "cfm-stream", []string{natsclient.CFMSubjectPrefix + ".*"})
+
+	stream, err := natsclient.SetupStream(ctx, nt.Client, "cfm-stream")
+	require.NoError(t, err)
+	info, err := stream.Info(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, []string{natsclient.CFMStreamSubjects}, info.Config.Subjects)
+	assert.Equal(t, jetstream.InterestPolicy, info.Config.Retention, "the rest of the configuration is kept")
+
+	_, err = natsclient.NewMsgClient(nt.Client).Publish(ctx, natsclient.Subject("second", "test-activity"), []byte(`{}`))
+	require.NoError(t, err)
 }

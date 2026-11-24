@@ -81,7 +81,7 @@ func TestProcessMessage_PanicTerminatesMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	mockClient := mocks.NewMockMsgClient(t)
-	mockClient.EXPECT().Get(mock.Anything, "test-panic").Return(panicTestEntry{value: orchestrationBytes}, nil)
+	mockClient.EXPECT().Get(mock.Anything, "default.test-panic").Return(panicTestEntry{value: orchestrationBytes}, nil)
 
 	executor := &NatsActivityExecutor{
 		Client:            mockClient,

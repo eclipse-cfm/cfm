@@ -24,9 +24,12 @@ import (
 )
 
 func newOrchestrationEntryStore() store.EntityStore[*api.OrchestrationEntry] {
-	columnNames := []string{"id", "namespace", "version", "correlation_id", "definition_id", "state", "state_timestamp", "created_timestamp", "orchestration_type"}
+	columnNames := []string{"id", "orchestration_id", "namespace", "version", "correlation_id", "definition_id", "state", "state_timestamp", "created_timestamp", "orchestration_type"}
 	builder := sqlstore.NewPostgresJSONBBuilder().
-		WithFieldMappings(map[string]string{"correlationId": "correlation_id",
+		// the id column is the key of the entry, see api.OrchestrationEntry.GetID; a predicate on the id of an
+		// orchestration uses the orchestration_id column
+		WithFieldMappings(map[string]string{"id": "orchestration_id",
+			"correlationId":     "correlation_id",
 			"DefinitionID":      "definition_id",
 			"stateTimestamp":    "state_timestamp",
 			"createdTimestamp":  "created_timestamp",
@@ -45,7 +48,7 @@ func newOrchestrationEntryStore() store.EntityStore[*api.OrchestrationEntry] {
 
 func recordToOrchestrationEntry(tx *sql.Tx, record *sqlstore.DatabaseRecord) (*api.OrchestrationEntry, error) {
 	entry := &api.OrchestrationEntry{}
-	if id, ok := record.Values["id"].(string); ok {
+	if id, ok := record.Values["orchestration_id"].(string); ok {
 		entry.ID = id
 	} else {
 		return nil, fmt.Errorf("invalid orchestration entry id reading record")
@@ -108,7 +111,8 @@ func orchestrationEntryToRecord(orchestrationEntry *api.OrchestrationEntry) (*sq
 		Values: make(map[string]any),
 	}
 
-	record.Values["id"] = orchestrationEntry.ID
+	record.Values["id"] = orchestrationEntry.GetID()
+	record.Values["orchestration_id"] = orchestrationEntry.ID
 	record.Values["namespace"] = model.NamespaceOrDefault(orchestrationEntry.Namespace)
 	record.Values["version"] = orchestrationEntry.Version
 	record.Values["correlation_id"] = orchestrationEntry.CorrelationID

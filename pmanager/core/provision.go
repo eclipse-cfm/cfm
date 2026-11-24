@@ -74,8 +74,9 @@ func (p provisionManager) Start(ctx context.Context, manifest *model.Orchestrati
 			return types.NewFatalWrappedError(err, "unable to find orchestration definition for manifest %s", manifestID)
 		}
 
-		// perform de-duplication
-		orch, err := p.orchestrator.GetOrchestration(ctx, manifestID)
+		// perform de-duplication. The orchestrations of each namespace are stored under their own keys, so a manifest
+		// only finds an orchestration of its own namespace.
+		orch, err := p.orchestrator.GetOrchestration(ctx, namespace, manifestID)
 		if err != nil {
 			return types.NewFatalWrappedError(err, "error performing de-duplication for %s", manifestID)
 		}
@@ -137,7 +138,7 @@ func (p provisionManager) Cancel(ctx context.Context, namespace string, orchestr
 // GetOrchestration returns the orchestration if it belongs to the namespace. An orchestration of another namespace is
 // reported as not found, so that its existence is not disclosed.
 func (p provisionManager) GetOrchestration(ctx context.Context, namespace string, orchestrationID string) (*api.Orchestration, error) {
-	orchestration, err := p.orchestrator.GetOrchestration(ctx, orchestrationID)
+	orchestration, err := p.orchestrator.GetOrchestration(ctx, model.NamespaceOrDefault(namespace), orchestrationID)
 	if err != nil || orchestration == nil {
 		return orchestration, err
 	}
