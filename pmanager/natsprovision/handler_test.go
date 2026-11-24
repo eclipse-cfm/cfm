@@ -34,6 +34,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// subjectMsg is a message received on a subject
+type subjectMsg struct {
+	jetstream.Msg
+	subject string
+}
+
+func (m subjectMsg) Subject() string {
+	return m.subject
+}
+
+// dispatch dispatches the manifest as if it was received on the subject
+func dispatch(handler *natsProvisionHandler, ctx context.Context, manifest model.OrchestrationManifest, subject string) error {
+	return handler.RetriableMessageProcessor.DispatcherCtx(ctx, manifest, subjectMsg{subject: subject})
+}
+
+// inNamespace returns the manifest as the handler passes it to the provision manager
+func inNamespace(manifest model.OrchestrationManifest, namespace string) *model.OrchestrationManifest {
+	manifest.Namespace = namespace
+	return &manifest
+}
+
 // testOrchestrationType is an orchestration type without meaning to the engine.
 const testOrchestrationType model.OrchestrationType = "test.orchestration"
 
@@ -56,10 +77,10 @@ func TestNatsProvisionHandler_Dispatcher_SuccessfulDispatch(t *testing.T) {
 	}
 
 	// Mock expectations - successful provision manager call
-	mockProvisionManager.On("Start", ctx, &manifest).Return(orchestration, nil)
+	mockProvisionManager.On("Start", ctx, inNamespace(manifest, model.DefaultNamespace)).Return(orchestration, nil)
 
 	// No publish call should be made on success
-	err := handler.RetriableMessageProcessor.Dispatcher(ctx, manifest)
+	err := dispatch(handler, ctx, manifest, natsclient.CFMOrchestrationSubject)
 
 	// Should return no error (message gets ACK'd)
 	require.NoError(t, err)
@@ -85,7 +106,7 @@ func TestNatsProvisionHandler_Dispatcher_ValidResponseStructure(t *testing.T) {
 	pubAck := &jetstream.PubAck{}
 
 	// Mock expectations
-	mockProvisionManager.On("Start", ctx, &manifest).Return(nil, nonRecoverableErr)
+	mockProvisionManager.On("Start", ctx, inNamespace(manifest, model.DefaultNamespace)).Return(nil, nonRecoverableErr)
 
 	var capturedPayload []byte
 	mockClient.EXPECT().Publish(ctx, natsclient.CFMOrchestrationResponseSubject, mock.AnythingOfType("[]uint8")).
@@ -93,7 +114,7 @@ func TestNatsProvisionHandler_Dispatcher_ValidResponseStructure(t *testing.T) {
 			capturedPayload = payload
 		}).Return(pubAck, nil)
 
-	err := handler.RetriableMessageProcessor.Dispatcher(ctx, manifest)
+	err := dispatch(handler, ctx, manifest, natsclient.CFMOrchestrationSubject)
 
 	require.NoError(t, err)
 
@@ -134,7 +155,7 @@ func TestNatsProvisionHandler_Dispatcher_ErrorDetail(t *testing.T) {
 
 			ctx := context.Background()
 			manifest := model.OrchestrationManifest{ID: "test-manifest-id", OrchestrationType: testOrchestrationType}
-			mockProvisionManager.On("Start", ctx, &manifest).Return(nil, tc.error)
+			mockProvisionManager.On("Start", ctx, inNamespace(manifest, model.DefaultNamespace)).Return(nil, tc.error)
 
 			var capturedPayload []byte
 			mockClient.EXPECT().Publish(ctx, natsclient.CFMOrchestrationResponseSubject, mock.Anything).
@@ -142,7 +163,7 @@ func TestNatsProvisionHandler_Dispatcher_ErrorDetail(t *testing.T) {
 					capturedPayload = payload
 				}).Return(&jetstream.PubAck{}, nil)
 
-			require.NoError(t, handler.RetriableMessageProcessor.Dispatcher(ctx, manifest))
+			require.NoError(t, dispatch(handler, ctx, manifest, natsclient.CFMOrchestrationSubject))
 
 			var response model.OrchestrationResponse
 			require.NoError(t, json.Unmarshal(capturedPayload, &response))
@@ -183,14 +204,14 @@ func TestNatsProvisionHandler_Dispatcher_ErrorTypes(t *testing.T) {
 			}
 
 			// Mock expectations
-			mockProvisionManager.On("Start", ctx, &manifest).Return(nil, tc.error)
+			mockProvisionManager.On("Start", ctx, inNamespace(manifest, model.DefaultNamespace)).Return(nil, tc.error)
 
 			if tc.shouldPublish {
 				pubAck := &jetstream.PubAck{}
 				mockClient.EXPECT().Publish(ctx, natsclient.CFMOrchestrationResponseSubject, mock.Anything).Return(pubAck, nil)
 			}
 
-			err := handler.RetriableMessageProcessor.Dispatcher(ctx, manifest)
+			err := dispatch(handler, ctx, manifest, natsclient.CFMOrchestrationSubject)
 
 			if tc.shouldPublish {
 				assert.NoError(t, err, "Non-recoverable errors should result in ACK")
@@ -244,7 +265,7 @@ func TestNatsProvisionHandler_Dispatcher_StartErrorIsPublishedToReplyTo(t *testi
 		replyTo  string
 		expected string
 	}{
-		{"reply-to set", "second-manager-response", "event.second-manager-response"},
+		{"reply-to set", "second-manager-response", "event.default.second-manager-response"},
 		{"no reply-to", "", natsclient.CFMOrchestrationResponseSubject},
 		// An invalid token is rejected by Start; the rejection must still reach a subject in the stream
 		{"invalid reply-to", "a.b", natsclient.CFMOrchestrationResponseSubject},
@@ -259,7 +280,7 @@ func TestNatsProvisionHandler_Dispatcher_StartErrorIsPublishedToReplyTo(t *testi
 
 			ctx := context.Background()
 			manifest := model.OrchestrationManifest{ID: "test-manifest-id", OrchestrationType: testOrchestrationType, ReplyTo: tc.replyTo}
-			mockProvisionManager.On("Start", ctx, &manifest).Return(nil, types.NewClientError("orchestration type 'x' not found"))
+			mockProvisionManager.On("Start", ctx, inNamespace(manifest, model.DefaultNamespace)).Return(nil, types.NewClientError("orchestration type 'x' not found"))
 
 			var capturedPayload []byte
 			mockClient.EXPECT().Publish(ctx, tc.expected, mock.Anything).
@@ -267,7 +288,7 @@ func TestNatsProvisionHandler_Dispatcher_StartErrorIsPublishedToReplyTo(t *testi
 					capturedPayload = payload
 				}).Return(&jetstream.PubAck{}, nil)
 
-			require.NoError(t, handler.RetriableMessageProcessor.Dispatcher(ctx, manifest))
+			require.NoError(t, dispatch(handler, ctx, manifest, natsclient.CFMOrchestrationSubject))
 
 			var response model.OrchestrationResponse
 			require.NoError(t, json.Unmarshal(capturedPayload, &response))
@@ -275,4 +296,65 @@ func TestNatsProvisionHandler_Dispatcher_StartErrorIsPublishedToReplyTo(t *testi
 			assert.Equal(t, "test-manifest-id", response.ManifestID)
 		})
 	}
+}
+
+func TestNatsProvisionHandler_SubjectSelectsNamespace(t *testing.T) {
+	for name, manifestNamespace := range map[string]string{"manifest without namespace": "", "manifest with namespace": "second"} {
+		t.Run(name, func(t *testing.T) {
+			mockClient := mocks.NewMockMsgClient(t)
+			mockProvisionManager := &MockProvisionManager{}
+			handler := newNatsProvisionHandler(mockClient, mockProvisionManager, system.NoopMonitor{})
+			ctx := context.Background()
+			manifest := model.OrchestrationManifest{ID: "test-manifest-id", OrchestrationType: testOrchestrationType, Namespace: manifestNamespace}
+			mockProvisionManager.On("Start", ctx, inNamespace(manifest, "second")).Return(&api.Orchestration{ID: "test-manifest-id"}, nil)
+
+			require.NoError(t, dispatch(handler, ctx, manifest, natsclient.Subject("second", natsclient.CFMOrchestration)))
+
+			mockProvisionManager.AssertExpectations(t)
+		})
+	}
+}
+
+func TestNatsProvisionHandler_RejectsManifestOfOtherNamespace(t *testing.T) {
+	for name, tc := range map[string]struct {
+		manifestNamespace string
+		subjectNamespace  string
+	}{
+		"other namespace":   {"third", "second"},
+		"default namespace": {model.DefaultNamespace, "second"},
+		"from default":      {"second", model.DefaultNamespace},
+	} {
+		t.Run(name, func(t *testing.T) {
+			mockClient := mocks.NewMockMsgClient(t)
+			mockProvisionManager := &MockProvisionManager{}
+			handler := newNatsProvisionHandler(mockClient, mockProvisionManager, system.NoopMonitor{})
+			ctx := context.Background()
+			manifest := model.OrchestrationManifest{ID: "test-manifest-id", OrchestrationType: testOrchestrationType, Namespace: tc.manifestNamespace}
+
+			// the rejection goes to the namespace of the sender, and the provision manager is not called
+			var capturedPayload []byte
+			mockClient.EXPECT().Publish(ctx, natsclient.ResponseSubject(tc.subjectNamespace, ""), mock.Anything).
+				Run(func(ctx context.Context, subject string, payload []byte, opts ...jetstream.PublishOpt) {
+					capturedPayload = payload
+				}).Return(&jetstream.PubAck{}, nil)
+
+			require.NoError(t, dispatch(handler, ctx, manifest, natsclient.Subject(tc.subjectNamespace, natsclient.CFMOrchestration)))
+
+			var response model.OrchestrationResponse
+			require.NoError(t, json.Unmarshal(capturedPayload, &response))
+			assert.False(t, response.Success)
+			assert.Contains(t, response.ErrorDetail, "is not the namespace")
+			mockProvisionManager.AssertNotCalled(t, "Start", mock.Anything, mock.Anything)
+		})
+	}
+}
+
+func TestNatsProvisionHandler_DropsManifestOnUnknownSubject(t *testing.T) {
+	mockClient := mocks.NewMockMsgClient(t)
+	mockProvisionManager := &MockProvisionManager{}
+	handler := newNatsProvisionHandler(mockClient, mockProvisionManager, system.NoopMonitor{})
+
+	require.NoError(t, dispatch(handler, context.Background(), model.OrchestrationManifest{ID: "test-manifest-id"}, "event.cfm-orchestration"))
+
+	mockProvisionManager.AssertNotCalled(t, "Start", mock.Anything, mock.Anything)
 }

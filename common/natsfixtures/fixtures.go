@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/stretchr/testify/require"
@@ -170,9 +171,16 @@ func SetupTestStream(t *testing.T, ctx context.Context, client *natsclient.NatsC
 	return stream
 }
 
-// SetupTestConsumer creates an activity consumer for subject, configured as SetupActivityConsumer does.
+// SetupTestConsumer creates an activity consumer of the default namespace for subject, configured as
+// SetupActivityConsumer does.
 func SetupTestConsumer(t *testing.T, ctx context.Context, stream jetstream.Stream, subject string) jetstream.Consumer {
-	consumer, err := natsclient.SetupActivityConsumer(ctx, stream, subject)
+	return SetupTestNamespaceConsumer(t, ctx, stream, model.DefaultNamespace, subject)
+}
+
+// SetupTestNamespaceConsumer creates an activity consumer of the namespace for subject, configured as
+// SetupActivityConsumer does.
+func SetupTestNamespaceConsumer(t *testing.T, ctx context.Context, stream jetstream.Stream, namespace string, subject string) jetstream.Consumer {
+	consumer, err := natsclient.SetupActivityConsumer(ctx, stream, namespace, subject)
 	require.NoError(t, err)
 	return consumer
 }

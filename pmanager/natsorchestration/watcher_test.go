@@ -41,7 +41,7 @@ func TestOnMessage_CreateNewEntry(t *testing.T) {
 	watcher.onMessage(msg.Data, msg)
 
 	ctx := context.Background()
-	entry, err := index.FindByID(ctx, "orch-1")
+	entry, err := index.FindByID(ctx, "default.orch-1")
 	require.NoError(t, err)
 	assert.NotNil(t, entry)
 	assert.Equal(t, "orch-1", entry.ID)
@@ -70,7 +70,7 @@ func TestOnMessage_UpdateExistingEntry(t *testing.T) {
 
 	watcher.onMessage(msg.Data, msg)
 
-	entry, err := index.FindByID(ctx, "orch-1")
+	entry, err := index.FindByID(ctx, "default.orch-1")
 	require.NoError(t, err)
 	assert.Equal(t, api.OrchestrationStateCompleted, entry.State)
 }
@@ -116,7 +116,7 @@ func TestOnMessage_UpdateWhenStateUnchangedTimestampDifferent(t *testing.T) {
 	watcher.onMessage(msg.Data, msg)
 
 	// Verify state timestamp didn't change
-	entry, err := index.FindByID(ctx, "orch-1")
+	entry, err := index.FindByID(ctx, "default.orch-1")
 	require.NoError(t, err)
 	assert.True(t, entry.StateTimestamp.Equal(orch2.StateTimestamp))
 }
@@ -145,7 +145,7 @@ func TestOnMessage_IgnoreUpdatesWhenCompleted(t *testing.T) {
 	watcher.onMessage(msg.Data, msg)
 
 	// Verify state remains Completed
-	entry, err := index.FindByID(ctx, "orch-1")
+	entry, err := index.FindByID(ctx, "default.orch-1")
 	require.NoError(t, err)
 	assert.Equal(t, api.OrchestrationStateCompleted, entry.State)
 }
@@ -177,7 +177,7 @@ func TestOnMessage_ErroredStateUpdate(t *testing.T) {
 
 	watcher.onMessage(msg.Data, msg)
 
-	entry, err := index.FindByID(ctx, "orch-1")
+	entry, err := index.FindByID(ctx, "default.orch-1")
 	require.NoError(t, err)
 	assert.Equal(t, api.OrchestrationStateErrored, entry.State)
 }
@@ -252,20 +252,24 @@ func TestOnMessage_EntryNamespace(t *testing.T) {
 	index := createTestStore(t)
 	watcher := createTestWatcher(index, &store.NoOpTransactionContext{}, &mocks.MockProvisionManager{}, &mocks.MockDefinitionManager{})
 
+	// the same orchestration ID in two namespaces makes two entries
 	second := createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateRunning)
 	second.Namespace = "second"
 	msg := createNatsMsg(t, second)
 	watcher.onMessage(msg.Data, msg)
-	legacy := createWatcherOrchestration("orch-2", "corr-1", api.OrchestrationStateRunning)
+	legacy := createWatcherOrchestration("orch-1", "corr-2", api.OrchestrationStateRunning)
 	msg = createNatsMsg(t, legacy)
 	watcher.onMessage(msg.Data, msg)
 
-	entry, err := index.FindByID(context.Background(), "orch-1")
+	entry, err := index.FindByID(context.Background(), "second.orch-1")
 	require.NoError(t, err)
 	assert.Equal(t, "second", entry.Namespace)
-	entry, err = index.FindByID(context.Background(), "orch-2")
+	assert.Equal(t, "orch-1", entry.ID)
+	assert.Equal(t, "corr-1", entry.CorrelationID)
+	entry, err = index.FindByID(context.Background(), "default.orch-1")
 	require.NoError(t, err)
 	assert.Equal(t, model.DefaultNamespace, entry.Namespace)
+	assert.Equal(t, "corr-2", entry.CorrelationID)
 }
 
 // A failed orchestration whose definition declares no compensation type is not compensated
@@ -377,7 +381,7 @@ func TestOnMessage_ErrorWhenTooManyCompensationOrchs(t *testing.T) {
 	watcher.onMessage(msg.Data, msg)
 
 	// The no-op transaction context does not roll back, so the index keeps the update, but the message is rejected
-	entry, err := index.FindByID(ctx, "orch-1")
+	entry, err := index.FindByID(ctx, "default.orch-1")
 	require.NoError(t, err)
 	assert.Equal(t, api.OrchestrationStateErrored, entry.State)
 	assert.Equal(t, 1, msg.NakCalls, "the update should be redelivered when the compensation cannot be started")
@@ -405,15 +409,15 @@ func TestOnMessage_CreateMultipleEntries(t *testing.T) {
 	watcher.onMessage(msg3.Data, msg3)
 
 	// Verify all entries exist
-	entry1, err := index.FindByID(ctx, "orch-1")
+	entry1, err := index.FindByID(ctx, "default.orch-1")
 	require.NoError(t, err)
 	assert.Equal(t, "corr-1", entry1.CorrelationID)
 
-	entry2, err := index.FindByID(ctx, "orch-2")
+	entry2, err := index.FindByID(ctx, "default.orch-2")
 	require.NoError(t, err)
 	assert.Equal(t, "corr-2", entry2.CorrelationID)
 
-	entry3, err := index.FindByID(ctx, "orch-3")
+	entry3, err := index.FindByID(ctx, "default.orch-3")
 	require.NoError(t, err)
 	assert.Equal(t, "corr-3", entry3.CorrelationID)
 }
@@ -443,7 +447,7 @@ func TestOnMessage_CorrectMetadataAfterCreate(t *testing.T) {
 
 	watcher.onMessage(msg.Data, msg)
 
-	entry, err := index.FindByID(ctx, "orch-1")
+	entry, err := index.FindByID(ctx, "default.orch-1")
 	require.NoError(t, err)
 	assert.Equal(t, "orch-1", entry.ID)
 	assert.Equal(t, "corr-1", entry.CorrelationID)
@@ -466,7 +470,7 @@ func TestOnMessage_StateTransitionSequence(t *testing.T) {
 	msg1 := createNatsMsg(t, orch1)
 	watcher.onMessage(msg1.Data, msg1)
 
-	entry, err := index.FindByID(ctx, "orch-1")
+	entry, err := index.FindByID(ctx, "default.orch-1")
 	require.NoError(t, err)
 	assert.Equal(t, api.OrchestrationStateInitialized, entry.State)
 
@@ -476,7 +480,7 @@ func TestOnMessage_StateTransitionSequence(t *testing.T) {
 	msg2 := createNatsMsg(t, orch2)
 	watcher.onMessage(msg2.Data, msg2)
 
-	entry, err = index.FindByID(ctx, "orch-1")
+	entry, err = index.FindByID(ctx, "default.orch-1")
 	require.NoError(t, err)
 	assert.Equal(t, api.OrchestrationStateRunning, entry.State)
 
@@ -486,7 +490,7 @@ func TestOnMessage_StateTransitionSequence(t *testing.T) {
 	msg3 := createNatsMsg(t, orch3)
 	watcher.onMessage(msg3.Data, msg3)
 
-	entry, err = index.FindByID(ctx, "orch-1")
+	entry, err = index.FindByID(ctx, "default.orch-1")
 	require.NoError(t, err)
 	assert.Equal(t, api.OrchestrationStateCompleted, entry.State)
 }
@@ -515,7 +519,7 @@ func TestOnMessage_MultipleUpdatesToSameEntry(t *testing.T) {
 		watcher.onMessage(msg.Data, msg)
 	}
 
-	entry, err := index.FindByID(ctx, "orch-1")
+	entry, err := index.FindByID(ctx, "default.orch-1")
 	require.NoError(t, err)
 	assert.Equal(t, api.OrchestrationStateCompleted, entry.State)
 }
@@ -532,7 +536,7 @@ func TestOnMessage_CorrelationIDPreserved(t *testing.T) {
 	msg := createNatsMsg(t, orch)
 	watcher.onMessage(msg.Data, msg)
 
-	entry, err := index.FindByID(ctx, "orch-1")
+	entry, err := index.FindByID(ctx, "default.orch-1")
 	require.NoError(t, err)
 	assert.Equal(t, "corr-1", entry.CorrelationID)
 }
@@ -569,7 +573,7 @@ func TestOnMessage_EntryPropertiesPreserved(t *testing.T) {
 	msg2 := createNatsMsg(t, orch2)
 	watcher.onMessage(msg2.Data, msg2)
 
-	entry, err := index.FindByID(ctx, "orch-1")
+	entry, err := index.FindByID(ctx, "default.orch-1")
 	require.NoError(t, err)
 	assert.Equal(t, "corr-1", entry.CorrelationID)
 	assert.Equal(t, model.OrchestrationType("MyWorkflow"), entry.OrchestrationType)

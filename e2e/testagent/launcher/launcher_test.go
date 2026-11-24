@@ -17,6 +17,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/common/model"
+
 	"github.com/eclipse-cfm/cfm/common/fixtures"
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/natsfixtures"
@@ -87,7 +89,7 @@ func TestTestAgent_Integration(t *testing.T) {
 
 	// Wait for the activity to be processed
 	assert.Eventually(t, func() bool {
-		updatedOrchestration, _, err := natsorchestration.ReadOrchestration(ctx, orchestration.ID, adapter)
+		updatedOrchestration, _, err := natsorchestration.ReadOrchestration(ctx, model.DefaultNamespace, orchestration.ID, adapter)
 		require.NoError(t, err)
 		return updatedOrchestration.State == api.OrchestrationStateCompleted
 	}, testTimeout, pollInterval, "Activity should be processed")

@@ -172,9 +172,11 @@ func TestCreateTables_MigratesDefinitionsToDefaultNamespace(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, model.DefaultNamespace, activity.Namespace)
 
-	entry, err := newOrchestrationEntryStore().FindByID(ctx, "o1")
+	// entries are keyed by namespace and orchestration ID
+	entry, err := newOrchestrationEntryStore().FindByID(ctx, "default.o1")
 	require.NoError(t, err)
 	assert.Equal(t, model.DefaultNamespace, entry.Namespace)
+	assert.Equal(t, "o1", entry.ID)
 	assert.Equal(t, "test.deploy", entry.DefinitionID)
 
 	var ids []string
@@ -195,9 +197,10 @@ func TestOrchestrationEntryStore_Namespace(t *testing.T) {
 	ctx := context.WithValue(context.Background(), sqlstore.SQLTransactionKey, mustBegin(t))
 	entries := newOrchestrationEntryStore()
 
+	// the same orchestration ID in two namespaces makes two entries
 	for _, entry := range []*api.OrchestrationEntry{
 		{ID: "o1", CorrelationID: "c1", DefinitionID: "test.deploy", OrchestrationType: "test.deploy", StateTimestamp: time.Now(), CreatedTimestamp: time.Now()},
-		{ID: "o2", Namespace: "second", CorrelationID: "c1", DefinitionID: "test.deploy", OrchestrationType: "test.deploy", StateTimestamp: time.Now(), CreatedTimestamp: time.Now()},
+		{ID: "o1", Namespace: "second", CorrelationID: "c2", DefinitionID: "test.deploy", OrchestrationType: "test.deploy", StateTimestamp: time.Now(), CreatedTimestamp: time.Now()},
 	} {
 		_, err := entries.Create(ctx, entry)
 		require.NoError(t, err)
@@ -206,12 +209,23 @@ func TestOrchestrationEntryStore_Namespace(t *testing.T) {
 	found, err := collection.CollectAll(entries.FindByPredicate(ctx, query.Eq("namespace", "second")))
 	require.NoError(t, err)
 	require.Len(t, found, 1)
-	assert.Equal(t, "o2", found[0].ID)
+	assert.Equal(t, "o1", found[0].ID)
 	assert.Equal(t, "second", found[0].Namespace)
+	assert.Equal(t, "c2", found[0].CorrelationID)
 
-	entry, err := entries.FindByID(ctx, "o1")
+	// a predicate on the id is on the orchestration ID
+	found, err = collection.CollectAll(entries.FindByPredicate(ctx, query.And(query.Eq("namespace", model.DefaultNamespace), query.Eq("id", "o1"))))
+	require.NoError(t, err)
+	require.Len(t, found, 1)
+	assert.Equal(t, "c1", found[0].CorrelationID)
+
+	entry, err := entries.FindByID(ctx, "default.o1")
 	require.NoError(t, err)
 	assert.Equal(t, model.DefaultNamespace, entry.Namespace)
+	assert.Equal(t, "o1", entry.ID)
+	entry, err = entries.FindByID(ctx, api.OrchestrationKey("second", "o1"))
+	require.NoError(t, err)
+	assert.Equal(t, "second", entry.Namespace)
 }
 
 func mustBegin(t *testing.T) any {

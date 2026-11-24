@@ -20,6 +20,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eclipse-cfm/cfm/common/model"
+
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/natsfixtures"
 	"github.com/eclipse-cfm/cfm/common/system"
@@ -70,7 +72,7 @@ func TestNatsOrchestrator_GetOrchestration_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test GetOrchestration
-	result, err := orchestrator.GetOrchestration(ctx, orchestration.ID)
+	result, err := orchestrator.GetOrchestration(ctx, model.DefaultNamespace, orchestration.ID)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
@@ -92,7 +94,7 @@ func TestNatsOrchestrator_GetOrchestration_NotFound(t *testing.T) {
 	}
 
 	// Test GetOrchestration for non-existent orchestration
-	result, err := orchestrator.GetOrchestration(ctx, "non-existent-orchestration")
+	result, err := orchestrator.GetOrchestration(ctx, model.DefaultNamespace, "non-existent-orchestration")
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }
@@ -201,7 +203,7 @@ func Test_ValuePersistence(t *testing.T) {
 
 			// Verify values were persisted
 			require.Eventually(t, func() bool {
-				updatedOrchestration, _, err := ReadOrchestration(ctx, orchestration.ID, adapter)
+				updatedOrchestration, _, err := ReadOrchestration(ctx, model.DefaultNamespace, orchestration.ID, adapter)
 				if err != nil {
 					return false
 				}
@@ -332,7 +334,7 @@ func Test_ValuePersistenceOnRetry(t *testing.T) {
 
 			// Verify values were persisted
 			require.Eventually(t, func() bool {
-				finalOrchestration, _, err := ReadOrchestration(ctx, orchestration.ID, adapter)
+				finalOrchestration, _, err := ReadOrchestration(ctx, model.DefaultNamespace, orchestration.ID, adapter)
 				if err != nil {
 					return false
 				}
@@ -462,7 +464,7 @@ func Test_ValuePersistenceMultipleActivities(t *testing.T) {
 
 			// Verify values were persisted
 			require.Eventually(t, func() bool {
-				finalOrchestration, _, err := ReadOrchestration(ctx, orchestration.ID, adapter)
+				finalOrchestration, _, err := ReadOrchestration(ctx, model.DefaultNamespace, orchestration.ID, adapter)
 				if err != nil {
 					return false
 				}
@@ -570,7 +572,7 @@ func Test_ValuePersistenceOnWait(t *testing.T) {
 
 			// Verify values were persisted
 			require.Eventually(t, func() bool {
-				waitOrchestration, _, err := ReadOrchestration(ctx, orchestration.ID, adapter)
+				waitOrchestration, _, err := ReadOrchestration(ctx, model.DefaultNamespace, orchestration.ID, adapter)
 				if err != nil {
 					return false
 				}

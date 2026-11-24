@@ -17,6 +17,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/eclipse-cfm/cfm/common/model"
+
 	"github.com/eclipse-cfm/cfm/common/natsclient"
 	"github.com/eclipse-cfm/cfm/common/natsfixtures"
 	"github.com/eclipse-cfm/cfm/common/system"
@@ -57,7 +59,7 @@ func setupResumeTest(t *testing.T) (context.Context, natsclient.MsgClient, jetst
 func storeOrchestration(t *testing.T, ctx context.Context, client natsclient.MsgClient, orchestration *api.Orchestration) {
 	serialized, err := json.Marshal(orchestration)
 	require.NoError(t, err)
-	_, err = client.Update(ctx, orchestration.ID, serialized, 0)
+	_, err = client.Update(ctx, api.OrchestrationKey(orchestration.Namespace, orchestration.ID), serialized, 0)
 	require.NoError(t, err)
 }
 
@@ -73,7 +75,7 @@ func TestExecute_MarksOrchestrationRunning(t *testing.T) {
 
 	require.NoError(t, orchestrator.Execute(ctx, resumeTestOrchestration("O1", api.OrchestrationStateInitialized)))
 
-	stored, _, err := ReadOrchestration(ctx, "O1", client)
+	stored, _, err := ReadOrchestration(ctx, model.DefaultNamespace, "O1", client)
 	require.NoError(t, err)
 	assert.Equal(t, api.OrchestrationStateRunning, stored.State)
 	assert.Equal(t, uint64(2), streamMessages(t, ctx, stream), "the first step's activities must be enqueued")
@@ -86,7 +88,7 @@ func TestExecute_StartsOrchestrationThatWasStoredButNotStarted(t *testing.T) {
 
 	require.NoError(t, orchestrator.Execute(ctx, resumeTestOrchestration("O1", api.OrchestrationStateInitialized)))
 
-	stored, _, err := ReadOrchestration(ctx, "O1", client)
+	stored, _, err := ReadOrchestration(ctx, model.DefaultNamespace, "O1", client)
 	require.NoError(t, err)
 	assert.Equal(t, api.OrchestrationStateRunning, stored.State)
 	assert.Equal(t, uint64(2), streamMessages(t, ctx, stream), "the first step's activities must be enqueued")
@@ -106,8 +108,8 @@ func TestEnqueueActivityMessages_DropsDuplicates(t *testing.T) {
 	ctx, client, stream := setupResumeTest(t)
 	activities := resumeTestOrchestration("O1", api.OrchestrationStateInitialized).Steps[0].Activities
 
-	require.NoError(t, EnqueueActivityMessages(ctx, "O1", activities, client))
-	require.NoError(t, EnqueueActivityMessages(ctx, "O1", activities, client))
+	require.NoError(t, EnqueueActivityMessages(ctx, model.DefaultNamespace, "O1", activities, client))
+	require.NoError(t, EnqueueActivityMessages(ctx, model.DefaultNamespace, "O1", activities, client))
 
 	assert.Equal(t, uint64(2), streamMessages(t, ctx, stream), "enqueueing the same activities again must not add messages")
 }

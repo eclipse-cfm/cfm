@@ -19,6 +19,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/eclipse-cfm/cfm/common/model"
+
 	"github.com/eclipse-cfm/cfm/common/mocks"
 	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/eclipse-cfm/cfm/pmanager/api"
@@ -30,7 +32,7 @@ import (
 
 const (
 	activityType = "test.activity"
-	subject      = "event.test-activity"
+	subject      = "event.default.test-activity"
 )
 
 func TestExecuteOrchestration_Errors(t *testing.T) {
@@ -53,7 +55,7 @@ func TestExecuteOrchestration_Errors(t *testing.T) {
 				},
 			},
 			setupMock: func(m *mocks.MockMsgClient) {
-				m.EXPECT().Update(mock.Anything, "test-3", mock.Anything, uint64(0)).
+				m.EXPECT().Update(mock.Anything, "default.test-3", mock.Anything, uint64(0)).
 					Return(uint64(0), &jetstream.APIError{ErrorCode: jetstream.JSErrCodeStreamWrongLastSequence})
 			},
 			expectedCalls: 0,
@@ -69,7 +71,7 @@ func TestExecuteOrchestration_Errors(t *testing.T) {
 				},
 			},
 			setupMock: func(m *mocks.MockMsgClient) {
-				m.EXPECT().Update(mock.Anything, "test-4", mock.Anything, uint64(0)).
+				m.EXPECT().Update(mock.Anything, "default.test-4", mock.Anything, uint64(0)).
 					Return(uint64(0), assert.AnError)
 			},
 			expectedError: "error storing orchestration",
@@ -86,7 +88,7 @@ func TestExecuteOrchestration_Errors(t *testing.T) {
 				},
 			},
 			setupMock: func(m *mocks.MockMsgClient) {
-				m.EXPECT().Update(mock.Anything, "test-5", mock.Anything, uint64(0)).
+				m.EXPECT().Update(mock.Anything, "default.test-5", mock.Anything, uint64(0)).
 					Return(uint64(1), nil)
 				m.EXPECT().Publish(mock.Anything, subject, mock.Anything).
 					Return(nil, assert.AnError)
@@ -160,7 +162,7 @@ func TestEnqueueMessages_Errors(t *testing.T) {
 			mockClient := mocks.NewMockMsgClient(t)
 			tt.setupMock(mockClient)
 
-			err := EnqueueActivityMessages(context.Background(), "test-oid", tt.activities, mockClient)
+			err := EnqueueActivityMessages(context.Background(), model.DefaultNamespace, "test-oid", tt.activities, mockClient)
 
 			if tt.wantErr {
 				assert.Error(t, err)

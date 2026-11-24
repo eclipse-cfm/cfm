@@ -17,7 +17,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
@@ -56,8 +55,12 @@ func initActivityMetrics() {
 const DefaultActivityTimeout = 5 * time.Minute
 
 type NatsActivityExecutor struct {
-	Client            natsclient.MsgClient
-	StreamName        string
+	Client     natsclient.MsgClient
+	StreamName string
+	// Namespace is the namespace the executor runs the activities of. It only receives the activity messages of its
+	// namespace, and only reads and writes the state of the orchestrations of its namespace. An empty namespace is
+	// model.DefaultNamespace.
+	Namespace         string
 	ActivityType      string
 	ActivityProcessor api.ActivityProcessor
 	Monitor           system.LogMonitor
@@ -91,7 +94,7 @@ func (e *NatsActivityExecutor) Execute(ctx context.Context) error {
 		return fmt.Errorf("error opening stream: %w", err)
 	}
 
-	consumerName := strings.ReplaceAll(e.ActivityType, ".", "-")
+	consumerName := natsclient.ConsumerName(e.Namespace, e.ActivityType)
 	consumer, err := stream.Consumer(ctx, consumerName)
 	if err != nil {
 		return fmt.Errorf("error connecting to consumer %s: %w", consumerName, err)
@@ -103,7 +106,7 @@ func (e *NatsActivityExecutor) Execute(ctx context.Context) error {
 			if err != nil {
 				return nil, fmt.Errorf("error opening stream: %w", err)
 			}
-			return natsclient.SetupActivityConsumer(ctx, stream, e.ActivityType)
+			return natsclient.SetupActivityConsumer(ctx, stream, e.Namespace, e.ActivityType)
 		}
 	}
 
@@ -146,7 +149,13 @@ func (e *NatsActivityExecutor) processMessage(ctx context.Context, message jetst
 
 	finalDelivery := natsclient.IsFinalDelivery(message, natsclient.ActivityMaxDeliver)
 
-	orchestration, revision, err := ReadOrchestration(ctx, oMessage.OrchestrationID, e.Client)
+	orchestration, revision, err := ReadOrchestration(ctx, e.Namespace, oMessage.OrchestrationID, e.Client)
+	if err == nil && model.NamespaceOrDefault(orchestration.Namespace) != model.NamespaceOrDefault(e.Namespace) {
+		// The state is stored under the key of the executor's namespace, so it can only be of another namespace if it
+		// was written by something else than the engine. Don't run an activity of another namespace.
+		err = fmt.Errorf("orchestration %s is in namespace %s, not in %s", oMessage.OrchestrationID,
+			model.NamespaceOrDefault(orchestration.Namespace), model.NamespaceOrDefault(e.Namespace))
+	}
 	if err != nil {
 		if finalDelivery {
 			// Last chance: without the orchestration it cannot be marked errored, so drop the message loudly
@@ -369,7 +378,7 @@ func (e *NatsActivityExecutor) processOnActivityCompletion(
 	}
 
 	// Enqueue next activities
-	if err := EnqueueActivityMessages(activityContext.Context(), orchestration.ID, next, e.Client); err != nil {
+	if err := EnqueueActivityMessages(activityContext.Context(), orchestration.Namespace, orchestration.ID, next, e.Client); err != nil {
 		// Failed redeliver the message
 		err = natsclient.NakError(message, err)
 		return fmt.Errorf("failed to enqueue next orchestration activities %s: %w", oMessage.OrchestrationID, err)
@@ -407,7 +416,7 @@ func (e *NatsActivityExecutor) handleOrchestrationCompletion(
 }
 
 // publishResponse reports the outcome of an orchestration to its initiator, on the subject selected by the manifest's
-// reply-to token. A non-empty errorDetail reports a failure:
+// reply-to token in the namespace of the orchestration. A non-empty errorDetail reports a failure:
 // errorDetail describes it for the caller and errorCause is the underlying error, for operators. Both are passed in
 // rather than read from the orchestration, because the orchestration may not carry the error if recording it failed.
 func (e *NatsActivityExecutor) publishResponse(activityContext api.ActivityContext, orchestration api.Orchestration, errorDetail string, errorCause string) error {
@@ -426,7 +435,7 @@ func (e *NatsActivityExecutor) publishResponse(activityContext api.ActivityConte
 	if err != nil {
 		return fmt.Errorf("failed to marshal orchestration response: %w", err)
 	}
-	_, err = e.Client.Publish(activityContext.Context(), natsclient.ResponseSubject(orchestration.ReplyTo), ser)
+	_, err = e.Client.Publish(activityContext.Context(), natsclient.ResponseSubject(orchestration.Namespace, orchestration.ReplyTo), ser)
 	return err
 }
 

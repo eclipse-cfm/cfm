@@ -28,12 +28,13 @@ import (
 
 // EnqueueActivityMessages enqueues the given activities for processing.
 //
-// Messages are sent to a named durable queue corresponding to the activity type. For example, messages for the
-// 'test-activity' type will be routed to the 'event.test-activity' queue.
+// Messages are sent to a named durable queue corresponding to the activity type in the namespace of the orchestration.
+// For example, messages for the 'test-activity' type will be routed to the 'event.test-activity' queue in the default
+// namespace, and to the 'event.second.test-activity' queue in the namespace 'second', see natsclient.Subject.
 //
 // Each message carries a message ID derived from the orchestration and activity IDs, so JetStream drops a message that
 // is enqueued again within the stream's duplicate window, for example when an enqueue is retried after a failure.
-func EnqueueActivityMessages(ctx context.Context, orchestrationID string, activities []api.Activity, client natsclient.MsgClient) error {
+func EnqueueActivityMessages(ctx context.Context, namespace string, orchestrationID string, activities []api.Activity, client natsclient.MsgClient) error {
 	for _, activity := range activities {
 		// route to queue
 		payload, err := json.Marshal(api.ActivityMessage{
@@ -45,9 +46,9 @@ func EnqueueActivityMessages(ctx context.Context, orchestrationID string, activi
 		}
 
 		// Strip out periods since they denote a subject hierarchy for NATS
-		subject := natsclient.CFMSubjectPrefix + "." + strings.ReplaceAll(activity.Type.String(), ".", "-")
+		subject := natsclient.Subject(namespace, strings.ReplaceAll(activity.Type.String(), ".", "-"))
 		headers := nats.Header{}
-		headers.Set(jetstream.MsgIDHeader, ActivityMessageID(orchestrationID, activity.ID))
+		headers.Set(jetstream.MsgIDHeader, ActivityMessageID(namespace, orchestrationID, activity.ID))
 		otel.GetTextMapPropagator().Inject(ctx, &natsHeaderCarrier{headers: headers})
 
 		msg := &nats.Msg{
@@ -63,14 +64,15 @@ func EnqueueActivityMessages(ctx context.Context, orchestrationID string, activi
 	return nil
 }
 
-// ActivityMessageID returns the JetStream message ID of the message for an activity of an orchestration.
-func ActivityMessageID(orchestrationID string, activityID string) string {
-	return orchestrationID + "." + activityID
+// ActivityMessageID returns the JetStream message ID of the message for an activity of an orchestration of the
+// namespace.
+func ActivityMessageID(namespace string, orchestrationID string, activityID string) string {
+	return api.OrchestrationKey(namespace, orchestrationID) + "." + activityID
 }
 
-// ReadOrchestration reads the orchestration state from the KV store.
-func ReadOrchestration(ctx context.Context, orchestrationID string, client natsclient.MsgClient) (api.Orchestration, uint64, error) {
-	oEntry, err := client.Get(ctx, orchestrationID)
+// ReadOrchestration reads the state of the orchestration of the namespace from the KV store, see api.OrchestrationKey.
+func ReadOrchestration(ctx context.Context, namespace string, orchestrationID string, client natsclient.MsgClient) (api.Orchestration, uint64, error) {
+	oEntry, err := client.Get(ctx, api.OrchestrationKey(namespace, orchestrationID))
 	if err != nil {
 		return api.Orchestration{}, 0, fmt.Errorf("failed to get orchestration state %s: %w", orchestrationID, err)
 	}
@@ -103,7 +105,7 @@ func UpdateOrchestration(
 		if err != nil {
 			return api.Orchestration{}, 0, fmt.Errorf("failed to marshal orchestration %s: %w", orchestration.ID, err)
 		}
-		newRevision, err := client.Update(ctx, orchestration.ID, serialized, revision)
+		newRevision, err := client.Update(ctx, api.OrchestrationKey(orchestration.Namespace, orchestration.ID), serialized, revision)
 		if err == nil {
 			return orchestration, newRevision, nil
 		}
@@ -114,7 +116,7 @@ func UpdateOrchestration(
 			return api.Orchestration{}, 0, fmt.Errorf("failed to update orchestration %s after %d conflicting updates: %w",
 				orchestration.ID, maxUpdateConflicts, err)
 		}
-		orchestration, revision, err = ReadOrchestration(ctx, orchestration.ID, client)
+		orchestration, revision, err = ReadOrchestration(ctx, orchestration.Namespace, orchestration.ID, client)
 		if err != nil {
 			return api.Orchestration{}, 0, fmt.Errorf("failed to read orchestration data for update: %w", err)
 		}

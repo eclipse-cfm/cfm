@@ -38,7 +38,7 @@ func TestOnMessage_FindByIDError_NakCalledOnce(t *testing.T) {
 	expectedErr := errors.New("database connection failed")
 
 	mockStore.EXPECT().
-		FindByID(mock.Anything, "orch-1").
+		FindByID(mock.Anything, "default.orch-1").
 		Return(nil, expectedErr).
 		Once()
 
@@ -62,7 +62,7 @@ func TestOnMessage_CreateError_NakCalledNotAck(t *testing.T) {
 	expectedErr := errors.New("failed to write to database")
 
 	mockStore.EXPECT().
-		FindByID(mock.Anything, "orch-1").
+		FindByID(mock.Anything, "default.orch-1").
 		Return(nil, types.ErrNotFound).
 		Once()
 
@@ -102,7 +102,7 @@ func TestOnMessage_UpdateError_NakCalledNotAck(t *testing.T) {
 	expectedErr := errors.New("update failed - constraint violation")
 
 	mockStore.EXPECT().
-		FindByID(mock.Anything, "orch-1").
+		FindByID(mock.Anything, "default.orch-1").
 		Return(existingEntry, nil).
 		Once()
 
@@ -133,7 +133,7 @@ func TestOnMessage_FindByIDUnexpectedError_NakCalledImmediately(t *testing.T) {
 	unexpectedErr := errors.New("data corruption detected")
 
 	mockStore.EXPECT().
-		FindByID(mock.Anything, "orch-1").
+		FindByID(mock.Anything, "default.orch-1").
 		Return(nil, unexpectedErr).
 		Once()
 
@@ -158,7 +158,7 @@ func TestOnMessage_SequentialErrors_EachNakOnce(t *testing.T) {
 
 	// First message - FindByID fails
 	mockStore.EXPECT().
-		FindByID(mock.Anything, "orch-1").
+		FindByID(mock.Anything, "default.orch-1").
 		Return(nil, dbError).
 		Once()
 
@@ -172,7 +172,7 @@ func TestOnMessage_SequentialErrors_EachNakOnce(t *testing.T) {
 
 	// Second message - Create fails
 	mockStore.EXPECT().
-		FindByID(mock.Anything, "orch-2").
+		FindByID(mock.Anything, "default.orch-2").
 		Return(nil, types.ErrNotFound).
 		Once()
 
@@ -203,7 +203,7 @@ func TestOnMessage_CreateTransientError_NakForRetry(t *testing.T) {
 	transientErr := errors.New("temporary lock timeout")
 
 	mockStore.EXPECT().
-		FindByID(mock.Anything, "orch-1").
+		FindByID(mock.Anything, "default.orch-1").
 		Return(nil, types.ErrNotFound).
 		Once()
 
@@ -243,7 +243,7 @@ func TestOnMessage_UpdateStateConflict_NakForRetry(t *testing.T) {
 	stateConflictErr := errors.New("version mismatch")
 
 	mockStore.EXPECT().
-		FindByID(mock.Anything, "orch-1").
+		FindByID(mock.Anything, "default.orch-1").
 		Return(existingEntry, nil).
 		Once()
 
@@ -272,7 +272,7 @@ func TestOnMessage_SuccessfulCreate_AckCalledNotNak(t *testing.T) {
 	watcher := createTestWatcher(mockStore, trxContext, &aMocks.MockProvisionManager{}, &aMocks.MockDefinitionManager{})
 
 	mockStore.EXPECT().
-		FindByID(mock.Anything, "orch-1").
+		FindByID(mock.Anything, "default.orch-1").
 		Return(nil, types.ErrNotFound).
 		Once()
 
@@ -310,7 +310,7 @@ func TestOnMessage_SuccessfulUpdate_AckCalledNotNak(t *testing.T) {
 	}
 
 	mockStore.EXPECT().
-		FindByID(mock.Anything, "orch-1").
+		FindByID(mock.Anything, "default.orch-1").
 		Return(existingEntry, nil).
 		Once()
 
@@ -376,7 +376,7 @@ func TestOnMessage_CommitError_NakNotAck(t *testing.T) {
 	mockStore := mocks.NewMockEntityStore[*api.OrchestrationEntry](t)
 	watcher := createTestWatcher(mockStore, failingCommitTransactionContext{}, &aMocks.MockProvisionManager{}, &aMocks.MockDefinitionManager{})
 
-	mockStore.EXPECT().FindByID(mock.Anything, "orch-1").Return(nil, types.ErrNotFound).Once()
+	mockStore.EXPECT().FindByID(mock.Anything, "default.orch-1").Return(nil, types.ErrNotFound).Once()
 	mockStore.EXPECT().Create(mock.Anything, mock.Anything).Return(&api.OrchestrationEntry{}, nil).Once()
 
 	msg := createNatsMsg(t, createWatcherOrchestration("orch-1", "corr-1", api.OrchestrationStateRunning))

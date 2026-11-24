@@ -24,9 +24,53 @@ import (
 
 const CFMSubjectPrefix = "event"
 const CFMOrchestration = "cfm-orchestration"
-const CFMOrchestrationSubject = CFMSubjectPrefix + "." + CFMOrchestration
 const CFMOrchestrationResponse = "cfm-orchestration-response"
-const CFMOrchestrationResponseSubject = CFMSubjectPrefix + "." + CFMOrchestrationResponse
+
+// CFMOrchestrationSubject is the subject that the managers of model.DefaultNamespace, such as the Tenant Manager, send
+// orchestration manifests to, see Subject.
+const CFMOrchestrationSubject = CFMSubjectPrefix + "." + model.DefaultNamespace + "." + CFMOrchestration
+
+// CFMOrchestrationResponseSubject is the subject that the managers of model.DefaultNamespace receive orchestration
+// responses on, unless a manifest selects another one, see ResponseSubject.
+const CFMOrchestrationResponseSubject = CFMSubjectPrefix + "." + model.DefaultNamespace + "." + CFMOrchestrationResponse
+
+// CFMStreamSubjects is the subject filter of the stream that carries the messages of every namespace
+const CFMStreamSubjects = CFMSubjectPrefix + ".>"
+
+// CFMOrchestrationSubjects matches the subjects that the managers of every namespace send orchestration manifests to
+const CFMOrchestrationSubjects = CFMSubjectPrefix + ".*." + CFMOrchestration
+
+// CFMOrchestrationConsumer is the durable consumer of CFMOrchestrationSubjects. It starts with the namespace separator
+// of ConsumerName, so that it is not the name of a consumer of a namespace.
+const CFMOrchestrationConsumer = consumerNamespaceSeparator + CFMOrchestration
+
+// consumerNamespaceSeparator separates the namespace from the subject token in the name of a durable consumer. A
+// namespace, an activity type and a reply-to token cannot contain it, so a consumer name has only one reading.
+const consumerNamespaceSeparator = "~"
+
+// Subject returns the subject of a token, such as an activity type or a reply-to token, in the namespace:
+// CFMSubjectPrefix + "." + namespace + "." + token. An empty namespace is model.DefaultNamespace. A namespace is a single
+// subject token, so "event.<namespace>.>" are exactly the subjects of a namespace, also in NATS permissions.
+func Subject(namespace string, token string) string {
+	return CFMSubjectPrefix + "." + model.NamespaceOrDefault(namespace) + "." + token
+}
+
+// SubjectNamespace returns the namespace of a subject that Subject returned, and false if the subject is not one of
+// them.
+func SubjectNamespace(subject string) (string, bool) {
+	tokens := strings.Split(subject, ".")
+	if len(tokens) != 3 || tokens[0] != CFMSubjectPrefix || model.ValidateNamespace(tokens[1]) != nil {
+		return "", false
+	}
+	return tokens[1], true
+}
+
+// ConsumerName returns the name of the durable consumer of a subject token in the namespace: namespace + "~" + token,
+// with the dots of the token replaced. An empty namespace is model.DefaultNamespace.
+func ConsumerName(namespace string, token string) string {
+	token = strings.ReplaceAll(token, ".", "-") // NATS uses dots to denote subject hierarchies
+	return model.NamespaceOrDefault(namespace) + consumerNamespaceSeparator + token
+}
 
 // IsReservedReplyTo reports whether the given reply-to token names the subject the Provision Manager receives
 // orchestration manifests on. Responses published there would be consumed as manifests.
@@ -34,23 +78,25 @@ func IsReservedReplyTo(replyTo string) bool {
 	return replyTo == CFMOrchestration
 }
 
-// ResponseSubject returns the subject an orchestration response is published to. A manifest that sets a reply-to token
-// receives its response on CFMSubjectPrefix + "." + replyTo. An empty, invalid or reserved token selects
-// CFMOrchestrationResponseSubject, so that a response is never published to a subject outside the stream.
-func ResponseSubject(replyTo string) string {
+// ResponseSubject returns the subject an orchestration response of the namespace is published to. A manifest that sets
+// a reply-to token receives its response on the subject of the token in its namespace. An empty, invalid or reserved
+// token selects the subject of CFMOrchestrationResponse in the namespace, so that a response is never published to a
+// subject outside the stream or outside the namespace.
+func ResponseSubject(namespace string, replyTo string) string {
 	if replyTo == "" || model.ValidateReplyTo(replyTo) != nil || IsReservedReplyTo(replyTo) {
-		return CFMOrchestrationResponseSubject
+		return Subject(namespace, CFMOrchestrationResponse)
 	}
-	return CFMSubjectPrefix + "." + replyTo
+	return Subject(namespace, replyTo)
 }
 
 // SetupStream configures a JetStream stream used for component messaging. If the stream does not exist, it is created
-// with the client's resource configuration. An existing stream is never updated, so a stream provisioned out of band
-// keeps its configuration.
+// with the client's resource configuration and the subjects CFMStreamSubjects. An existing stream keeps its
+// configuration, except that its subjects are widened to CFMStreamSubjects if it does not carry them yet, see
+// WidenStreamSubjects.
 func SetupStream(ctx context.Context, client *NatsClient, streamName string) (jetstream.Stream, error) {
 	stream, err := client.JetStream.Stream(ctx, streamName)
 	if err == nil {
-		return stream, nil
+		return WidenStreamSubjects(ctx, client, stream)
 	}
 
 	// If stream doesn't exist, create it
@@ -58,7 +104,7 @@ func SetupStream(ctx context.Context, client *NatsClient, streamName string) (je
 		return createStream(ctx, client, jetstream.StreamConfig{
 			Name:      streamName,
 			Retention: jetstream.WorkQueuePolicy,
-			Subjects:  []string{CFMSubjectPrefix + ".*"},
+			Subjects:  []string{CFMStreamSubjects},
 		})
 	}
 
@@ -83,29 +129,63 @@ func createStream(ctx context.Context, client *NatsClient, cfg jetstream.StreamC
 	return stream, nil
 }
 
-// SetupConsumer creates or updates a NATS JetStream consumer for a message processor. Messages are delivered at most
-// DefaultMaxDeliver times, and redelivered after DefaultAckWait when they are not acknowledged in time.
+// WidenStreamSubjects adds CFMStreamSubjects, which carries the subjects of every namespace, to an existing stream. A
+// stream created before namespaces were introduced only carries CFMSubjectPrefix + ".*". It is a no-op for a stream that
+// already carries the subjects, so it needs no permission to update streams then.
+func WidenStreamSubjects(ctx context.Context, client *NatsClient, stream jetstream.Stream) (jetstream.Stream, error) {
+	if anySubjectCovers(stream.CachedInfo().Config.Subjects, CFMStreamSubjects) {
+		return stream, nil
+	}
+	widened, err := EnsureStreamSubjects(ctx, client, stream, []string{CFMStreamSubjects})
+	if err != nil {
+		return nil, fmt.Errorf("stream %q does not carry the subjects %s of the namespaces and could not be updated: %w",
+			stream.CachedInfo().Config.Name, CFMStreamSubjects, err)
+	}
+	return widened, nil
+}
+
+// SetupConsumer creates or updates a NATS JetStream consumer for a message processor of model.DefaultNamespace. Messages
+// are delivered at most DefaultMaxDeliver times, and redelivered after DefaultAckWait when they are not acknowledged in
+// time.
 func SetupConsumer(ctx context.Context, stream jetstream.Stream, subject string) (jetstream.Consumer, error) {
-	return setupSubjectConsumer(ctx, stream, subject, DefaultMaxDeliver)
+	return SetupNamespaceConsumer(ctx, stream, model.DefaultNamespace, subject)
+}
+
+// SetupNamespaceConsumer creates or updates a NATS JetStream consumer for a message processor of the namespace, such as
+// the consumer of the orchestration responses of a manager. It is configured as SetupConsumer.
+func SetupNamespaceConsumer(ctx context.Context, stream jetstream.Stream, namespace string, subject string) (jetstream.Consumer, error) {
+	return setupSubjectConsumer(ctx, stream, namespace, subject, DefaultMaxDeliver)
+}
+
+// SetupOrchestrationConsumer creates or updates the consumer of the orchestration manifests of every namespace, see
+// CFMOrchestrationSubjects. It is configured as SetupConsumer.
+func SetupOrchestrationConsumer(ctx context.Context, stream jetstream.Stream) (jetstream.Consumer, error) {
+	return stream.CreateOrUpdateConsumer(ctx, consumerConfig(CFMOrchestrationConsumer, CFMOrchestrationSubjects, DefaultMaxDeliver))
 }
 
 // SetupActivityConsumer creates or updates a NATS JetStream consumer for an orchestration activity. A rescheduled activity
 // polls by having its message redelivered, so the number of deliveries says little about how often the activity failed:
 // the activity executor bounds retries itself, and the consumer only has the much higher ActivityMaxDeliver as a
 // safety net.
-func SetupActivityConsumer(ctx context.Context, stream jetstream.Stream, activityType string) (jetstream.Consumer, error) {
-	return setupSubjectConsumer(ctx, stream, activityType, ActivityMaxDeliver)
+//
+// The consumer receives the messages of the activity type in the namespace, see Subject and ConsumerName.
+func SetupActivityConsumer(ctx context.Context, stream jetstream.Stream, namespace string, activityType string) (jetstream.Consumer, error) {
+	return setupSubjectConsumer(ctx, stream, namespace, activityType, ActivityMaxDeliver)
 }
 
-func setupSubjectConsumer(ctx context.Context, stream jetstream.Stream, subject string, maxDeliver int) (jetstream.Consumer, error) {
+func setupSubjectConsumer(ctx context.Context, stream jetstream.Stream, namespace string, subject string, maxDeliver int) (jetstream.Consumer, error) {
 	sanitizedSubject := strings.ReplaceAll(subject, ".", "-") // convert to `-` because NATs uses dot-notation to denote subject hierarchies
-	return stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
-		Durable:       sanitizedSubject,
+	return stream.CreateOrUpdateConsumer(ctx, consumerConfig(ConsumerName(namespace, sanitizedSubject), Subject(namespace, sanitizedSubject), maxDeliver))
+}
+
+func consumerConfig(durable string, filterSubject string, maxDeliver int) jetstream.ConsumerConfig {
+	return jetstream.ConsumerConfig{
+		Durable:       durable,
 		AckPolicy:     jetstream.AckExplicitPolicy,
-		FilterSubject: CFMSubjectPrefix + "." + sanitizedSubject,
+		FilterSubject: filterSubject,
 		AckWait:       DefaultAckWait,
 		MaxDeliver:    maxDeliver,
-	})
+	}
 }
 
 // GetStream looks up an existing JetStream stream by name. If the stream does not exist, it creates it with the client's

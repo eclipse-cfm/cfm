@@ -67,7 +67,7 @@ func TestNatsOrchestrationClient_Deploy(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify the message was published by consuming it
-	consumer, err := stream.Consumer(ctx, natsclient.CFMOrchestration)
+	consumer, err := stream.Consumer(ctx, natsclient.ConsumerName(model.DefaultNamespace, natsclient.CFMOrchestration))
 	require.NoError(t, err)
 
 	messageBatch, err := consumer.Fetch(1, jetstream.FetchMaxWait(time.Second))

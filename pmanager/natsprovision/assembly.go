@@ -69,20 +69,21 @@ func (a *natsProvisionServiceAssembly) Start(startCtx *system.StartContext) erro
 	a.provisionHandler.Loop.Recreate = a.setupConsumer
 
 	health.RegisterOptional(startCtx.Registry, func(r *health.Registry) {
-		r.AddConsumerLoop("consumer:"+natsclient.CFMOrchestration, &a.provisionHandler.Loop)
+		r.AddConsumerLoop("consumer:"+natsclient.CFMOrchestrationConsumer, &a.provisionHandler.Loop)
 	})
 
 	ctx, a.processCancel = context.WithCancel(context.Background())
 	return a.provisionHandler.Init(ctx, consumer)
 }
 
+// setupConsumer sets up the consumer of the orchestration manifests of every namespace
 func (a *natsProvisionServiceAssembly) setupConsumer(ctx context.Context) (jetstream.Consumer, error) {
 	stream, err := natsclient.SetupStream(ctx, a.natsClient, a.streamName)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing NATS stream: %w", err)
 	}
 
-	consumer, err := natsclient.SetupConsumer(ctx, stream, natsclient.CFMOrchestration)
+	consumer, err := natsclient.SetupOrchestrationConsumer(ctx, stream)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing NATS orchestration manifest consumer: %w", err)
 	}

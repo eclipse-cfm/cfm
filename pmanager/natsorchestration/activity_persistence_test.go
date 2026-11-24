@@ -66,7 +66,7 @@ func TestNatsActivityExecutor_ProcessingDataPersistedAcrossReschedules(t *testin
 	serializedOrchestration, err := json.Marshal(orchestration)
 	require.NoError(t, err)
 
-	_, err = msgClient.Update(ctx, orchestration.ID, serializedOrchestration, 0)
+	_, err = msgClient.Update(ctx, api.OrchestrationKey(orchestration.Namespace, orchestration.ID), serializedOrchestration, 0)
 	require.NoError(t, err)
 
 	// Setup message capture for orchestration response
@@ -113,7 +113,7 @@ func TestNatsActivityExecutor_ProcessingDataPersistedAcrossReschedules(t *testin
 	msgData, err := json.Marshal(activityMessage)
 	require.NoError(t, err)
 
-	subject := natsclient.CFMSubjectPrefix + "." + testActivity
+	subject := natsclient.Subject(model.DefaultNamespace, testActivity)
 	_, err = msgClient.Publish(ctx, subject, msgData)
 	require.NoError(t, err)
 
@@ -133,7 +133,7 @@ func TestNatsActivityExecutor_ProcessingDataPersistedAcrossReschedules(t *testin
 	responseMutex.Unlock()
 
 	// Verify the orchestration completed successfully
-	updatedOrchestration, _, err := ReadOrchestration(ctx, orchestration.ID, msgClient)
+	updatedOrchestration, _, err := ReadOrchestration(ctx, model.DefaultNamespace, orchestration.ID, msgClient)
 	require.NoError(t, err)
 	assert.Equal(t, api.OrchestrationStateCompleted, updatedOrchestration.State, "Orchestration should be completed")
 

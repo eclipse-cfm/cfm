@@ -92,8 +92,10 @@ type OrchestrationEntry struct {
 	DefinitionID      string                  `json:"definitionId"`
 }
 
+// GetID returns the key of the entry, which is made of the namespace and the ID of its orchestration, see
+// OrchestrationKey.
 func (o *OrchestrationEntry) GetID() string {
-	return o.ID
+	return OrchestrationKey(o.Namespace, o.ID)
 }
 
 func (o *OrchestrationEntry) GetVersion() int64 {

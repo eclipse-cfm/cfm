@@ -65,7 +65,7 @@ func TestProvisionManager_Start(t *testing.T) {
 				_, _ = store.StoreOrchestrationDefinition(ctx, definition)
 			},
 			setupOrch: func(orch *mocks.MockOrchestrator) {
-				orch.EXPECT().GetOrchestration(mock.Anything, "test-orchestration-1").Return(nil, nil)
+				orch.EXPECT().GetOrchestration(mock.Anything, model.DefaultNamespace, "test-orchestration-1").Return(nil, nil)
 				orch.EXPECT().Execute(mock.Anything, mock.AnythingOfType("*api.Orchestration")).Return(nil)
 			},
 			expectedResult: &api.Orchestration{
@@ -98,7 +98,7 @@ func TestProvisionManager_Start(t *testing.T) {
 					OrchestrationType: "test-type",
 					State:             api.OrchestrationStateRunning,
 				}
-				orch.EXPECT().GetOrchestration(mock.Anything, "test-orchestration-2").Return(existingOrch, nil)
+				orch.EXPECT().GetOrchestration(mock.Anything, model.DefaultNamespace, "test-orchestration-2").Return(existingOrch, nil)
 			},
 			expectedResult: &api.Orchestration{
 				ID: "test-orchestration-2",
@@ -117,7 +117,7 @@ func TestProvisionManager_Start(t *testing.T) {
 					OrchestrationType: "test-type",
 					State:             api.OrchestrationStateInitialized,
 				}
-				orch.EXPECT().GetOrchestration(mock.Anything, "test-orchestration-7").Return(existingOrch, nil)
+				orch.EXPECT().GetOrchestration(mock.Anything, model.DefaultNamespace, "test-orchestration-7").Return(existingOrch, nil)
 				orch.EXPECT().Execute(mock.Anything, existingOrch).Return(nil)
 			},
 			expectedResult: &api.Orchestration{
@@ -137,7 +137,7 @@ func TestProvisionManager_Start(t *testing.T) {
 					OrchestrationType: "other-type",
 					State:             api.OrchestrationStateInitialized,
 				}
-				orch.EXPECT().GetOrchestration(mock.Anything, "test-orchestration-8").Return(existingOrch, nil)
+				orch.EXPECT().GetOrchestration(mock.Anything, model.DefaultNamespace, "test-orchestration-8").Return(existingOrch, nil)
 			},
 			expectedError: "already exists with a different namespace, type or correlation ID",
 		},
@@ -156,7 +156,7 @@ func TestProvisionManager_Start(t *testing.T) {
 					OrchestrationType: "test-type",
 					State:             api.OrchestrationStateRunning,
 				}
-				orch.EXPECT().GetOrchestration(mock.Anything, "test-orchestration-9").Return(existingOrch, nil)
+				orch.EXPECT().GetOrchestration(mock.Anything, model.DefaultNamespace, "test-orchestration-9").Return(existingOrch, nil)
 			},
 			expectedError: "already exists with a different namespace, type or correlation ID",
 		},
@@ -196,7 +196,7 @@ func TestProvisionManager_Start(t *testing.T) {
 				_, _ = store.StoreOrchestrationDefinition(ctx, definition)
 			},
 			setupOrch: func(orch *mocks.MockOrchestrator) {
-				orch.EXPECT().GetOrchestration(mock.Anything, "test-orchestration-5").Return(nil, errors.New("orchestrator error"))
+				orch.EXPECT().GetOrchestration(mock.Anything, model.DefaultNamespace, "test-orchestration-5").Return(nil, errors.New("orchestrator error"))
 			},
 			expectedError: "error performing de-duplication for test-orchestration-5",
 		},
@@ -221,7 +221,7 @@ func TestProvisionManager_Start(t *testing.T) {
 				_, _ = store.StoreOrchestrationDefinition(ctx, definition)
 			},
 			setupOrch: func(orch *mocks.MockOrchestrator) {
-				orch.EXPECT().GetOrchestration(mock.Anything, "test-orchestration-6").Return(nil, nil)
+				orch.EXPECT().GetOrchestration(mock.Anything, model.DefaultNamespace, "test-orchestration-6").Return(nil, nil)
 				orch.EXPECT().Execute(mock.Anything, mock.AnythingOfType("*api.Orchestration")).Return(errors.New("execution error"))
 			},
 			expectedError: "error executing orchestration",
@@ -234,7 +234,7 @@ func TestProvisionManager_Start(t *testing.T) {
 			},
 			setupStore: storeTestDefinition,
 			setupOrch: func(orch *mocks.MockOrchestrator) {
-				orch.EXPECT().GetOrchestration(mock.Anything, "test-orchestration-8").Return(nil, nil)
+				orch.EXPECT().GetOrchestration(mock.Anything, model.DefaultNamespace, "test-orchestration-8").Return(nil, nil)
 				orch.EXPECT().Execute(mock.Anything, mock.AnythingOfType("*api.Orchestration")).
 					Return(types.NewRecoverableError("enqueue failed"))
 			},
@@ -303,7 +303,7 @@ func TestProvisionManager_Start_OrchestrationInstantiation(t *testing.T) {
 
 	// Setup mock orchestrator
 	mockOrch := mocks.NewMockOrchestrator(t)
-	mockOrch.EXPECT().GetOrchestration(mock.Anything, "test-deployment").Return(nil, nil)
+	mockOrch.EXPECT().GetOrchestration(mock.Anything, model.DefaultNamespace, "test-deployment").Return(nil, nil)
 	mockOrch.EXPECT().Execute(mock.Anything, mock.MatchedBy(func(orch *api.Orchestration) bool {
 		// Verify orchestration properties
 		return orch.ID == "test-deployment"
@@ -339,7 +339,7 @@ func TestProvisionManager_Start_RecordsCompensatedOrchestration(t *testing.T) {
 	_, _ = definitionStore.StoreOrchestrationDefinition(ctx, createTestOrchestrationDefinition("test-type"))
 
 	mockOrch := mocks.NewMockOrchestrator(t)
-	mockOrch.EXPECT().GetOrchestration(mock.Anything, "compensation").Return(nil, nil)
+	mockOrch.EXPECT().GetOrchestration(mock.Anything, model.DefaultNamespace, "compensation").Return(nil, nil)
 	mockOrch.EXPECT().Execute(mock.Anything, mock.MatchedBy(func(orch *api.Orchestration) bool {
 		return orch.CompensatedOrchestrationID == "failed-deployment"
 	})).Return(nil)
@@ -367,7 +367,7 @@ func TestProvisionManager_Start_RecordsReplyTo(t *testing.T) {
 	_, _ = definitionStore.StoreOrchestrationDefinition(ctx, createTestOrchestrationDefinition("test-type"))
 
 	mockOrch := mocks.NewMockOrchestrator(t)
-	mockOrch.EXPECT().GetOrchestration(mock.Anything, "deployment").Return(nil, nil)
+	mockOrch.EXPECT().GetOrchestration(mock.Anything, model.DefaultNamespace, "deployment").Return(nil, nil)
 	mockOrch.EXPECT().Execute(mock.Anything, mock.MatchedBy(func(orch *api.Orchestration) bool {
 		return orch.ReplyTo == "second-manager-response"
 	})).Return(nil)
