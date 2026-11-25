@@ -2,198 +2,135 @@
 
 ## Introduction
 
-This document defines the overall system architecture for the Component Fabric Manager (CFM). The CFM is a platform for
-deploying and managing dataspace-related (connector) resources in a multitenant environment. These resources include:  
+This document defines the overall system architecture for the Component Fabric Manager (CFM). The CFM is a generic
+orchestration engine: a platform for executing stateful workflows, called _**orchestrations**_, that provision and
+manage resources in a multitenant environment. A resource can be anything that can be automated, for example a
+configuration entry in an application, a cloud service, a credential, or a network route.
 
-- A Control Plane, which manages data sharing operations (including catalog publication, contract
-  negotiation, and transfer control)
-- One or more Data Planes that perform data transmission
-- A Credential Service that manages a participant's DID artifacts, store credentials, and create Verifiable
-  Presentations
-- An Issuer Service for entities and participants that issue Verifiable Credentials.
-
-Dataspace services do not operate in isolation. They collaborate with cloud services (for example, a vault for secure
-storage and load-balancers for network routing) and other networking infrastructure. The CFM orchestrates these layers
-and provides the isolation necessary for efficient and secure multitenant operation. The CFM is represented by the
-following logical architecture:
+The CFM does not define which resources exist or how they are provisioned. It defines how the work is described,
+ordered, executed reliably and isolated between the parties that use it. The domain is added by components that build
+on the engine:
 
 **Logical Systems Architecture**
 
 ```mermaid
 block-beta
     columns 4
-    CP ["Control Plane"]
-    CS ["Credential Service"]
-    DP ["Data Plane"]
-    IS ["Issuer Service"]
-    CFM ["Component Fabric Manager"]:4
-    CIF ["Cloud Infrastructure"]:4
+    M1 ["Manager A"]:2
+    M2 ["Manager B"]:2
+    PM ["Provision Manager"]:4
+    A1 ["Agent"]
+    A2 ["Agent"]
+    A3 ["Agent"]
+    A4 ["Agent"]
+    INF ["Applications and Infrastructure"]:4
 ```
 
-The CFM is composed of three subsystems:
+The CFM is composed of the following parts:
 
-- The **Tenant Manager (TM)** which manages tenancy data and initiates deployment processes.
-- The **Provision Manager (PM)** which executes stateful orchestrations that configure services and
-  infrastructure for participants.
-- **Activity Agents** that execute tasks specified by the Provision Manager
+- The **Provision Manager (PM)** which executes stateful orchestrations. It is the engine, and the only runtime in this
+  repository.
+- **Managers** which own a domain model and ask the Provision Manager to run orchestrations. A manager is not part of
+  the engine. The Tenant Manager of [cfm-dataspace](https://github.com/eclipse-cfm/cfm-dataspace) is one.
+- **Activity Agents** that execute the tasks of an orchestration against applications and infrastructure. The engine
+  provides the framework for agents; the agents themselves belong to a domain.
 
 The CFM is designed as a reliable message-based system that can be extended and deployed to diverse cloud and on-premise
-environments. Its design is simple; at a minimum it requires only a Postgres database and messaging system (NATS is the
-default).
+environments. Its design is simple; at a minimum it requires only a messaging system (NATS is the default), and a
+Postgres database for durable definitions.
 
-## Multitenancy and Service Virtualization
+## A Generic Engine
 
-The system architecture is based on the concept of ***service virtualization***: a single software deployment can enable
-an isolation environment to process requests for different participants and dataspace contexts. We use the term
-virtualization over multitenancy for several reasons. First, multitenancy is too ambiguous and has been used to denote
-different architectures. More importantly, multitenancy does not accurately describe the architecture this document lays
-out. As we will see, while individual services have the concept of an isolation context, it does not directly map to the
-concept of a "tenant." Instead, tenant management is externalized from core dataspace services and managed by the CFM.
+The engine has no notion of what an orchestration is about. Its model consists of a few concepts:
 
-## Service Virtualization Model
+| Concept                      | Description                                                                                                                             |
+|------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
+| **Activity definition**      | Declares an activity type, with the schema of its input and its output                                                                  |
+| **Orchestration definition** | Declares an orchestration type: the activities it runs, their dependencies, the schema of its input, and the type that compensates it   |
+| **Orchestration manifest**   | The request of a manager to run an orchestration of a type, with a payload                                                              |
+| **Orchestration**            | A running or finished instance, with its state and the data its activities share                                                        |
+| **Orchestration response**   | The outcome of an orchestration, with the output values of its activities, sent to the manager                                          |
+| **Namespace**                | The space of one manager. Definitions, orchestrations, messages and API access are kept apart by namespace                              |
 
-Service virtualization is based on the following model:
+The types are free-form strings chosen by whoever registers the definitions, and the payload of a manifest is an
+arbitrary JSON object that the engine passes to the activities without interpreting it. A domain is therefore built on
+the engine by adding, not by changing it:
 
-**Virtualization Model**
+- **A manager** owns the domain model and its API. It decides when an orchestration is needed, sends a manifest and
+  applies the response to its model. It can talk to the engine over NATS or over the REST API.
+- **Orchestration and activity definitions** describe the workflows of the domain. They are data, registered through
+  the REST API.
+- **Activity agents** implement the activity types of the domain as `ActivityProcessor`s on the agent framework
+  ([`pmanager/natsagent`](../../../pmanager/natsagent)).
+- **Lifecycle agents** react to events of the domain that are not part of an orchestration, on the lifecycle agent
+  framework ([`common/lifecycleagent`](../../../common/lifecycleagent)).
+- **A namespace** gives the manager and its agents a space of their own, so that several domains can share one
+  Provision Manager instance, see [Namespaces](../namespaces.md).
 
-```mermaid
+The dependency only points one way: the engine must not import a component that builds on it. For the dataspace
+components this is enforced by the `depguard` rule in [`.golangci.yml`](../../../.golangci.yml).
 
-classDiagram
-    class Tenant
-    class ParticipantProfile
-    class Identifier
-    class DataspaceProfile
-    class VirtualParticipantAgent
-    class User
-    class Right
-    class Role
-    class Cell
-    Tenant *-- "0..N" ParticipantProfile
-    ParticipantProfile --> "1..N" VirtualParticipantAgent
-    ParticipantProfile --> "1..1" Identifier
-    ParticipantProfile --> "1..N" DataspaceProfile
-    User --> "0..N" Role
-    Role --> "0..N" Right
-    User --> "0..N" Right
-    VirtualParticipantAgent --> "1..N" Cell
-    style User fill: #92D6A4, stroke: #06B050, stroke-width: 1px
-    style Role fill: #92D6A4, stroke: #06B050, stroke-width: 1px 
-    style Right fill: #92D6A4, stroke: #06B050, stroke-width: 1px 
-    style Cell fill: #FFD676, stroke: #FFBF00, stroke-width: 1px 
+The [samples](../../../samples/README.md) contain a manager, an agent and definitions for a made-up domain.
 
-```
+### The Dataspace Variant: CFM-Dataspace
 
-A **Tenant** represents an organization or entity that participates in one or more dataspaces. A tenant has one or more
-**Participant Profiles.** Each profile is associated with an **Identifier**, at least one **Dataspace Profile**, and at
-least one **Virtual Participant Agent (VPA)**.
+The CFM was first built to deploy and manage dataspace-related (connector) resources: control planes, data planes,
+credential services and issuer services that are virtualized per participant. This is now the dataspace-specific
+variant of the CFM, maintained in [eclipse-cfm/cfm-dataspace](https://github.com/eclipse-cfm/cfm-dataspace). It uses
+the extension points above as follows:
 
-A Dataspace Profile includes a set of interoperable policies and DSP protocol version.
+| Extension point  | In cfm-dataspace                                                                                                              |
+|------------------|-------------------------------------------------------------------------------------------------------------------------------|
+| Manager          | The **Tenant Manager** (`tmanager`), which manages tenants, participant profiles, cells and dataspace profiles                |
+| Domain model     | The `dataspace` package, with the Virtual Participant Agent (VPA) and the orchestration types that deploy and dispose VPAs    |
+| Activity agents  | `agent/orchestration`: agents for EDC-V, IdentityHub, registration, onboarding and others                                     |
+| Lifecycle agents | `agent/lifecycle`: for example the key management agent                                                                       |
+| Namespace        | `default`. The Tenant Manager does not name a namespace, so it uses the subjects and the API routes of the default namespace  |
 
-A Virtual Participant Agent is a unit of administrative control and deployment. A VPA targets a **cell**.
+The service virtualization model of the dataspace variant, with tenants, participant profiles, VPAs and cells, is
+described in the
+[cfm-dataspace documentation](https://github.com/eclipse-cfm/cfm-dataspace/blob/main/docs/architecture/service.virtualization.md).
 
-A **User** performs management operations against a VPA using an RBAC model based on **roles** and **rights**.
+A deployment can run the dataspace variant alone, another domain alone, or both against the same Provision Manager in
+separate namespaces.
 
-The service virtualization layers in the control plane and data plane implement runtime isolation for each VPA.
-Importantly, they do not contain the concept of a tenant; the CFM orchestrator manages tenants.
+## Message Flow
 
-The control and data planes use the VPA as the unit of runtime isolation. However, the services are loosely coupled
-through the [Data Plane Signaling Protocol](). As will be detailed later, control plane and data plane deployments are
-typically remote and mapped by participant profile.
-
-#### The Participant Profile
-
-A dataspace has an overriding constraint:
-
-> A participant has one and only one identifier
-
-Note that this does not mean an organization (e.g., a legal entity) must have exactly one identifier. Rather, if an
-organization has multiple identifiers, it must either be mapped to a single identity (e.g., DID) or the organization
-must have multiple participants.
-
-Let's break down several different virtualization scenarios based on this using a fictitious organization, Acme
-Industries.
-
-##### One identity per dataspace
-
-In this scenario, Acme uses one DID per dataspace. This results in a participant profile per dataspace since the
-identifiers used for each dataspace are different.
-
-##### One identity, multiple dataspaces
-
-In this scenario, Acme uses a single DID across multiple dataspaces, resulting in a single participant profile for all
-dataspaces.
-
-#### Virtual Participant Agents
-
-A VPA defines a runtime context deployed when a participant profile is provisioned. Let's consider a simple case where
-Acme participates in one dataspace. Returning to the logical systems architecture, VPAs for the control plane,
-credential service, and data plane(s) will be provisioned. This results in the creation of three VPA *types*:
-
-- A Credential Service VPA
-- A Control Plane VPA
-- A Data Plane VPA
-
-Multiple VPAs of the same type may also be deployed. For example, Acme may want to share streaming data and access to an
-API, which are served through different data planes. In this case, two VPAs will be created, one for each data plane.
-
-VPAs are linked through network, transport, and application security layers. As will be detailed further, a control
-plane and data plane VPA may rely on a VPN, TLS, and OAuth tokens for secure communications.
-
-##### Cell Targeting
-
-VPAs are targeted to a *cell*, which is a homogenous deployment zone. A cell could be a Kubernetes cluster or some other
-infrastructure. Cells are responsible for their own scaling. For example, a Kubernetes-based cell may use an autoscaling
-system such as [Keda](https://keda.sh/) to add capacity dynamically.
-
-##### RBAC: Users, Roles, and Rights
-
-> TODO: This section will be further developed as requirements evolve.
-
-A **User** represents an administrator who can perform a set of actions against subsystems. Users have a set of **Rights
-** and/or are assigned **Roles**.
-
-## Context Isolation Architecture
-
-The virtualization model we have outlined is realized across multiple services through runtime context isolation. A
-guiding principle is that this isolation is ***configuration-based***, not _**process-based**_. A process-based
-architecture achieves isolation based on runtime segmentation. For example, a VPA following this approach would spin up
-a set of operating system processes such as control plane, data plane, and database instances. This is not scalable or
-efficient. Instead, a configuration-based isolation architecture involves writing VPA metadata to a persistent store.
-This metadata is used by shared services that create inexpensive isolation contexts on the fly when requests are
-received and processed. This provides efficient service utilization and makes context migration relatively easily - move
-the VPA metadata to a different cell and update request routing configuration.
-
-**Configuration-Based Architecture**
+A manager and the agents never call each other. They are connected through the Provision Manager and the messaging
+system:
 
 ```mermaid
-block-beta
-    columns 3
-    block: container1
-        columns 3
-        vpa1["VPA 1"] vpa2["VPA 2"]
-    end
-    space
-    block: container2
-        columns 3
-        vpa3["VPA 3"] vpa4["VPA 1"]
-    end
-    data1[("Context Data")] space data2[("Context Data")]
-    data1 -- "Migration" --> data2
-    style container1 fill: #FAFAFA, stroke: #000000, stroke-width: 1px
-    style container2 fill: #FAFAFA, stroke: #000000, stroke-width: 1px
-    style vpa1 fill: #FAFAFA, stroke: #FAFAFA, stroke-width: 1px
-    style vpa4 fill: #0063FF, stroke: #0063FF, stroke-width: 1px, color: #FFFFFF;
+sequenceDiagram
+    participant M as Manager
+    participant PM as Provision Manager
+    participant A1 as Agent (activity type a)
+    participant A2 as Agent (activity type b)
+    M ->> PM: orchestration manifest<br/>event.#lt;namespace#gt;.cfm-orchestration
+    PM ->> PM: find the definition, store the orchestration state
+    PM ->> A1: activity message<br/>event.#lt;namespace#gt;.a
+    A1 ->> A1: process, update the orchestration state
+    A1 ->> A2: activity message of the next step<br/>event.#lt;namespace#gt;.b
+    A2 ->> A2: process, update the orchestration state
+    A2 ->> M: orchestration response<br/>event.#lt;namespace#gt;.cfm-orchestration-response
 ```
 
-To implement this architecture, each service will provide APIs for creating, updating, and deleting VPA metadata. We now
-turn to how these services support this virtualization model.
+1. The manager sends an orchestration manifest, on the subject of its namespace or through the REST API.
+2. The Provision Manager looks up the orchestration definition of the manifest's type in the namespace, orders its
+   activities into steps, stores the orchestration state in the key-value bucket and enqueues the activities of the
+   first step.
+3. The agent of an activity type receives the activity message, runs its `ActivityProcessor` and updates the
+   orchestration state. When all activities of a step are complete, the executor in the agent enqueues the activities
+   of the next step.
+4. The executor that completes the last activity, or that records a fatal error, publishes the orchestration response
+   for the manager.
+5. If the orchestration failed and its definition names a compensation type, the Provision Manager starts the
+   compensating orchestration, see [Compensation and reconciliation](../compensation.md).
 
 ## CFM Subsystems
 
-The CFM consists of multiple subsystems: the Tenant Manager, the Provision Manager, and Activity Agents. The CFM
-platform is designed as a message-based system built on an extensible messaging middleware for reliable, asynchronous
-communication. This architecture enables temporal and spatial decoupling between independent subsystems, allowing them
-to operate autonomously without direct dependencies.
+The CFM platform is designed as a message-based system built on an extensible messaging middleware for reliable,
+asynchronous communication. This architecture enables temporal and spatial decoupling between independent subsystems,
+allowing them to operate autonomously without direct dependencies.
 
 ### NATS Jetstream
 
@@ -261,8 +198,8 @@ centralized in the `/common` directory, which provides cross-cutting utilities i
 - Query and handler implementations
 - Type definitions and runtime models
 
-The `/assembly` directory contains shared service assemblies that implement the core CFM functionality. These assemblies
-are organized by subsystem and provide capabilities such as an HTTP client, HTTP request routing, and a Vault client.
+The `/assembly` directory contains shared service assemblies that every CFM runtime can use. They provide capabilities
+such as an HTTP client, HTTP request routing, API authentication and health endpoints.
 
 #### Service Type Registry
 
@@ -272,23 +209,48 @@ requires a service, it specifies the required `ServiceType`, and the registry re
 runtime. This allows for multiple implementations of the same service interface to coexist in different deployment
 configurations.
 
-### Tenant Manager
-
-The Tenant Manager implements the CFM service virtualization model and provides a REST API for executing operations that
-modify resources. Virtualization model entities are persisted with extensible properties that can be queried using the
-CFM predicate-based query language.
-
-When the Tenant Manager provisions or disposes resources, it sends message requests to the Provision Manager, which
-asynchronously notifies the Tenant Manager when processing is completed.
-
 ### Provision Manager
 
 The Provision Manager implements asynchronous orchestration by executing stateful workflows defined through
 `OrchestrationDefinition` entities. The orchestration architecture is
 described [here](./provisioning/orchestrator.design.md).
 
+The Provision Manager provides a REST API under `/api/v1alpha1` for managing activity definitions and orchestration
+definitions, and for starting, reading and querying orchestrations. The API is described in
+[`pmanager/docs/openapi.json`](../../../pmanager/docs/openapi.json). Access is authorized with OAuth2 access tokens
+whose scopes name a permission (`read`, `write` or `admin`) and optionally a namespace. Orchestrations can be queried
+using the CFM predicate-based [query language](./query/cfm.query.language.md).
+
+Definitions and the orchestration index are stored in Postgres, or in memory when Postgres is not configured. The state
+of an orchestration is stored in a NATS JetStream key-value bucket, where the agents update it.
+
+### Managers
+
+A manager initiates orchestrations and consumes their results. The engine provides no manager; it defines the contract
+a manager uses:
+
+- The manager sends an `OrchestrationManifest` (`common/model`) to the subject `event.<namespace>.cfm-orchestration`,
+  or posts it to the REST API.
+- The Provision Manager, or the agent that completes the orchestration, publishes an `OrchestrationResponse` to
+  `event.<namespace>.cfm-orchestration-response`, or to the subject of the `replyTo` token of the manifest. The
+  `replyTo` token lets several initiators in one namespace receive their own responses.
+- A manifest ID identifies an orchestration in its namespace. Sending the same manifest again does not start a second
+  orchestration.
+
+A manager that does not name a namespace works in the namespace `default`.
+
 ### Activity Agents
 
 Activity agents asynchronously process orchestration steps by receiving messages sent by the Provision Manager. Agents
 are temporally and spatially decoupled from the provisioner through NATS. Agents isolate infrastructure secrets and
 access from the provisioning manager. This results in bounded security contexts, even within an orchestration.
+
+An agent executes the activities of one activity type in one namespace. It is built by passing an `ActivityProcessor`
+to the agent launcher in `pmanager/natsagent`, see [Activity Agents](./provisioning/orchestrator.design.md#activity-agents).
+
+### Lifecycle Agents
+
+Lifecycle agents react to domain events that are not part of an orchestration, for example the rotation of a key. The
+events are delivered as [CloudEvents](https://cloudevents.io/) on NATS JetStream subjects. The framework in
+`common/lifecycleagent` connects an `EventProcessor` to the configured subjects with a durable consumer. See the
+[decision record](../decision_records/2026-06-26-lifecycle-agents/README.md).

@@ -1,102 +1,48 @@
 {
-  "$id": "https://https://github.com/eclipse-cfm/cfm/orchestration.definition.schema.json",
+  "$id": "https://github.com/eclipse-cfm/cfm/orchestration.definition.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "OrchestrationDefinitionSchema",
-  "description": "Defines an Orchestration Definition",
+  "title": "OrchestrationTemplateSchema",
+  "description": "Defines an Orchestration Template, as accepted by POST /api/v1alpha1/orchestration-definitions. One Orchestration Definition is created for each orchestration type in activities",
   "type": "object",
   "allOf": [
     {
-      "$ref": "#/definitions/OrchestrationDefinitionType"
+      "$ref": "#/definitions/OrchestrationTemplateType"
     }
   ],
   "definitions": {
-    "OrchestrationDefinitionType": {
+    "OrchestrationTemplateType": {
       "type": "object",
       "properties": {
-        "type": {
-          "type": "string"
+        "id": {
+          "type": "string",
+          "description": "ID of the template, generated if omitted. The created definitions refer to it as templateRef"
         },
-        "apiVersion": {
-          "type": "string"
-        },
-        "resource": {
-          "type": "object",
-          "allOf": [
-            {
-              "$ref": "#/definitions/ResourceType"
-            }
-          ]
-        },
-        "versions": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/VersionType"
-          },
-          "minItems": 1
-        }
-      },
-      "required": [
-        "type",
-        "apiVersion",
-        "resource",
-        "versions"
-      ]
-    },
-    "ResourceType": {
-      "type": "object",
-      "properties": {
-        "group": {
-          "type": "string"
-        },
-        "singular": {
-          "type": "string"
-        },
-        "plural": {
-          "type": "string"
+        "namespace": {
+          "$ref": "#/definitions/NamespaceType"
         },
         "description": {
           "type": "string"
-        }
-      },
-      "required": [
-        "group",
-        "singular",
-        "plural"
-      ]
-    },
-    "VersionType": {
-      "type": "object",
-      "properties": {
-        "version": {
-          "type": "string"
-        },
-        "active": {
-          "type": "boolean"
         },
         "schema": {
-          "type": "object"
+          "type": "object",
+          "description": "JSON Schema of the orchestration manifest payload"
         },
-        "orchestration": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/OrchestrationStepType"
-          }
-        }
-      },
-      "required": [
-        "version",
-        "active",
-        "schema",
-        "orchestration"
-      ]
-    },
-    "OrchestrationStepType": {
-      "type": "object",
-      "properties": {
         "activities": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/ActivityType"
+          "type": "object",
+          "description": "Maps an orchestration type to the activities of an orchestration of that type",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/ActivityType"
+            }
+          }
+        },
+        "compensation": {
+          "type": "object",
+          "description": "Maps an orchestration type in activities to the orchestration type in activities that is started when an orchestration of the first type fails",
+          "additionalProperties": {
+            "type": "string"
           }
         }
       },
@@ -111,49 +57,29 @@
           "type": "string"
         },
         "type": {
-          "type": "string"
-        },
-        "discriminator": {
-          "type": "string"
+          "$ref": "#/definitions/ModelType",
+          "description": "Type of an activity definition of the same namespace"
         },
         "dependsOn": {
           "type": "array",
           "items": {
             "type": "string"
           }
-        },
-        "inputs": {
-          "type": "array",
-          "items": {
-            "oneOf": [
-              {
-                "type": "string"
-              },
-              {
-                "$ref": "#/definitions/MappingEntryType"
-              }
-            ]
-          }
         }
       },
       "required": [
-        "id"
+        "id",
+        "type"
       ]
     },
-    "MappingEntryType": {
-      "type": "object",
-      "properties": {
-        "source": {
-          "type": "string"
-        },
-        "target": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "source",
-        "target"
-      ]
+    "ModelType": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9._-]+$"
+    },
+    "NamespaceType": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]+$",
+      "description": "Optional. Must be the namespace of the request if given"
     }
   }
 }

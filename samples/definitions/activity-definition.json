@@ -1,0 +1,18 @@
+{
+  "type": "sample-storage",
+  "description": "Creates or deletes the storage of a workspace",
+  "inputSchema": {
+    "type": "object",
+    "required": ["workspace"],
+    "properties": {
+      "workspace": { "type": "string" },
+      "region": { "type": "string" }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "bucketName": { "type": "string" }
+    }
+  }
+}

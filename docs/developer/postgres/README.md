@@ -1,7 +1,13 @@
 # Running CFM on Postgres
 
-The Tenant Manager (TM) and the Provision Manager (PM) store their data in Postgres when `postgres` is set to `true` and
-`dsn` holds the connection string (for example `TM_POSTGRES` and `TM_DSN` in environment variables).
+The Provision Manager (PM) stores its definitions and its orchestration index in Postgres when the key `postgres` is
+set and `dsn` holds the connection string (`PM_POSTGRES=true` and `PM_DSN` in environment variables). Without
+`postgres`, it keeps them in memory, which is only suitable for development. The state of running orchestrations is
+kept in the NATS key-value bucket in both cases.
+
+Managers that build on the engine can use the same storage library (`common/sqlstore`) and the same keys. The Tenant
+Manager of [cfm-dataspace](https://github.com/eclipse-cfm/cfm-dataspace), for example, is configured with `TM_POSTGRES`
+and `TM_DSN`.
 
 ## Connection pool
 
@@ -20,4 +26,4 @@ A request uses a single connection: store calls made while a transaction is open
 ## Schema
 
 Each component creates its tables on startup if they don't exist. The statements run in one transaction under a
-Postgres advisory lock, so replicas, and TM and PM sharing a database, can start at the same time.
+Postgres advisory lock, so replicas, and a manager and the PM sharing a database, can start at the same time.

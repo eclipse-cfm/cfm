@@ -30,7 +30,7 @@ The query language supports both simple and complex query expressions.
 | =        | Equal                 | status = 'active'    |
 | !=       | Not equal             | status != 'inactive' |
 | \>       | Greater than          | count > 10           |
-| =        | Greater than or equal | count >= 10          |
+| \>=      | Greater than or equal | count >= 10          |
 | <        | Less than             | count < 100          |
 | <=       | Less than or equal    | count <= 100         |
 
@@ -207,10 +207,12 @@ SQL WHERE Clause:
 
 The query language can be used to query CFM entities:
 
-- **Tenants and participant profiles**: Query tenant properties, profiles, and configurations
-- **Orchestrations**:Filter by state, type, correlation ID, timestamps
+- **Orchestrations**: Filter by state, type, correlation ID, timestamps, for example with
+  `POST /api/v1alpha1/orchestrations/query` and the body `{"predicate": "state = 3", "offset": 0, "limit": 50}`
 - **Definitions**: Search orchestration and activity definitions
-- **VPA Metadata**: Find virtual participant agents by type, state, cell assignment
+- **Entities of a manager**: A manager that builds on the engine can use the query language for its own entities. The
+  Tenant Manager of [cfm-dataspace](https://github.com/eclipse-cfm/cfm-dataspace) uses it for tenants, participant
+  profiles and VPA metadata, which the examples with `vpas` below are taken from
 
 ### JSONB Support
 
@@ -395,7 +397,7 @@ predicate := query.In("metadata.status", "active", "pending")
 
 #### Real-World Usage Examples
 
-##### Tenant Manager (tmanager/sqlstore)
+##### Tenant Manager (`tmanager/sqlstore` in [cfm-dataspace](https://github.com/eclipse-cfm/cfm-dataspace))
 
 Querying participant profiles with VPAs:
 
@@ -408,7 +410,7 @@ Querying tenant properties:
 - Metadata matching: `properties.region = 'us-east'`
 - Nested config: `properties.config.environment = 'prod'`
 
-##### Provision Manager (pmanager/sqlstore)
+##### Provision Manager (`pmanager/sqlstore`)
 
 Querying orchestration definitions:
 

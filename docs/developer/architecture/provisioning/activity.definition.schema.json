@@ -1,8 +1,8 @@
 {
-  "$id": "https://https://github.com/eclipse-cfm/cfm/orchestration.definition.schema.json",
+  "$id": "https://github.com/eclipse-cfm/cfm/activity.definition.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActivityDefinitionSchema",
-  "description": "Defines an Activity Definition",
+  "description": "Defines an Activity Definition, as accepted by POST /api/v1alpha1/activity-definitions",
   "type": "object",
   "allOf": [
     {
@@ -13,26 +13,36 @@
     "ActivityDefinitionType": {
       "type": "object",
       "properties": {
-        "type": {
-          "type": "string"
+        "namespace": {
+          "$ref": "#/definitions/NamespaceType"
         },
-        "provider": {
-          "type": "string"
+        "type": {
+          "$ref": "#/definitions/ModelType"
         },
         "description": {
           "type": "string"
         },
         "inputSchema": {
-          "type": "object"
+          "type": "object",
+          "description": "JSON Schema of the values the activity reads. Its required fields must be provided by the orchestrations that use the activity"
         },
         "outputSchema": {
-          "type": "object"
+          "type": "object",
+          "description": "JSON Schema of the values the activity provides to the activities that depend on it"
         }
       },
       "required": [
-        "type",
-        "provider"
+        "type"
       ]
+    },
+    "ModelType": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9._-]+$"
+    },
+    "NamespaceType": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]+$",
+      "description": "Optional. Must be the namespace of the request if given"
     }
   }
 }

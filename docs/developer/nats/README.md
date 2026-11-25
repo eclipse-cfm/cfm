@@ -1,16 +1,21 @@
 # Securing the NATS control plane
 
-CFM components coordinate exclusively through NATS: the Tenant Manager (TM) starts orchestrations, the Provision
-Manager (PM) and orchestration agents execute them and keep their state in a JetStream key-value bucket, and lifecycle
-agents react to CloudEvents such as IdentityHub key pair events. Every component trusts the messages it receives, so
+CFM components coordinate exclusively through NATS: managers start orchestrations, the Provision Manager (PM) and
+orchestration agents execute them and keep their state in a JetStream key-value bucket, and lifecycle agents react to
+CloudEvents. Every component trusts the messages it receives, so anyone who can publish to the bus can start
+orchestrations, forge their outcome or trigger lifecycle agents. The broker is therefore the security boundary of the
+control plane and must be locked down in every non-development deployment.
+
+The examples in this document use the components of the dataspace variant,
+[cfm-dataspace](https://github.com/eclipse-cfm/cfm-dataspace): the Tenant Manager (TM) as the manager of the namespace
+`default`, and its key management lifecycle agent, which reacts to the key pair events of IdentityHub. With them,
 anyone who can publish to the bus can deploy or dispose participants, mark deployments as active or swap signing keys.
-The broker is therefore the security boundary of the control plane and must be locked down in every non-development
-deployment.
+The same rules apply to any other manager and agent.
 
 ## 1. Authenticate every connection
 
 Each component reads its NATS authentication from configuration, relative to its configuration prefix (for example
-`TM_`, `PM_` or the agent's prefix in environment variables):
+`PM_`, the prefix of a manager such as `TM_`, or the agent's prefix in environment variables):
 
 | Key                     | Description                                                                      |
 |-------------------------|----------------------------------------------------------------------------------|
@@ -48,10 +53,10 @@ Authentication alone still lets every component publish anything. Give each comp
 restricted to the subjects it needs. [`least-privilege.conf`](least-privilege.conf) is a complete authorization block
 for a NATS server configuration that does this for the TM, the PM, an orchestration agent, the key management lifecycle
 agent and IdentityHub, and for a second manager and its agent in their own namespace (see
-[Namespaces](../namespaces.md)). The end-to-end tests `Test_VerifyE2E_LeastPrivilegeNatsUsers`,
-`Test_VerifyLeastPrivilegeNatsUsers_KeyManagementEvents` and `Test_VerifyLeastPrivilegeNatsUsers_NamespacesAreSeparated`
-run the deploy, dispose and key event flows and the namespace checks against exactly this file, so it stays in sync with
-the subjects the code uses.
+[Namespaces](../namespaces.md)). The end-to-end tests `Test_VerifyLeastPrivilegeNatsUsers_KeyManagementEvents` and
+`Test_VerifyLeastPrivilegeNatsUsers_NamespacesAreSeparated` in [`e2e/e2etests`](../../../e2e/e2etests) run the key event
+flow and the namespace checks against exactly this file, so it stays in sync with the subjects the code uses. The
+end-to-end tests of cfm-dataspace run the deploy and dispose flows of the Tenant Manager with the same permissions.
 
 What the permissions enforce:
 
@@ -61,7 +66,7 @@ What the permissions enforce:
 | `event.<namespace>.cfm-orchestration-response` | PM and the orchestration agents of the namespace    | The manager of the namespace        |
 | `event.<namespace>.<activity-type>`            | PM and the orchestration agents of the namespace    | Agent for the type in the namespace |
 | `$KV.<bucket>.<namespace>.>` (orchestration state) | PM and the orchestration agents of the namespace | PM (index watcher)                  |
-| `events.keypair.>`                             | IdentityHub only                                    | Key management agent                |
+| `events.keypair.>` (example of lifecycle events) | IdentityHub only                                  | Key management agent                |
 
 Adapting the file to a deployment:
 
@@ -83,11 +88,12 @@ The permissions narrow what a compromised component can do, but some trust remai
 
 - **Orchestration agents can publish responses and write orchestration state.** The executor that completes an
   orchestration runs inside the agent, so every agent may publish the responses of its namespace and update the
-  orchestration state of its namespace. The TM mitigates forged or replayed responses by only applying a response whose `manifestId` matches the
-  orchestration it started for that profile (or the PM's auto-compensation of it), but an agent can still forge the
-  outcome of an in-flight orchestration. Signing envelopes would close this gap.
+  orchestration state of its namespace. A manager should mitigate forged or replayed responses by only applying a
+  response whose `manifestId` matches an orchestration it started (or the PM's auto-compensation of it), as the TM
+  does, but an agent can still forge the outcome of an in-flight orchestration. Signing envelopes would close this
+  gap.
 - **All components may create the KV bucket.** The shared client setup creates the bucket on start when it is missing,
-  so even the TM and lifecycle agents need `$JS.API.STREAM.CREATE.KV_<bucket>` unless the bucket is provisioned out of
+  so even managers and lifecycle agents need `$JS.API.STREAM.CREATE.KV_<bucket>` unless the bucket is provisioned out of
   band. No component needs to update an existing bucket, and only a stream created before namespaces were introduced
   needs to be updated once, see [Namespaces](../namespaces.md#upgrading).
 - **Replies share the `_INBOX.>` namespace.** Components can subscribe to each other's request replies. NATS supports

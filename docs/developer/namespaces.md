@@ -9,7 +9,12 @@ A namespace is a single NATS subject token: letters, digits, `_` and `-`. Dots, 
 wildcards `*` and `>` are not allowed.
 
 A manifest, a definition or an orchestration without a namespace belongs to the default namespace, `default`. A manager
-that does not use namespaces, such as the Tenant Manager, therefore keeps working without a change.
+that does not use namespaces, such as the Tenant Manager of
+[cfm-dataspace](https://github.com/eclipse-cfm/cfm-dataspace), therefore keeps working without a change.
+
+A deployment can thus run the dataspace variant in `default` and other managers, with their own definitions and agents,
+in further namespaces of the same Provision Manager. The [samples](../../samples/README.md#use-a-namespace) show the
+calls of a manager and an agent in a namespace.
 
 ## Definitions
 
@@ -50,7 +55,8 @@ rejected with an error response if that is not the namespace of its subject. The
 manifests of every namespace with one durable consumer, `~cfm-orchestration`, on `event.*.cfm-orchestration`.
 
 An agent runs the activities of one namespace, which it reads from the configuration key `namespace` (for example
-`TESTAGENT_NAMESPACE`), and which is `default` if it is not set. The durable consumer of an activity type in a namespace is
+`TESTAGENT_NAMESPACE`) or, if the key is not set, from `LauncherConfig.Namespace`, and which is `default` if neither
+is set. The durable consumer of an activity type in a namespace is
 `<namespace>~<activity-type>`, with `.` replaced by `-` in the activity type. A manager's consumer of its responses is
 `<namespace>~cfm-orchestration-response`. A namespace, an activity type and a reply-to token cannot contain `~`, so the
 consumers of different namespaces never share a name. An agent only reads and writes the orchestration state of its
@@ -103,7 +109,7 @@ The subjects, the consumers and the KV keys of the versions with namespaces diff
 Messages in the stream on the old subjects are not delivered to the new consumers, and orchestrations stored under the
 old keys are not continued. Drain the system before the upgrade:
 
-1. Stop the Tenant Manager, so that no new orchestrations are started.
+1. Stop the managers, such as the Tenant Manager, so that no new orchestrations are started.
 2. Wait until every orchestration has completed or failed: a query of the orchestrations in the states initialized (0) or
    running (1), for example `POST /api/v1alpha1/orchestrations/query` with the predicate `state = 0 OR state = 1`,
    returns none, and `nats stream info <stream>` shows no messages.
