@@ -10,6 +10,7 @@ dispose a made-up resource, the storage of a "workspace":
 | [`definitions/activity-definition.json`](definitions/activity-definition.json)     | An activity definition with an input and an output schema                               |
 | [`definitions/orchestration-template.json`](definitions/orchestration-template.json) | An orchestration template with two orchestration types, a schema and a compensation   |
 | [`definitions/manifest.json`](definitions/manifest.json)                           | An orchestration manifest for the REST API                                              |
+| [`nats/nats-auth.conf`](nats/nats-auth.conf)                                       | A NATS server configuration with one user and least-privilege permissions per component |
 
 For a complete, dataspace-specific set of a manager and agents on the same engine, see
 [cfm-dataspace](https://github.com/eclipse-cfm/cfm-dataspace).
@@ -164,6 +165,67 @@ curl -H "Authorization: Bearer $TOKEN" $NS/orchestration-definitions
 
 A token with the scopes of `team-a` only gets `403 Forbidden` on the routes of `default` and of any other namespace.
 The processing and output data of an orchestration are only returned with the `admin` scope of its namespace.
+
+## Use authenticated NATS
+
+The steps above connect to NATS anonymously, which a component only accepts in development mode. In production mode,
+which is the default, every component must authenticate, see
+[Securing the NATS control plane](../docs/developer/nats/README.md). This section runs the same samples with one NATS
+user per component.
+
+1. Stop the Provision Manager, the agent and NATS, and start NATS with [`nats/nats-auth.conf`](nats/nats-auth.conf).
+   It defines the users `pmanager`, `sample-agent` and `sample-manager`, each limited to the subjects it needs:
+
+   ```sh
+   docker run --rm -p 4222:4222 -v "$PWD/samples/nats/nats-auth.conf:/etc/nats/nats.conf" nats:2 -c /etc/nats/nats.conf
+   ```
+
+2. Start the Provision Manager with its user. The keys are `nats.auth.method`, `nats.auth.username` and
+   `nats.auth.password` under the prefix of the component:
+
+   ```sh
+   PM_URI=nats://localhost:4222 PM_BUCKET=cfm-bucket PM_STREAM=cfm-stream PM_AUTH_ENABLED=false \
+     PM_NATS_AUTH_METHOD=userinfo PM_NATS_AUTH_USERNAME=pmanager PM_NATS_AUTH_PASSWORD=pmanager-secret \
+     go run ./pmanager/cmd/server -mode development
+   ```
+
+   `PM_AUTH_ENABLED` is about the REST API and is independent of the NATS authentication. Development mode is only
+   kept here because the sample disables the authentication of the REST API.
+
+3. Start the agent with its user. An agent built on `pmanager/natsagent` reads the same keys under its own prefix
+   without any code. It authenticates, so it also starts in production mode, without `-mode development`:
+
+   ```sh
+   SAMPLEAGENT_URI=nats://localhost:4222 SAMPLEAGENT_BUCKET=cfm-bucket SAMPLEAGENT_STREAM=cfm-stream \
+     SAMPLEAGENT_NATS_AUTH_METHOD=userinfo SAMPLEAGENT_NATS_AUTH_USERNAME=sample-agent \
+     SAMPLEAGENT_NATS_AUTH_PASSWORD=sample-agent-secret \
+     go run ./samples/agent
+   ```
+
+4. Register the definitions as in [Register the definitions](#register-the-definitions), then run the manager with its
+   user. The sample manager resolves the same keys with `natsclient.AuthFromConfig`, under the prefix
+   `SAMPLEMANAGER_`:
+
+   ```sh
+   SAMPLEMANAGER_NATS_AUTH_METHOD=userinfo SAMPLEMANAGER_NATS_AUTH_USERNAME=sample-manager \
+     SAMPLEMANAGER_NATS_AUTH_PASSWORD=sample-manager-secret \
+     go run ./samples/manager -workspace acme
+   ```
+
+Without the credentials, the components cannot use NATS any more:
+
+- `go run ./samples/manager -workspace acme`, without the variables or with a wrong password, fails with
+  `unable to access jetstream key value store with bucket cfm-bucket: nats: connection closed` instead of starting an
+  orchestration. The log of the NATS server shows the `authentication error`.
+- The agent without the variables does not start in production mode:
+  `anonymous NATS connections are not allowed in production mode`.
+
+The permissions also separate the components. The user `sample-manager` can start orchestrations, but it cannot publish
+activity messages or responses, and it cannot use another namespace. With `-namespace team-a` it prints
+`nats: permissions violation: Permissions Violation for Publish to "$JS.API.CONSUMER.CREATE.cfm-stream.team-a~cfm-orchestration-response..."`
+and fails when its timeout of one minute ends, because the server does not answer a request it does not permit. To add
+a namespace, add a manager user and an agent user for it, as
+[`least-privilege.conf`](../docs/developer/nats/least-privilege.conf) does for the namespace `second`.
 
 ## Clean up
 

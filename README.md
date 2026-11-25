@@ -95,6 +95,7 @@ orchestrations, also in a namespace.
 | [Manager](samples/manager/main.go)                      | Starting an orchestration over NATS and receiving its response      |
 | [Definitions](samples/definitions)                      | An activity definition, an orchestration template and a manifest    |
 | [API calls](samples/README.md#register-the-definitions) | `curl` calls to the REST API, with and without a namespace          |
+| [Authenticated NATS](samples/README.md#use-authenticated-nats) | A NATS user with least-privilege permissions per component   |
 
 ## Documentation
 

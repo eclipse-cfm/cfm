@@ -34,6 +34,143 @@ set to `true`. Use that flag only for local setups and tests against an unsecure
 Prefer `nkey` or `credentials`: the secret never leaves the component, and per-user permissions (section 3) can be
 managed centrally with operator JWTs.
 
+### Which components read these keys
+
+| Component                                              | Prefix                         | How                                                                 |
+|--------------------------------------------------------|--------------------------------|---------------------------------------------------------------------|
+| Provision Manager                                      | `pm` (`PM_NATS_AUTH_METHOD`)   | Built in                                                            |
+| Activity agent built on `pmanager/natsagent`           | `LauncherConfig.ConfigPrefix`  | Built in, no code in the agent                                      |
+| Lifecycle agent built on `common/lifecycleagent`       | `LauncherConfig.ConfigPrefix`  | Built in, no code in the agent                                      |
+| A manager, or any other component with its own client  | Its own                        | `natsclient.AuthFromConfig` and `natsclient.TLSFromConfig`, see below |
+
+A key is read from the configuration file of the component or from an environment variable: the prefix and the key in
+upper case, with `.` replaced by `_`. `nats.auth.nkeySeedFile` of the Provision Manager is `PM_NATS_AUTH_NKEYSEEDFILE`.
+
+A component that creates its own NATS client resolves the settings in the same way as the built-in components, so that
+it is configured with the same keys:
+
+```go
+config := system.LoadConfigOrPanic("mymanager")
+mode := runtime.LoadMode()
+
+auth, err := natsclient.AuthFromConfig(config, mode) // refuses an anonymous connection in production mode
+if err != nil {
+	return err
+}
+client, err := natsclient.NewNatsClient(natsclient.ClientConfig{
+	URL:    config.GetString("uri"),
+	Bucket: config.GetString("bucket"),
+	Auth:   auth,
+	TLS:    natsclient.TLSFromConfig(config),
+})
+```
+
+[`samples/manager`](../../../samples/manager/main.go) resolves its settings in this way, except that it always passes
+the development mode, so that it also runs against a local NATS without authentication. The
+[samples](../../../samples/README.md#use-authenticated-nats) run the Provision Manager, an agent and a manager against
+a NATS server with one user per component.
+
+### Examples
+
+Each example shows the user in the NATS server configuration and the settings of the Provision Manager. The other
+components are configured in the same way, with their own prefix and their own user.
+
+**User name and password** (`userinfo`)
+
+```
+authorization {
+  users = [
+    { user: "pmanager", password: "pmanager-secret", permissions: $PMANAGER }
+  ]
+}
+```
+
+```sh
+PM_NATS_AUTH_METHOD=userinfo
+PM_NATS_AUTH_USERNAME=pmanager
+PM_NATS_AUTH_PASSWORD=pmanager-secret
+```
+
+The server also accepts a bcrypt hash as the password, created with `nats server passwd`, so that the configuration
+file does not contain the clear text.
+
+**Token** (`token`)
+
+```
+authorization {
+  token: "s3cr3t-t0ken"
+}
+```
+
+```sh
+PM_NATS_AUTH_METHOD=token
+PM_NATS_AUTH_TOKEN=s3cr3t-t0ken
+```
+
+A token is shared by all clients of the server, so the components cannot be told apart and cannot get different
+permissions. Use it only where a single shared secret is acceptable.
+
+**NKey** (`nkey`)
+
+Create a key pair for each component, for example with `nk -gen user -pubout`, which prints the seed (`SU...`) and the
+public key (`U...`). The server only knows the public key; the component signs the server's challenge with the seed,
+which it reads from a file:
+
+```
+authorization {
+  users = [
+    { nkey: "UDXU4RCSJNZOIQHZNWXHXORDPRTGNJAHAHFRGZNEEJCPQTT2M7NLCNF4", permissions: $PMANAGER }
+  ]
+}
+```
+
+```sh
+PM_NATS_AUTH_METHOD=nkey
+PM_NATS_AUTH_NKEYSEEDFILE=/etc/cfm/pmanager.nk
+```
+
+**JWT credentials** (`credentials`)
+
+In the decentralized (operator) mode of NATS, users and their permissions are issued as JWTs, for example with
+[`nsc`](https://docs.nats.io/using-nats/nats-tools/nsc), and the server configuration contains no users. The component
+reads its JWT and its seed from a credentials file:
+
+```sh
+nsc add user --account CFM --name pmanager --allow-pub 'event.>' --deny-pub 'event.*.cfm-orchestration' ...
+nsc generate creds --account CFM --name pmanager > /etc/cfm/pmanager.creds
+```
+
+```sh
+PM_NATS_AUTH_METHOD=credentials
+PM_NATS_AUTH_CREDSFILE=/etc/cfm/pmanager.creds
+```
+
+The subjects of the permissions are the same as in [`least-privilege.conf`](least-privilege.conf).
+
+### Errors at startup
+
+Authentication is checked when a component starts. A component that cannot authenticate does not start: it panics
+with one of the following messages.
+
+| Situation                                                   | Message                                                                                                  |
+|-------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
+| No method, or `none`, in production mode                    | `anonymous NATS connections are not allowed in production mode: set nats.auth.method to one of ...`      |
+| An unknown method                                           | `unsupported NATS authentication method`                                                                 |
+| A method without its values, for example `userinfo` without a password | `user/password authentication requires nats.auth.username and nats.auth.password to be set`  |
+| The seed file or the credentials file cannot be read        | `failed to load NKey seed file ...` or `failed to read credentials file ...`                             |
+| The server rejects the credentials, or requires them        | `unable to access jetstream key value store with bucket ...: nats: connection closed`                    |
+
+The last message does not mention authentication, because the client only sees that the server closed the connection.
+The log of the NATS server has the reason, for example `authentication error - User "pmanager"`. See
+[#259](https://github.com/eclipse-cfm/cfm/issues/259).
+
+A user that authenticates but lacks a permission fails at the operation that needs it, often at startup, when the
+component creates its consumer. The client logs
+`nats: permissions violation: Permissions Violation for Publish to "<subject>"` at once, and the server logs a
+`Publish Violation` with the user and the subject. The operation itself gets no answer from the server and only fails
+when it times out. The subject in the message is what to add to the permissions of the user, see section 3, and
+[#260](https://github.com/eclipse-cfm/cfm/issues/260) for the delay.
+
 ## 2. Encrypt the connection
 
 | Key                | Description                                                                         |

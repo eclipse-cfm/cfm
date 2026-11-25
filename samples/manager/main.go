@@ -25,9 +25,14 @@ import (
 
 	"github.com/eclipse-cfm/cfm/common/model"
 	"github.com/eclipse-cfm/cfm/common/natsclient"
+	"github.com/eclipse-cfm/cfm/common/system"
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go/jetstream"
 )
+
+// configPrefix is the name of the configuration file and the prefix of the environment variables that the manager reads
+// its NATS authentication and TLS settings from, for example SAMPLEMANAGER_NATS_AUTH_METHOD
+const configPrefix = "samplemanager"
 
 func main() {
 	uri := flag.String("uri", "nats://localhost:4222", "URI of the NATS server")
@@ -51,7 +56,22 @@ func run(uri string, bucket string, streamName string, namespace string, orchest
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	client, err := natsclient.NewNatsClient(natsclient.ClientConfig{URL: uri, Bucket: bucket})
+	// The manager reads the same NATS authentication and TLS keys as every CFM component (nats.auth.* and nats.tls.*),
+	// see docs/developer/nats/README.md. A component normally passes runtime.LoadMode() as the mode, which refuses an
+	// anonymous connection in production mode. The sample always allows it, so that it runs against a local NATS
+	// without authentication.
+	config := system.LoadConfigOrPanic(configPrefix)
+	auth, err := natsclient.AuthFromConfig(config, system.DevelopmentMode)
+	if err != nil {
+		return err
+	}
+
+	client, err := natsclient.NewNatsClient(natsclient.ClientConfig{
+		URL:    uri,
+		Bucket: bucket,
+		Auth:   auth,
+		TLS:    natsclient.TLSFromConfig(config),
+	})
 	if err != nil {
 		return err
 	}
