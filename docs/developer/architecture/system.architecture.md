@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This document defines the overall system architecture for the Connector Fabric Manager (CFM). The CFM is a platform for
+This document defines the overall system architecture for the Component Fabric Manager (CFM). The CFM is a platform for
 deploying and managing dataspace-related (connector) resources in a multitenant environment. These resources include:  
 
 - A Control Plane, which manages data sharing operations (including catalog publication, contract
@@ -26,7 +26,7 @@ block-beta
     CS ["Credential Service"]
     DP ["Data Plane"]
     IS ["Issuer Service"]
-    CFM ["Connector Fabric Manager"]:4
+    CFM ["Component Fabric Manager"]:4
     CIF ["Cloud Infrastructure"]:4
 ```
 
