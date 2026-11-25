@@ -1,4 +1,8 @@
-![](./docs/logo/cfm.small.logo.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/logo/cfm-logo-reversed.svg">
+  <source media="(prefers-color-scheme: light)" srcset="./docs/logo/cfm-logo.svg">
+  <img alt="CFM logo" src="./docs/logo/cfm-logo.svg" width="200">
+</picture>
 
 Component Fabric Manager (CFM) provides infrastructure for managing virtualized dataspace connectors. CFM consists of
 the following components:
