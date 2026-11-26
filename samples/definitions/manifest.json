@@ -1,0 +1,9 @@
+{
+  "id": "workspace-acme-deploy-1",
+  "correlationId": "acme",
+  "orchestrationType": "sample.workspace.deploy",
+  "payload": {
+    "workspace": "acme",
+    "region": "eu-central"
+  }
+}

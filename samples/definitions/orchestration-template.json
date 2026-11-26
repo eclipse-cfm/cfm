@@ -1,0 +1,23 @@
+{
+  "id": "sample-workspace",
+  "description": "Deploys and disposes a workspace",
+  "schema": {
+    "type": "object",
+    "required": ["workspace"],
+    "properties": {
+      "workspace": { "type": "string" },
+      "region": { "type": "string" }
+    }
+  },
+  "activities": {
+    "sample.workspace.deploy": [
+      { "id": "create-storage", "type": "sample-storage" }
+    ],
+    "sample.workspace.dispose": [
+      { "id": "delete-storage", "type": "sample-storage" }
+    ]
+  },
+  "compensation": {
+    "sample.workspace.deploy": "sample.workspace.dispose"
+  }
+}

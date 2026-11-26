@@ -15,17 +15,17 @@ To address this, CFM employs various compensation and reconciliation mechanisms.
   applied it yet, reconciliation would involve detecting this discrepancy and applying the change to the remaining
   components. Here, the reconciliation would be a _retry_.
 
-  > For example, requesting the issuance of a verifiable credential and waiting for it to be issued would involve
-  periodically checking the status and retry the issuance process if a transient error occurs.
+  > For example, requesting a certificate from an external authority and waiting for it to be issued would involve
+  periodically checking the status and retrying the request if a transient error occurs.
 
 - **Compensation**: The process of undoing or mitigating the effects of an operation that has already been performed.
   This is typically used in scenarios where an operation fails after partially completing, and the system needs to
-  revert to a previous consistent state. For example, a deployment process involves multiple agents (VPAs), but one of
+  revert to a previous consistent state. For example, a deployment process involves multiple agents, but one of
   them fails with an unrecoverable error. In this case, compensation would involve rolling back the changes made by the
   other agents to ensure that the overall system remains consistent. Here, the compensation would be a _rollback_.
 
-  > For example, attempting to provision a Web-DID may fail if the same Web-DID is already in use. Any prior steps taken
-  to provision the Web-DID would need to be undone.
+  > For example, attempting to register a domain name may fail if the same name is already in use. Any prior steps
+  taken for the deployment, such as creating storage, would need to be undone.
 
 ## Requirements for compensation and reconciliation
 
@@ -37,18 +37,20 @@ To address this, CFM employs various compensation and reconciliation mechanisms.
    consistent to derive a unique system state:
 
 - `Orchestration`: represents the overall execution plan (`OrchestrationSteps`), for example, onboarding a new
-  participant into a dataspace. It should reflect the summary results of all its `OrchestrationSteps`.
-- `Activity`: activities contain the specific workflows, for example, requesting the issuance of a verifiable
-  credential, or creating an account with the billing system.
-- `VirtualParticipantAgent`: the state property of the VPA must also be consistent with the Activity result
+  customer. It should reflect the summary results of all its `OrchestrationSteps`.
+- `Activity`: activities contain the specific workflows, for example, requesting a certificate, or creating an account
+  with the billing system.
+- The resource in the model of the manager: the manager that started the orchestration must keep the state of the
+  resource it manages consistent with the result of the orchestration, see
+  [Mapping onto the model of a manager](#mapping-onto-the-model-of-a-manager).
 
-  > Example: If the billing system account creation succeeded, but the verifiable credential issuance failed, the
+  > Example: If the billing system account creation succeeded, but the certificate request failed, the
   `Orchestration` should reflect a failed result.
 
 1. **Reversability**: All activities must be reversible, possibly with side effects, meaning that they must be "undoable". This
    is necessary to allow compensation mechanisms to revert the system to a consistent state in case of failures.
 
-   > For example, if a verifiable credential issuance process fails after the billing system account has been created,
+   > For example, if a certificate request fails after the billing system account has been created,
    the compensation mechanism should be able to delete the billing system account to maintain consistency.
 
 2. **Error handling**: Activity processors must return
@@ -62,8 +64,8 @@ The orchestration state must always reflect the _summary result_ of all activiti
 is dictated by the result of the _least advanced_ activity or by an error result. Some examples:
 
 - `[ActivityResultSchedule, ActivityResultComplete]`: summary state is `OrchestrationStateRunning`
-- `[ActivityStateComplete, ActivityStateRetryError]`: summary state is `OrchestrationStateRunning`
-- `[ActivityStateWait, ActivityStateFatalError]`: summary state is `OrchestrationStateErrored`
+- `[ActivityResultComplete, ActivityResultRetryError]`: summary state is `OrchestrationStateRunning`
+- `[ActivityResultWait, ActivityResultFatalError]`: summary state is `OrchestrationStateErrored`
 
 The following table illustrates the mapping from activity states onto orchestration states.
 
@@ -72,10 +74,17 @@ The following table illustrates the mapping from activity states onto orchestrat
 | N/A                                                                                  | `OrchestrationStateInitialized` | Initial state, no activity has been started. After the orchestrator has started the <br/>initial activities, the orchestration transitions to `OrchestrationStateRunning` |
 | `ActivityResultSchedule`, <br/>`ActivityResultWait`, <br/>`ActivityResultRetryError` | `OrchestrationStateRunning`     | One or more activities are still in progress and have not finished yet, <br/>or have not started yet, i.e. have one of the specified states.                              |
 | `ActivityResultComplete`                                                             | `OrchestrationStateCompleted`   | All activities have successfully completed.                                                                                                                               |
-| `ActivityResultFatalError`                                                           | `OrchestartionStateErrored`     | One or more activities have failed with an unrecoverable error. <br/>Exhausting a timeout or a numerical retry limit is regarded as unrecoverable error.                  |
+| `ActivityResultFatalError`                                                           | `OrchestrationStateErrored`     | One or more activities have failed with an unrecoverable error. <br/>Exhausting a timeout or a numerical retry limit is regarded as unrecoverable error.                  |
 
-Similarly, an Orchestration should accurately reflect the summary states of all VPAs. The following table illustrates
-the correlation between an Orchestration state and VPA state:
+### Mapping onto the model of a manager
+
+The engine only knows the states of orchestrations. A manager maps the outcome of an orchestration, which it receives
+in the `OrchestrationResponse`, onto the state of the resource in its own model. A response with a
+`compensatedManifestId` reports the outcome of the compensation of an earlier orchestration.
+
+The dataspace variant of the CFM is an example: the Tenant Manager of
+[cfm-dataspace](https://github.com/eclipse-cfm/cfm-dataspace) keeps the deployment state of each Virtual Participant
+Agent (VPA) consistent with the orchestration that deploys or disposes it:
 
 | Orchestration state             | VPA state                                            | Description                                                                                                                  |
 |---------------------------------|------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|
@@ -84,8 +93,8 @@ the correlation between an Orchestration state and VPA state:
 | `OrchestrationStateCompleted`   | `DeploymentStateActive`, `DeploymentStateDisposed`   | Activity has finished successfully                                                                                           |
 | `OrchestrationStateErrored`     | `DeploymentStateError`                               | failed with an unrecoverable error. <br/>Exhausting a timeout or a numerical retry limit is regarded as unrecoverable error. |
 
-Note that `DeploymentStateLocked` and `DeploymentStateOffline` are not considered here, as they have no effect on the
-Orchestration or, in fact, compensation and reconciliation.
+The VPA states `DeploymentStateLocked` and `DeploymentStateOffline` have no effect on the orchestration or on
+compensation and reconciliation.
 
 ## Compensation processing
 
@@ -95,24 +104,26 @@ ongoing operation has completed (either successfully or with a failure).
 
 Additionally, as a last resort method, there should be a way to force a compensation process. This may be useful if a process gets stuck, an external system is unresponsive or a data inconsistency occurs. Forced compensations may require some manual intervention.
 
-For example, if account creation in a billing system succeeds, but the verifiable credential issuance fails, the
-compensation for the billing system account creation should be enqueued and executed after the verifiable credential
-issuance has failed.
+For example, if account creation in a billing system succeeds, but the certificate request fails, the
+compensation for the billing system account creation should be enqueued and executed after the certificate request
+has failed.
 
 Compensation may be initiated by several triggers:
 
-- automatically, after an unrecoverable error occurs during an orchestration, and the orchestation is marked as
-  auto-compensate.
+- automatically, after an unrecoverable error occurs during an orchestration whose definition names a compensation
+  type, see [Automatic compensation](#automatic-compensation).
 
-- manually, by an operator via the CFM API.
+- manually, by a manager or an operator that starts the compensating orchestration, for example the `dispose`
+  orchestration of a failed `deploy`, over NATS or with the Provision Manager API.
 
 ### Automatic compensation
 
 An orchestration template declares which orchestration type compensates which other type in its `compensation` map. A
 key and its value must both be orchestration types in `activities`. When an orchestration fails, the Provision Manager
 reads the definition of the failed orchestration and starts an orchestration of the declared compensation type, which
-must come from the same template. The compensation orchestration has the ID `<failed orchestration ID>-compensation`, so
-it is started only once, and it reports its result to the `replyTo` subject of the orchestration it compensates.
+must come from the same template. The compensation orchestration runs in the namespace of the failed orchestration and
+receives its data as payload. It has the ID `<failed orchestration ID>-compensation`, so it is started only once, and it reports
+its result to the `replyTo` subject of the orchestration it compensates.
 
 An orchestration type without an entry in `compensation` is not compensated. This also applies to a failed compensation
 orchestration: it is only compensated if its own type has an entry. The template is rejected if an orchestration type
@@ -120,21 +131,24 @@ compensates itself, or if following the entries leads back to a type that was al
 
 ```json
 {
-  "id": "participant-template",
+  "id": "workspace-template",
   "activities": {
-    "cfm.orchestration.vpa.deploy": [{ "id": "connector-create", "type": "edcv-activity" }],
-    "cfm.orchestration.vpa.dispose": [{ "id": "connector-cleanup", "type": "edcv-activity" }]
+    "workspace.deploy": [{ "id": "create-storage", "type": "storage.example.com" }],
+    "workspace.dispose": [{ "id": "delete-storage", "type": "storage.example.com" }]
   },
   "compensation": {
-    "cfm.orchestration.vpa.deploy": "cfm.orchestration.vpa.dispose"
+    "workspace.deploy": "workspace.dispose"
   }
 }
 ```
 
+In the dataspace variant, the templates map `cfm.orchestration.vpa.deploy` to `cfm.orchestration.vpa.dispose` in the
+same way.
+
 ## Reconciliation processing
 
 Reconciliation should be implemented in `ActivityProcessors`. Each activity processor must report `ActivityResultWait`
-or `ActivityResultReschedule` when it detects that the desired state does not match the actual state. This will cause
+or `ActivityResultSchedule` when it detects that the desired state does not match the actual state. This will cause
 the orchestrator to retry the activity after a delay.
 
 In the case of `ActivityResultWait` the orchestrator must employ a timeout and eventually mark the orchestration as

@@ -1,16 +1,21 @@
 # Securing the NATS control plane
 
-CFM components coordinate exclusively through NATS: the Tenant Manager (TM) starts orchestrations, the Provision
-Manager (PM) and orchestration agents execute them and keep their state in a JetStream key-value bucket, and lifecycle
-agents react to CloudEvents such as IdentityHub key pair events. Every component trusts the messages it receives, so
+CFM components coordinate exclusively through NATS: managers start orchestrations, the Provision Manager (PM) and
+orchestration agents execute them and keep their state in a JetStream key-value bucket, and lifecycle agents react to
+CloudEvents. Every component trusts the messages it receives, so anyone who can publish to the bus can start
+orchestrations, forge their outcome or trigger lifecycle agents. The broker is therefore the security boundary of the
+control plane and must be locked down in every non-development deployment.
+
+The examples in this document use the components of the dataspace variant,
+[cfm-dataspace](https://github.com/eclipse-cfm/cfm-dataspace): the Tenant Manager (TM) as the manager of the namespace
+`default`, and its key management lifecycle agent, which reacts to the key pair events of IdentityHub. With them,
 anyone who can publish to the bus can deploy or dispose participants, mark deployments as active or swap signing keys.
-The broker is therefore the security boundary of the control plane and must be locked down in every non-development
-deployment.
+The same rules apply to any other manager and agent.
 
 ## 1. Authenticate every connection
 
 Each component reads its NATS authentication from configuration, relative to its configuration prefix (for example
-`TM_`, `PM_` or the agent's prefix in environment variables):
+`PM_`, the prefix of a manager such as `TM_`, or the agent's prefix in environment variables):
 
 | Key                     | Description                                                                      |
 |-------------------------|----------------------------------------------------------------------------------|
@@ -28,6 +33,143 @@ set to `true`. Use that flag only for local setups and tests against an unsecure
 
 Prefer `nkey` or `credentials`: the secret never leaves the component, and per-user permissions (section 3) can be
 managed centrally with operator JWTs.
+
+### Which components read these keys
+
+| Component                                              | Prefix                         | How                                                                 |
+|--------------------------------------------------------|--------------------------------|---------------------------------------------------------------------|
+| Provision Manager                                      | `pm` (`PM_NATS_AUTH_METHOD`)   | Built in                                                            |
+| Activity agent built on `pmanager/natsagent`           | `LauncherConfig.ConfigPrefix`  | Built in, no code in the agent                                      |
+| Lifecycle agent built on `common/lifecycleagent`       | `LauncherConfig.ConfigPrefix`  | Built in, no code in the agent                                      |
+| A manager, or any other component with its own client  | Its own                        | `natsclient.AuthFromConfig` and `natsclient.TLSFromConfig`, see below |
+
+A key is read from the configuration file of the component or from an environment variable: the prefix and the key in
+upper case, with `.` replaced by `_`. `nats.auth.nkeySeedFile` of the Provision Manager is `PM_NATS_AUTH_NKEYSEEDFILE`.
+
+A component that creates its own NATS client resolves the settings in the same way as the built-in components, so that
+it is configured with the same keys:
+
+```go
+config := system.LoadConfigOrPanic("mymanager")
+mode := runtime.LoadMode()
+
+auth, err := natsclient.AuthFromConfig(config, mode) // refuses an anonymous connection in production mode
+if err != nil {
+	return err
+}
+client, err := natsclient.NewNatsClient(natsclient.ClientConfig{
+	URL:    config.GetString("uri"),
+	Bucket: config.GetString("bucket"),
+	Auth:   auth,
+	TLS:    natsclient.TLSFromConfig(config),
+})
+```
+
+[`samples/manager`](../../../samples/manager/main.go) resolves its settings in this way, except that it always passes
+the development mode, so that it also runs against a local NATS without authentication. The
+[samples](../../../samples/README.md#use-authenticated-nats) run the Provision Manager, an agent and a manager against
+a NATS server with one user per component.
+
+### Examples
+
+Each example shows the user in the NATS server configuration and the settings of the Provision Manager. The other
+components are configured in the same way, with their own prefix and their own user.
+
+**User name and password** (`userinfo`)
+
+```
+authorization {
+  users = [
+    { user: "pmanager", password: "pmanager-secret", permissions: $PMANAGER }
+  ]
+}
+```
+
+```sh
+PM_NATS_AUTH_METHOD=userinfo
+PM_NATS_AUTH_USERNAME=pmanager
+PM_NATS_AUTH_PASSWORD=pmanager-secret
+```
+
+The server also accepts a bcrypt hash as the password, created with `nats server passwd`, so that the configuration
+file does not contain the clear text.
+
+**Token** (`token`)
+
+```
+authorization {
+  token: "s3cr3t-t0ken"
+}
+```
+
+```sh
+PM_NATS_AUTH_METHOD=token
+PM_NATS_AUTH_TOKEN=s3cr3t-t0ken
+```
+
+A token is shared by all clients of the server, so the components cannot be told apart and cannot get different
+permissions. Use it only where a single shared secret is acceptable.
+
+**NKey** (`nkey`)
+
+Create a key pair for each component, for example with `nk -gen user -pubout`, which prints the seed (`SU...`) and the
+public key (`U...`). The server only knows the public key; the component signs the server's challenge with the seed,
+which it reads from a file:
+
+```
+authorization {
+  users = [
+    { nkey: "UDXU4RCSJNZOIQHZNWXHXORDPRTGNJAHAHFRGZNEEJCPQTT2M7NLCNF4", permissions: $PMANAGER }
+  ]
+}
+```
+
+```sh
+PM_NATS_AUTH_METHOD=nkey
+PM_NATS_AUTH_NKEYSEEDFILE=/etc/cfm/pmanager.nk
+```
+
+**JWT credentials** (`credentials`)
+
+In the decentralized (operator) mode of NATS, users and their permissions are issued as JWTs, for example with
+[`nsc`](https://docs.nats.io/using-nats/nats-tools/nsc), and the server configuration contains no users. The component
+reads its JWT and its seed from a credentials file:
+
+```sh
+nsc add user --account CFM --name pmanager --allow-pub 'event.>' --deny-pub 'event.*.cfm-orchestration' ...
+nsc generate creds --account CFM --name pmanager > /etc/cfm/pmanager.creds
+```
+
+```sh
+PM_NATS_AUTH_METHOD=credentials
+PM_NATS_AUTH_CREDSFILE=/etc/cfm/pmanager.creds
+```
+
+The subjects of the permissions are the same as in [`least-privilege.conf`](least-privilege.conf).
+
+### Errors at startup
+
+Authentication is checked when a component starts. A component that cannot authenticate does not start: it panics
+with one of the following messages.
+
+| Situation                                                   | Message                                                                                                  |
+|-------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
+| No method, or `none`, in production mode                    | `anonymous NATS connections are not allowed in production mode: set nats.auth.method to one of ...`      |
+| An unknown method                                           | `unsupported NATS authentication method`                                                                 |
+| A method without its values, for example `userinfo` without a password | `user/password authentication requires nats.auth.username and nats.auth.password to be set`  |
+| The seed file or the credentials file cannot be read        | `failed to load NKey seed file ...` or `failed to read credentials file ...`                             |
+| The server rejects the credentials, or requires them        | `unable to access jetstream key value store with bucket ...: nats: connection closed`                    |
+
+The last message does not mention authentication, because the client only sees that the server closed the connection.
+The log of the NATS server has the reason, for example `authentication error - User "pmanager"`. See
+[#259](https://github.com/eclipse-cfm/cfm/issues/259).
+
+A user that authenticates but lacks a permission fails at the operation that needs it, often at startup, when the
+component creates its consumer. The client logs
+`nats: permissions violation: Permissions Violation for Publish to "<subject>"` at once, and the server logs a
+`Publish Violation` with the user and the subject. The operation itself gets no answer from the server and only fails
+when it times out. The subject in the message is what to add to the permissions of the user, see section 3, and
+[#260](https://github.com/eclipse-cfm/cfm/issues/260) for the delay.
 
 ## 2. Encrypt the connection
 
@@ -48,10 +190,10 @@ Authentication alone still lets every component publish anything. Give each comp
 restricted to the subjects it needs. [`least-privilege.conf`](least-privilege.conf) is a complete authorization block
 for a NATS server configuration that does this for the TM, the PM, an orchestration agent, the key management lifecycle
 agent and IdentityHub, and for a second manager and its agent in their own namespace (see
-[Namespaces](../namespaces.md)). The end-to-end tests `Test_VerifyE2E_LeastPrivilegeNatsUsers`,
-`Test_VerifyLeastPrivilegeNatsUsers_KeyManagementEvents` and `Test_VerifyLeastPrivilegeNatsUsers_NamespacesAreSeparated`
-run the deploy, dispose and key event flows and the namespace checks against exactly this file, so it stays in sync with
-the subjects the code uses.
+[Namespaces](../namespaces.md)). The end-to-end tests `Test_VerifyLeastPrivilegeNatsUsers_KeyManagementEvents` and
+`Test_VerifyLeastPrivilegeNatsUsers_NamespacesAreSeparated` in [`e2e/e2etests`](../../../e2e/e2etests) run the key event
+flow and the namespace checks against exactly this file, so it stays in sync with the subjects the code uses. The
+end-to-end tests of cfm-dataspace run the deploy and dispose flows of the Tenant Manager with the same permissions.
 
 What the permissions enforce:
 
@@ -61,7 +203,7 @@ What the permissions enforce:
 | `event.<namespace>.cfm-orchestration-response` | PM and the orchestration agents of the namespace    | The manager of the namespace        |
 | `event.<namespace>.<activity-type>`            | PM and the orchestration agents of the namespace    | Agent for the type in the namespace |
 | `$KV.<bucket>.<namespace>.>` (orchestration state) | PM and the orchestration agents of the namespace | PM (index watcher)                  |
-| `events.keypair.>`                             | IdentityHub only                                    | Key management agent                |
+| `events.keypair.>` (example of lifecycle events) | IdentityHub only                                  | Key management agent                |
 
 Adapting the file to a deployment:
 
@@ -83,11 +225,12 @@ The permissions narrow what a compromised component can do, but some trust remai
 
 - **Orchestration agents can publish responses and write orchestration state.** The executor that completes an
   orchestration runs inside the agent, so every agent may publish the responses of its namespace and update the
-  orchestration state of its namespace. The TM mitigates forged or replayed responses by only applying a response whose `manifestId` matches the
-  orchestration it started for that profile (or the PM's auto-compensation of it), but an agent can still forge the
-  outcome of an in-flight orchestration. Signing envelopes would close this gap.
+  orchestration state of its namespace. A manager should mitigate forged or replayed responses by only applying a
+  response whose `manifestId` matches an orchestration it started (or the PM's auto-compensation of it), as the TM
+  does, but an agent can still forge the outcome of an in-flight orchestration. Signing envelopes would close this
+  gap.
 - **All components may create the KV bucket.** The shared client setup creates the bucket on start when it is missing,
-  so even the TM and lifecycle agents need `$JS.API.STREAM.CREATE.KV_<bucket>` unless the bucket is provisioned out of
+  so even managers and lifecycle agents need `$JS.API.STREAM.CREATE.KV_<bucket>` unless the bucket is provisioned out of
   band. No component needs to update an existing bucket, and only a stream created before namespaces were introduced
   needs to be updated once, see [Namespaces](../namespaces.md#upgrading).
 - **Replies share the `_INBOX.>` namespace.** Components can subscribe to each other's request replies. NATS supports
